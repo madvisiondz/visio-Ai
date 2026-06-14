@@ -51,7 +51,7 @@ OASIS MALL operates at scale with fragmented workflows:
 
 | Area | Choice |
 |------|--------|
-| 2026-06-07 | Android v2.5.3: Bulk output moved to **Download/BULK** (MediaStore Downloads — DCIM not allowed on API 34) |
+| 2026-06-14 | **MadVision** private GitHub repo initialized; app display name → MadVision; source-only `.gitignore` |
 | 2026-06-07 | Android v2.5.2: Bulk saves PNGs to **DCIM/BULK** + `bulk_done.txt` tracker |
 | 2026-06-07 | Android v2.5.1: Bulk mode detects existing catalog PNGs via `product_images` (same as Smart) |
 | 2026-06-07 | Android v2.5.0: Design queue **sortOrder preserved** on print/Done; AGENT **Smart/Bulk** mode — bulk barcode-only captures in `bulk_captures` + `bulk_images/` |
