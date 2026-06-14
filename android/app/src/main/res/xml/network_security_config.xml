@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Mall LAN server often uses HTTP. Use HTTPS in production when possible. -->
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

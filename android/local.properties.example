@@ -1,0 +1,7 @@
+# Copy to android/local.properties (do not commit secrets)
+
+sdk.dir=C\:\\Users\\YourName\\AppData\\Local\\Android\\Sdk
+
+# Supabase — Dashboard → Project Settings → API → anon / publishable key (NOT the PC secret key)
+supabase.url=https://wjtawsojtoiovovreeri.supabase.co
+supabase.anon.key=

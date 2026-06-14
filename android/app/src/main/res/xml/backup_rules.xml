@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <include domain="file" path="paray_home/" />
+    <include domain="file" path="paray/" />
+    <include domain="database" path="." />
+</full-backup-content>

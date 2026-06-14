@@ -1,0 +1,45 @@
+﻿
+> Configure project :app
+WARNING: The option setting 'android.disallowKotlinSourceSets=false' is experimental.
+The current default is 'true'.
+
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:generateDebugBuildConfig UP-TO-DATE
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :app:packageDebugResources UP-TO-DATE
+> Task :app:processDebugNavigationResources UP-TO-DATE
+> Task :app:parseDebugLocalResources UP-TO-DATE
+> Task :app:generateDebugRFile UP-TO-DATE
+> Task :app:kspDebugKotlin
+
+> Task :app:compileDebugKotlin FAILED
+.\gradlew.bat : e: file:///C:/Users/kriim/OneDrive/Desktop/oasis%20ai/android/app/src/main/java/com/oasismall/oasisai/u
+i/screens/settings/SettingsViewModel.kt:112:25 Suspension functions can only be called within coroutine body.
+At C:\Users\kriim\AppData\Local\Temp\ps-script-3563821f-3fb1-4b5d-bc95-40a724e4df24.ps1:81 char:66
++ ... ktop\oasis ai\android"; .\gradlew.bat compileDebugKotlin 2>&1 | Out-F ...
++                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (e: file:///C:/U...coroutine body.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+e: file:///C:/Users/kriim/OneDrive/Desktop/oasis%20ai/android/app/src/main/java/com/oasismall/oasisai/ui/screens/settin
+gs/SettingsViewModel.kt:157:21 Suspension functions can only be called within coroutine body.
+e: file:///C:/Users/kriim/OneDrive/Desktop/oasis%20ai/android/app/src/main/java/com/oasismall/oasisai/ui/screens/settin
+gs/SettingsViewModel.kt:227:21 Suspension functions can only be called within coroutine body.
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:compileDebugKotlin'.
+> A failure occurred while executing 
+org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction
+   > Compilation error. See log for more details
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 14s
+8 actionable tasks: 2 executed, 6 up-to-date

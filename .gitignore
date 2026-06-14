@@ -1,0 +1,40 @@
+# Build outputs
+OasisAI-debug.apk
+*.apk
+*.aab
+
+# Android Gradle
+android/app/build/
+android/build/
+android/.gradle/
+android/local.properties
+android/.idea/
+android/*.iml
+android/app/*.iml
+
+# Large / generated / business data
+imports/
+exports/
+product_images/
+.model-download/
+
+# ML model (download via scripts/download-u2netp-tflite.ps1)
+android/app/src/main/assets/u2netp.onnx
+android/app/src/main/assets/*.tflite
+
+# Secrets
+.env
+*.env.local
+**/local.properties
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/

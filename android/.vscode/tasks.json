@@ -1,0 +1,65 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Android: Build Debug APK",
+      "type": "shell",
+      "command": ".\\gradlew.bat",
+      "args": ["assembleDebug"],
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "JAVA_HOME": "C:\\Program Files\\Android\\Android Studio\\jbr",
+          "ANDROID_HOME": "C:\\Users\\kriim\\AppData\\Local\\Android\\Sdk"
+        }
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Android: Install on Device/Emulator",
+      "type": "shell",
+      "command": ".\\gradlew.bat",
+      "args": ["installDebug"],
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "JAVA_HOME": "C:\\Program Files\\Android\\Android Studio\\jbr",
+          "ANDROID_HOME": "C:\\Users\\kriim\\AppData\\Local\\Android\\Sdk"
+        }
+      },
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Android: Start Emulator (Pixel_7)",
+      "type": "shell",
+      "command": "C:\\Users\\kriim\\AppData\\Local\\Android\\Sdk\\emulator\\emulator.exe",
+      "args": ["-avd", "Pixel_7"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "Android: Launch App",
+      "type": "shell",
+      "command": "C:\\Users\\kriim\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe",
+      "args": [
+        "shell",
+        "am",
+        "start",
+        "-n",
+        "com.oasismall.oasisai/.MainActivity"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    }
+  ]
+}

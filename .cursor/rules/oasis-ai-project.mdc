@@ -1,0 +1,33 @@
+---
+description: Oasis AI project source of truth — scope, architecture, MVP roadmap
+alwaysApply: true
+---
+
+# Oasis AI — Project Rule
+
+The canonical project document is **`PROJECT.md`** at the repository root.
+
+## Always do this
+
+1. **Read `PROJECT.md`** before implementing features, changing architecture, or scoping work.
+2. **Keep `PROJECT.md` updated** whenever any of the following change:
+   - Requirements, modules, or workflows
+   - Data model or table schema
+   - MVP scope, status, or priorities
+   - Technical stack or philosophy (e.g. designation-first identity, offline-first)
+   - Pre-selection → template → export workflow rules
+3. **Append a row to the Changelog** in `PROJECT.md` with date and a short summary of what changed.
+4. **Update the MVP status tracker** when an MVP starts, progresses, or completes.
+5. **Update `docs/` trackers** at end of each prompt: `SCREENS.md`, `DATA_FLOW.md`, `ARCHITECTURE.md`, `WORKING_PLAN.md`, `PROGRESS.md`, `CHAT_LOG.md`.
+
+## Non-negotiable product rules
+
+- **Designation/name is primary identity; barcode is secondary lookup.**
+- **Offline-first:** core flows work without internet.
+- **Pre-selection workflow:** catalog → pre-selection → template → export (never template-first).
+- **Print traceability:** every generated batch must be auditable with price/image snapshots.
+- **Build order:** import + database + search + scanner first, then pre-selection, print, audit, promo.
+
+## When in doubt
+
+Prefer decisions that match `PROJECT.md`. If the user asks for something that conflicts with it, flag the conflict and propose updating `PROJECT.md` before diverging.
