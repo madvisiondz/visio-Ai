@@ -72,7 +72,7 @@ fun BackgroundRemovalScreen(
         ) {
             if (!ui.modelReady) {
                 Text(
-                    "Background model not found. Install the latest OasisAI-debug.apk from the project folder.",
+                    "Cutout model not bundled in this APK. Install VisioAI-debug.apk from a full PC build.",
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodyMedium,
                 )

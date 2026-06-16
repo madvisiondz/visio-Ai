@@ -86,5 +86,5 @@ Shelf labels: **Design** screen → `ShelfA4Renderer` → landscape A4 JPEG (12-
 Phone-to-phone PNG sync: **Phone sync** (hotspot LAN, port 8776) — see `docs/PHONE_SYNC.md`.
 
 - **AGENT** tab: **Smart** (PARAY + catalog + SUB-BC) or **Bulk** (barcode-only mall captures → `bulk_images/` + `bulk_captures`).
-- Bottom nav **Batch txt** for designation-list routing to To share / AGENT.
+- Bottom nav **Batch txt** for designation-list routing to To share / To shoot / **Camera batch queue** (not in CSV).
 

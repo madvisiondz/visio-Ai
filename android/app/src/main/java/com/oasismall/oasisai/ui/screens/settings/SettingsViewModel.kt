@@ -10,6 +10,7 @@ import com.oasismall.oasisai.domain.ImageMatcher
 import com.oasismall.oasisai.domain.ImportService
 import com.oasismall.oasisai.domain.ReadyPngLoader
 import com.oasismall.oasisai.domain.ReadyPngModel
+import com.oasismall.oasisai.domain.visio.ProductImagesExporter
 import com.oasismall.oasisai.util.TaskProgress
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,6 +26,7 @@ data class SettingsUiState(
     val isReindexing: Boolean = false,
     val isLoadingSample: Boolean = false,
     val isLoadingImages: Boolean = false,
+    val isExportingPngs: Boolean = false,
     val progress: TaskProgress? = null,
     val message: String? = null,
     val messageIsError: Boolean = false,
@@ -43,6 +45,7 @@ class SettingsViewModel(
     private val importService: ImportService,
     private val imageMatcher: ImageMatcher,
     private val readyPngLoader: ReadyPngLoader,
+    private val productImagesExporter: ProductImagesExporter,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
@@ -114,6 +117,45 @@ class SettingsViewModel(
                     result.errorMessage ?: "Sample import failed"
                 },
                 messageIsError = !result.success,
+            )
+        }
+    }
+
+    fun exportProductImages(context: Context) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                isExportingPngs = true,
+                message = null,
+                progress = TaskProgress("Exporting PNG database", 0),
+            )
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    productImagesExporter.export { progress ->
+                        _uiState.value = _uiState.value.copy(isExportingPngs = true, progress = progress)
+                    }
+                }
+            }.fold(
+                onSuccess = { result ->
+                    _uiState.value = _uiState.value.copy(
+                        isExportingPngs = false,
+                        progress = null,
+                        message = if (result.copied == 0 && result.skipped == 0) {
+                            "No PNGs in product_images to export."
+                        } else {
+                            "Exported ${result.copied} PNG(s) to ${result.displayPath}/" +
+                                if (result.skipped > 0) " (${result.skipped} already there)" else ""
+                        },
+                        messageIsError = false,
+                    )
+                },
+                onFailure = { err ->
+                    _uiState.value = _uiState.value.copy(
+                        isExportingPngs = false,
+                        progress = null,
+                        message = "${err.javaClass.simpleName}: ${err.message}",
+                        messageIsError = true,
+                    )
+                },
             )
         }
     }

@@ -7,6 +7,8 @@ import com.oasismall.oasisai.data.model.CartType
 import com.oasismall.oasisai.ui.screens.article.ArticleDetailViewModel
 import com.oasismall.oasisai.ui.screens.backgroundremoval.BackgroundRemovalViewModel
 import com.oasismall.oasisai.ui.screens.batchtxt.BatchTxtViewModel
+import com.oasismall.oasisai.ui.screens.camerabatch.CameraBatchImportViewModel
+import com.oasismall.oasisai.ui.screens.camerabatch.CameraBatchShootViewModel
 import com.oasismall.oasisai.ui.screens.checkshoot.CheckShootViewModel
 import com.oasismall.oasisai.ui.screens.catalog.CatalogViewModel
 import com.oasismall.oasisai.ui.screens.cart.CartViewModel
@@ -40,6 +42,7 @@ class OasisViewModelFactory(
                     app.importService,
                     app.imageMatcher,
                     app.readyPngLoader,
+                    app.productImagesExporter,
                 ) as T
             modelClass.isAssignableFrom(ParayImportViewModel::class.java) ->
                 ParayImportViewModel(app.parayImportManager) as T
@@ -68,7 +71,15 @@ class OasisViewModelFactory(
             modelClass.isAssignableFrom(ImageManagerViewModel::class.java) ->
                 ImageManagerViewModel(app.repository) as T
             modelClass.isAssignableFrom(BatchTxtViewModel::class.java) ->
-                BatchTxtViewModel(app.repository) as T
+                BatchTxtViewModel(app.repository, app.batchCameraQueueStore) as T
+            modelClass.isAssignableFrom(CameraBatchShootViewModel::class.java) ->
+                CameraBatchShootViewModel(
+                    app.repository,
+                    app.cameraBatchStore,
+                    app.batchCameraQueueStore,
+                ) as T
+            modelClass.isAssignableFrom(CameraBatchImportViewModel::class.java) ->
+                CameraBatchImportViewModel(app.cameraBatchStore) as T
             modelClass.isAssignableFrom(CheckShootViewModel::class.java) ->
                 CheckShootViewModel(
                     app.applicationContext,

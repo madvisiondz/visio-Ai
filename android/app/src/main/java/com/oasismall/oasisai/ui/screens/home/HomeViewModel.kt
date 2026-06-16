@@ -54,6 +54,9 @@ class HomeViewModel(
     val shareCartCount = repository.observeCartCount(CartType.SHARE)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
+    val photoshootCartCount = repository.observeCartCount(CartType.PHOTOSHOOT)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
     init {
         @OptIn(FlowPreview::class)
         _query
@@ -71,6 +74,12 @@ class HomeViewModel(
     fun addToShareCart(articleId: Long) {
         viewModelScope.launch {
             repository.addToCart(articleId, CartType.SHARE, CartSourceTags.HOME)
+        }
+    }
+
+    fun addToPhotoshootCart(articleId: Long) {
+        viewModelScope.launch {
+            repository.addToCart(articleId, CartType.PHOTOSHOOT, CartSourceTags.HOME)
         }
     }
 }

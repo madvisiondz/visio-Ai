@@ -4,6 +4,8 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 import com.oasismall.oasisai.data.db.dao.ArticleAlternateBarcodeDao
 import com.oasismall.oasisai.data.db.dao.BulkCaptureDao
+import com.oasismall.oasisai.data.db.dao.BatchCameraQueueDao
+import com.oasismall.oasisai.data.db.dao.CameraBatchDao
 import com.oasismall.oasisai.data.db.dao.ArticleDao
 import com.oasismall.oasisai.data.db.dao.ArticlePriceHistoryDao
 import com.oasismall.oasisai.data.db.dao.ImportChangeDao
@@ -16,6 +18,8 @@ import com.oasismall.oasisai.data.db.dao.PromoAlertDao
 import com.oasismall.oasisai.data.db.dao.WorkflowHistoryDao
 import com.oasismall.oasisai.data.db.entity.ArticleAlternateBarcodeEntity
 import com.oasismall.oasisai.data.db.entity.BulkCaptureEntity
+import com.oasismall.oasisai.data.db.entity.BatchCameraQueueEntity
+import com.oasismall.oasisai.data.db.entity.CameraBatchItemEntity
 import com.oasismall.oasisai.data.db.entity.ArticleEntity
 import com.oasismall.oasisai.data.db.entity.ArticlePriceHistoryEntity
 import com.oasismall.oasisai.data.db.entity.ImportChangeEntity
@@ -43,8 +47,10 @@ import com.oasismall.oasisai.data.db.entity.WorkflowHistoryEntity
         PrintBatchItemEntity::class,
         PromoAlertEntity::class,
         BulkCaptureEntity::class,
+        CameraBatchItemEntity::class,
+        BatchCameraQueueEntity::class,
     ],
-    version = 11,
+    version = 13,
     exportSchema = false,
 )
 abstract class OasisDatabase : RoomDatabase() {
@@ -60,4 +66,6 @@ abstract class OasisDatabase : RoomDatabase() {
     abstract fun promoAlertDao(): PromoAlertDao
     abstract fun workflowHistoryDao(): WorkflowHistoryDao
     abstract fun bulkCaptureDao(): BulkCaptureDao
+    abstract fun cameraBatchDao(): CameraBatchDao
+    abstract fun batchCameraQueueDao(): BatchCameraQueueDao
 }

@@ -135,6 +135,14 @@ fun ArticleDetailScreen(
             ) {
                 Text(if (canShare) "Add to To share" else "Add to To share (needs PNG)")
             }
+            if (!canShare) {
+                Button(
+                    onClick = viewModel::addToPhotoshootCart,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Add to To shoot")
+                }
+            }
             if (a.needsTicketUpdate) {
                 OutlinedButton(onClick = viewModel::markTicketVerified, modifier = Modifier.fillMaxWidth()) {
                     Text("Mark ticket verified on shelf")

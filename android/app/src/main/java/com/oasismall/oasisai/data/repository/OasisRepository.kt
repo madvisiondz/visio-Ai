@@ -403,6 +403,9 @@ class OasisRepository(private val db: OasisDatabase) {
     suspend fun isInCart(articleId: Long, cartType: CartType): Boolean =
         db.preselectionDao().isInCart(articleId, cartType.name)
 
+    suspend fun getLatestPriceChange(articleId: Long) =
+        db.articlePriceHistoryDao().getLatestForArticle(articleId)
+
     suspend fun incrementDesignCopyCount(articleId: Long) {
         val item = db.preselectionDao().getItem(articleId, CartType.DESIGN.name) ?: return
         val next = (item.copyCount + 1).coerceAtMost(99)

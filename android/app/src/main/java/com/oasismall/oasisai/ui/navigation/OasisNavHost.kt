@@ -23,6 +23,10 @@ import com.oasismall.oasisai.data.model.CartType
 import com.oasismall.oasisai.ui.OasisViewModelFactory
 import com.oasismall.oasisai.ui.screens.article.ArticleDetailScreen
 import com.oasismall.oasisai.ui.screens.article.ArticleDetailViewModel
+import com.oasismall.oasisai.ui.screens.camerabatch.CameraBatchImportScreen
+import com.oasismall.oasisai.ui.screens.camerabatch.CameraBatchImportViewModel
+import com.oasismall.oasisai.ui.screens.camerabatch.CameraBatchShootScreen
+import com.oasismall.oasisai.ui.screens.camerabatch.CameraBatchShootViewModel
 import com.oasismall.oasisai.ui.screens.batchtxt.BatchTxtScreen
 import com.oasismall.oasisai.ui.screens.batchtxt.BatchTxtViewModel
 import com.oasismall.oasisai.ui.screens.backgroundremoval.BackgroundRemovalScreen
@@ -248,6 +252,14 @@ fun OasisNavHost(factory: OasisViewModelFactory) {
                     onArticleClick = { navController.navigate(OasisRoute.ArticleDetail.create(it)) },
                 )
             }
+            composable(OasisRoute.PhotoshootCart.route) {
+                CartRoute(
+                    cartType = CartType.PHOTOSHOOT,
+                    factory = factory,
+                    onArticleClick = { navController.navigate(OasisRoute.ArticleDetail.create(it)) },
+                    onOpenAgent = { navController.navigate(OasisRoute.CheckShoot.create()) },
+                )
+            }
             composable(OasisRoute.WorkHistory.route) {
                 val vm: WorkHistoryViewModel = viewModel(factory = factory)
                 WorkHistoryScreen(
@@ -319,7 +331,41 @@ fun OasisNavHost(factory: OasisViewModelFactory) {
             }
             composable(OasisRoute.BatchTxt.route) {
                 val vm: BatchTxtViewModel = viewModel(factory = factory)
-                BatchTxtScreen(viewModel = vm)
+                BatchTxtScreen(
+                    viewModel = vm,
+                    onOpenCameraBatch = { queueItemId ->
+                        navController.navigate(OasisRoute.CameraBatchShoot.create(queueItemId))
+                    },
+                    onOpenPhotoroomImport = { navController.navigate(OasisRoute.CameraBatchImport.route) },
+                )
+            }
+            composable(
+                route = OasisRoute.CameraBatchShoot.route,
+                arguments = listOf(
+                    navArgument("queueItemId") {
+                        type = NavType.StringType
+                        defaultValue = ""
+                        nullable = true
+                    },
+                ),
+            ) { backStackEntry ->
+                val queueItemId = backStackEntry.arguments
+                    ?.getString("queueItemId")
+                    ?.toLongOrNull()
+                val vm: CameraBatchShootViewModel = viewModel(factory = factory)
+                CameraBatchShootScreen(
+                    viewModel = vm,
+                    queueItemId = queueItemId,
+                    onBack = { navController.popBackStack() },
+                    onDoneShooting = { navController.navigate(OasisRoute.CameraBatchImport.route) },
+                )
+            }
+            composable(OasisRoute.CameraBatchImport.route) {
+                val vm: CameraBatchImportViewModel = viewModel(factory = factory)
+                CameraBatchImportScreen(
+                    viewModel = vm,
+                    onBack = { navController.popBackStack() },
+                )
             }
             composable(OasisRoute.Preselection.route) {
                 val vm: PreselectionViewModel = viewModel(factory = factory)

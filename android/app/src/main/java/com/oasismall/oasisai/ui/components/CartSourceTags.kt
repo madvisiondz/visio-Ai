@@ -19,6 +19,7 @@ object CartSourceTags {
     const val MANUAL = "SRC_MANUAL"
     const val STAMPER = "SRC_STAMPER"
     const val BATCH_TXT = "SRC_BATCH_TXT"
+    const val BATCH_CAMERA = "SRC_BATCH_CAMERA"
     const val CHECK_SHOOT = "SRC_CHECK_SHOOT"
     const val SCANNER = "SRC_SCANNER"
     const val HOME = "SRC_HOME"
@@ -36,7 +37,7 @@ fun cartSourceStyle(note: String?): CartSourceStyle = when (note) {
     CartSourceTags.CHECK_SHOOT -> CartSourceStyle("AGENT", Color(0xFF6A1B9A))
     CartSourceTags.SCANNER -> CartSourceStyle("Scanner", Color(0xFF00838F))
     CartSourceTags.HOME -> CartSourceStyle("Articles search", Color(0xFFF57C00))
-    CartSourceTags.ARTICLE -> CartSourceStyle("Article detail", Color(0xFFAD1457))
+    CartSourceTags.BATCH_CAMERA -> CartSourceStyle("Camera batch", Color(0xFF5E35B1))
     else -> CartSourceStyle("Manual", Color(0xFF757575))
 }
 
@@ -58,6 +59,7 @@ fun CartSourceLegend(modifier: Modifier = Modifier) {
                     CartSourceTags.SCANNER,
                     CartSourceTags.HOME,
                     CartSourceTags.ARTICLE,
+                    CartSourceTags.BATCH_CAMERA,
                     CartSourceTags.MANUAL,
                 ).forEach { key ->
                     val style = cartSourceStyle(key)

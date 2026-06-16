@@ -5,6 +5,7 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.oasismall.oasisai.data.model.ArticleChangeStatus
+import com.oasismall.oasisai.data.model.CameraBatchStatus
 
 @Entity(
     tableName = "articles",
@@ -307,4 +308,37 @@ data class BulkCaptureEntity(
     val capturedAt: Long = System.currentTimeMillis(),
     val replaced: Boolean = false,
     val syncStatus: String = "PENDING",
+)
+
+/** Camera batch shoot — raw JPEG in Download/VisioAi/Batch_images[date], awaiting PhotoRoom cutout. */
+@Entity(
+    tableName = "camera_batch_items",
+    indices = [Index("batchDate"), Index("status"), Index("barcode")],
+)
+data class CameraBatchItemEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val batchDate: String,
+    val shotPath: String,
+    val shotFileName: String,
+    val barcode: String,
+    val designation: String,
+    val codeart: String? = null,
+    val price: Double? = null,
+    val articleId: Long? = null,
+    val capturedAt: Long = System.currentTimeMillis(),
+    val status: String = CameraBatchStatus.AWAITING_PHOTOROOM.name,
+    val photoroomPath: String? = null,
+)
+
+/** Designation lines from Batch txt not found in CSV — camera capture queue. */
+@Entity(
+    tableName = "batch_camera_queue",
+    indices = [Index("done"), Index("sortOrder")],
+)
+data class BatchCameraQueueEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val designation: String,
+    val sortOrder: Int,
+    val done: Boolean = false,
+    val createdAt: Long = System.currentTimeMillis(),
 )

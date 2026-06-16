@@ -2,13 +2,23 @@ package com.oasismall.oasisai.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-/** Oasis Mall brand orange from official logo */
-val OasisBrandOrange = Color(0xFFFF5E13)
-val OasisBrandOrangeDark = Color(0xFFE04E0A)
-val OasisGreen = Color(0xFF1B7A4E)
-val OasisGreenDark = Color(0xFF145C3A)
-val OasisSand = Color(0xFFF5F0E8)
-val OasisOrange = OasisBrandOrange
-val OasisRed = Color(0xFFC0392B)
-val OasisSurfaceDark = Color(0xFF121212)
-val OasisSurfaceContainerDark = Color(0xFF1E1E1E)
+/** Visio Ai — brushed steel on charcoal (logo-inspired, not loud) */
+val VisioSteel = Color(0xFFC4C8D0)
+val VisioSteelBright = Color(0xFFE2E5EA)
+val VisioSteelMuted = Color(0xFF8A9099)
+val VisioCharcoal = Color(0xFF121214)
+val VisioSurface = Color(0xFF1A1A1E)
+val VisioSurfaceElevated = Color(0xFF242428)
+val VisioAccent = Color(0xFFB0B8C4)
+val VisioRed = Color(0xFFCF6679)
+
+/** Legacy aliases kept for gradual migration */
+val OasisBrandOrange = VisioSteel
+val OasisBrandOrangeDark = VisioSteelMuted
+val OasisGreen = Color(0xFF7A9E8A)
+val OasisGreenDark = Color(0xFF5C7A68)
+val OasisSand = Color(0xFFE8EAED)
+val OasisOrange = VisioSteel
+val OasisRed = VisioRed
+val OasisSurfaceDark = VisioCharcoal
+val OasisSurfaceContainerDark = VisioSurface

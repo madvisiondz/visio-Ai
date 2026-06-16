@@ -38,7 +38,7 @@ class BackgroundRemovalService(private val context: Context) {
             return@withContext BackgroundRemovalResult(
                 originalPath = inputImage.absolutePath,
                 success = false,
-                errorMessage = "U2NetP model missing from APK assets. Reinstall the latest OasisAI-debug.apk.",
+                errorMessage = "U2NetP cutout model missing from app assets. Run scripts/download-u2netp-tflite.ps1 and rebuild the APK.",
             )
         }
         try {

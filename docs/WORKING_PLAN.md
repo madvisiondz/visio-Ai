@@ -50,8 +50,9 @@
 - [x] Stamper last-card fix, larger scrollable cards, and enriched shared PNG metadata
 - [x] Replace repo image database from `G:\DATA BASE` and support barcode-only PNG filenames
 - [x] One-by-one Share cart queue with article text attached per PNG file
-- [x] Batch txt screen routes designation lists to To share/To shoot automatically
+- [x] Batch txt screen routes designation lists to To share / To shoot / **Camera batch queue** automatically
 - [x] To shoot source labels/colors (Manual / Batch txt / Check & shoot / Stamper)
+- [x] **Visio Ai 2.0**: To shoot bottom nav restored (2026-06-16)
 
 ## Phase 4 — Ready PNG linking (planned)
 

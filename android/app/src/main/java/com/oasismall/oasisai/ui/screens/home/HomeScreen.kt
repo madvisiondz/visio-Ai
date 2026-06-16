@@ -38,9 +38,10 @@ fun HomeScreen(
     val query by viewModel.query.collectAsStateWithLifecycle()
     val result by viewModel.searchResult.collectAsStateWithLifecycle()
     val shareCount by viewModel.shareCartCount.collectAsStateWithLifecycle()
+    val shootCount by viewModel.photoshootCartCount.collectAsStateWithLifecycle()
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Oasis AI") }) },
+        topBar = { TopAppBar(title = { Text("Visio Ai") }) },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
             OutlinedTextField(
@@ -60,7 +61,7 @@ fun HomeScreen(
                     style = MaterialTheme.typography.bodySmall,
                 )
                 Text(
-                    "To share: $shareCount ready · use AGENT tab to scan & capture",
+                    "To share: $shareCount ready · To shoot: $shootCount · use AGENT tab to capture",
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                     style = MaterialTheme.typography.labelMedium,
                 )
@@ -97,6 +98,7 @@ fun HomeScreen(
                                 canShare = false,
                                 onArticleClick = onArticleClick,
                                 onShare = { viewModel.addToShareCart(article.id) },
+                                onShoot = { viewModel.addToPhotoshootCart(article.id) },
                             )
                         }
                     }
@@ -136,10 +138,16 @@ private fun HomeArticleRow(
     canShare: Boolean,
     onArticleClick: (Long) -> Unit,
     onShare: () -> Unit,
+    onShoot: (() -> Unit)? = null,
 ) {
     val shareEnabled = canShare && article.hasAppGalleryImage()
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         ArticleCard(article = article, onClick = { onArticleClick(article.id) })
+        if (onShoot != null && !article.hasAppGalleryImage()) {
+            Button(onClick = onShoot, modifier = Modifier.fillMaxWidth()) {
+                Text("Add to To shoot")
+            }
+        }
         Button(
             onClick = onShare,
             enabled = shareEnabled,

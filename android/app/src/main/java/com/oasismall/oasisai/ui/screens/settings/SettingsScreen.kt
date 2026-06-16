@@ -99,7 +99,7 @@ fun SettingsScreen(
         }
     }
 
-    val busy = uiState.isLoadingImages || uiState.isReindexing || uiState.isLoadingSample
+    val busy = uiState.isLoadingImages || uiState.isReindexing || uiState.isLoadingSample || uiState.isExportingPngs
 
     Scaffold(topBar = { TopAppBar(title = { Text("Settings") }) }) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
@@ -223,6 +223,18 @@ fun SettingsScreen(
                     icon = Icons.Default.Image,
                     enabled = !busy,
                     onClick = { readyImagesPicker.launch(arrayOf("image/png")) },
+                )
+            }
+            item {
+                SettingsRow(
+                    title = "Export PNG database",
+                    subtitle = "Copy product_images/ → Download/VisioAi/Product_images[date]/ (Visio metadata preserved)",
+                    icon = Icons.Default.FileUpload,
+                    enabled = !busy,
+                    onClick = { viewModel.exportProductImages(context) },
+                    trailing = {
+                        if (uiState.isExportingPngs) CircularProgressIndicator()
+                    },
                 )
             }
             item {

@@ -42,6 +42,8 @@ data class CheckShootScan(
     val barcode: String,
     val articleId: Long? = null,
     val designation: String? = null,
+    val price: Double? = null,
+    val lastPriceChangedAt: Long? = null,
     val existingImagePath: String? = null,
     val inGestiumCatalog: Boolean = false,
     val linkedViaAlternate: Boolean = false,
@@ -166,7 +168,7 @@ class CheckShootViewModel(
     fun prepareBulkCapture(replaced: Boolean, onReady: () -> Unit) {
         val barcode = _bulkScan.value?.barcode ?: return
         if (!modelReady) {
-            _message.value = "Background model missing. Install the latest OasisAI-debug.apk."
+            _message.value = "Cutout model not bundled in this APK — install a full build from your PC."
             return
         }
         pendingBulkBarcode = barcode
@@ -539,7 +541,7 @@ class CheckShootViewModel(
         val current = _scan.value ?: return
         if (!_isLocked.value) return
         if (!modelReady) {
-            _message.value = "Background model missing. Install the latest OasisAI-debug.apk."
+            _message.value = "Cutout model not bundled in this APK — install a full build from your PC."
             return
         }
         viewModelScope.launch {
@@ -727,10 +729,13 @@ class CheckShootViewModel(
         val existing = article?.imagePath
             ?.takeIf { it.isNotBlank() }
             ?.takeIf { File(it).exists() }
+        val lastPriceChange = article?.id?.let { repository.getLatestPriceChange(it) }
         _scan.value = CheckShootScan(
             barcode = barcode,
             articleId = article?.id,
             designation = article?.designation,
+            price = article?.price,
+            lastPriceChangedAt = lastPriceChange?.changedAt,
             existingImagePath = existing,
             inGestiumCatalog = resolved != null,
             linkedViaAlternate = resolved != null && !resolved.primary,

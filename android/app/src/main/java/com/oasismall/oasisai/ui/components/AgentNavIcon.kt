@@ -54,11 +54,11 @@ fun AgentNavIcon(
     )
 
     val ringColors = listOf(
-        Color(0xFF00E5FF),
-        Color(0xFF7C4DFF),
-        Color(0xFFFF4081),
-        Color(0xFF00E676),
-        Color(0xFF00E5FF),
+        Color(0xFFE2E5EA),
+        Color(0xFFB0B8C4),
+        Color(0xFF8A9099),
+        Color(0xFFC4C8D0),
+        Color(0xFFE2E5EA),
     )
 
     Canvas(modifier = modifier.size(46.8.dp)) {
@@ -80,7 +80,7 @@ fun AgentNavIcon(
 
         drawRoundRect(
             brush = Brush.linearGradient(
-                colors = listOf(Color(0xFF311B92), Color(0xFF00BCD4)),
+                colors = listOf(Color(0xFF3A3F48), Color(0xFF6B7280)),
                 start = Offset(c.x - base, c.y),
                 end = Offset(c.x + base, c.y),
             ),
@@ -92,7 +92,7 @@ fun AgentNavIcon(
 
         drawCircle(
             brush = Brush.radialGradient(
-                colors = listOf(Color(0xFFB2EBF2), Color(0xFF536DFE), Color(0xFF0D0221)),
+                colors = listOf(Color(0xFFE8EAED), Color(0xFF8A9099), Color(0xFF1A1A1E)),
                 center = c,
                 radius = base * 0.4f,
             ),

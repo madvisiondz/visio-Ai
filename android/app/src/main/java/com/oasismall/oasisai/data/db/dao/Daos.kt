@@ -8,6 +8,8 @@ import androidx.room.Transaction
 import androidx.room.Update
 import com.oasismall.oasisai.data.db.entity.ArticleAlternateBarcodeEntity
 import com.oasismall.oasisai.data.db.entity.BulkCaptureEntity
+import com.oasismall.oasisai.data.db.entity.BatchCameraQueueEntity
+import com.oasismall.oasisai.data.db.entity.CameraBatchItemEntity
 import com.oasismall.oasisai.data.db.entity.ArticleEntity
 import com.oasismall.oasisai.data.db.entity.ArticlePriceHistoryEntity
 import com.oasismall.oasisai.data.db.entity.ImportChangeEntity
@@ -490,6 +492,9 @@ interface ArticlePriceHistoryDao {
     @Insert
     suspend fun insertAll(entries: List<ArticlePriceHistoryEntity>)
 
+    @Query("SELECT * FROM article_price_history WHERE articleId = :articleId ORDER BY changedAt DESC LIMIT 1")
+    suspend fun getLatestForArticle(articleId: Long): ArticlePriceHistoryEntity?
+
     @Query("SELECT * FROM article_price_history WHERE articleId = :articleId ORDER BY changedAt DESC")
     fun observeForArticle(articleId: Long): Flow<List<ArticlePriceHistoryEntity>>
 }
@@ -762,4 +767,64 @@ interface BulkCaptureDao {
 
     @Query("SELECT * FROM bulk_captures ORDER BY capturedAt DESC")
     fun observeAll(): Flow<List<BulkCaptureEntity>>
+}
+
+@Dao
+interface CameraBatchDao {
+    @Insert
+    suspend fun insert(entity: CameraBatchItemEntity): Long
+
+    @Query(
+        """
+        SELECT * FROM camera_batch_items
+        WHERE batchDate = :date AND status = :status
+        ORDER BY capturedAt ASC
+        """,
+    )
+    suspend fun getForDateAndStatus(date: String, status: String): List<CameraBatchItemEntity>
+
+    @Query("SELECT * FROM camera_batch_items WHERE batchDate = :date ORDER BY capturedAt ASC")
+    fun observeForDate(date: String): Flow<List<CameraBatchItemEntity>>
+
+    @Query(
+        """
+        SELECT * FROM camera_batch_items
+        WHERE batchDate = :date AND status = :status
+        ORDER BY capturedAt ASC
+        """,
+    )
+    fun observeForDateAndStatus(date: String, status: String): Flow<List<CameraBatchItemEntity>>
+
+    @Query("SELECT COUNT(*) FROM camera_batch_items WHERE batchDate = :date AND status = :status")
+    fun observeCountForDateAndStatus(date: String, status: String): Flow<Int>
+
+    @Query("UPDATE camera_batch_items SET status = :status, photoroomPath = :photoroomPath WHERE id = :id")
+    suspend fun updateStatus(id: Long, status: String, photoroomPath: String?)
+
+    @Query("SELECT * FROM camera_batch_items WHERE id = :id LIMIT 1")
+    suspend fun getById(id: Long): CameraBatchItemEntity?
+}
+
+@Dao
+interface BatchCameraQueueDao {
+    @Insert
+    suspend fun insertAll(items: List<BatchCameraQueueEntity>)
+
+    @Query("DELETE FROM batch_camera_queue")
+    suspend fun clearAll()
+
+    @Query("SELECT * FROM batch_camera_queue WHERE done = 0 ORDER BY sortOrder ASC")
+    fun observePending(): Flow<List<BatchCameraQueueEntity>>
+
+    @Query("SELECT * FROM batch_camera_queue WHERE done = 0 ORDER BY sortOrder ASC")
+    suspend fun getPending(): List<BatchCameraQueueEntity>
+
+    @Query("SELECT * FROM batch_camera_queue WHERE id = :id LIMIT 1")
+    suspend fun getById(id: Long): BatchCameraQueueEntity?
+
+    @Query("UPDATE batch_camera_queue SET done = 1 WHERE id = :id")
+    suspend fun markDone(id: Long)
+
+    @Query("SELECT COUNT(*) FROM batch_camera_queue WHERE done = 0")
+    fun observePendingCount(): Flow<Int>
 }

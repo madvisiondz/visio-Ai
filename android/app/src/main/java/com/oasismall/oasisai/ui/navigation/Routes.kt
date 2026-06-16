@@ -2,6 +2,7 @@ package com.oasismall.oasisai.ui.navigation
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Brush
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.ListAlt
 import androidx.compose.material.icons.filled.Settings
@@ -34,6 +35,13 @@ sealed class OasisRoute(val route: String) {
     data object Promo : OasisRoute("promo")
     data object Images : OasisRoute("images")
     data object BatchTxt : OasisRoute("batch_txt")
+    data object CameraBatchShoot : OasisRoute("camera_batch_shoot?queueItemId={queueItemId}") {
+        fun create(queueItemId: Long? = null): String {
+            val id = queueItemId?.toString() ?: ""
+            return "camera_batch_shoot?queueItemId=$id"
+        }
+    }
+    data object CameraBatchImport : OasisRoute("camera_batch_import")
     data object CheckShoot : OasisRoute("check_shoot") {
         fun create(
             barcode: String? = null,
@@ -68,6 +76,7 @@ data class BottomNavItem(
 
 val bottomNavItems = listOf(
     BottomNavItem(OasisRoute.Home.route, "Articles", Icons.Default.Home),
+    BottomNavItem(OasisRoute.PhotoshootCart.route, "To shoot", Icons.Default.CameraAlt),
     BottomNavItem(OasisRoute.CheckShoot.route, "AGENT", Icons.Default.Home, useAgentIcon = true),
     BottomNavItem(OasisRoute.BatchTxt.route, "Batch txt", Icons.Default.ListAlt),
     BottomNavItem(OasisRoute.ShareCart.route, "To share", Icons.Default.Share),

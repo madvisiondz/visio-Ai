@@ -261,9 +261,16 @@ To print list ordered by sortOrder ASC, addedAt ASC
 ```
 Batch txt screen receives multi-line designations
     -> normalize each designation and lookup article
-    -> if article has existing PNG: add to To share cart
-    -> if article exists but PNG missing: add to To shoot cart
-    -> if no article match: keep in "not found" result list for manual follow-up
+    -> if article has existing PNG: add to To share cart (SRC_BATCH_TXT)
+    -> if article exists but PNG missing: add to To shoot cart (SRC_BATCH_TXT)
+    -> if no article match: insert into batch_camera_queue (Room v13)
+         -> Batch txt shows clickable queue list
+         -> tap item -> camera_batch_shoot?queueItemId=
+              scan barcode (lock) -> shoot -> Proceed -> mark queue item done -> next pending
+              unknown barcode: Create designation + CSV match
+                   Proceed -> linkSubBarcodeToMainArticle + continue shoot flow
+                   Add to To share -> cart + unlock scan
+    -> JPEG saved to Download/VisioAi/Batch_images[date]/ with barcode in sidecar metadata
 ```
 
 ## 13. IMAGE ASSETS folder load automation

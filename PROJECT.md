@@ -51,10 +51,13 @@ OASIS MALL operates at scale with fragmented workflows:
 
 | Area | Choice |
 |------|--------|
+| 2026-06-16 | **Visio Ai v2.3.0**: Batch txt **3-way routing** (To share / To shoot / **Camera batch queue**); scan-first camera batch (like AGENT) with create designation, CSV match → Proceed (sub-barcode) or Add to To share; queue auto-advance; Room `batch_camera_queue` (v13) |
+| 2026-06-16 | **Visio Ai v2.2.0**: Settings **Export PNG database** → `Download/VisioAi/Product_images[date]/`; **Camera batch** on Batch txt → shoot to `Batch_images[date]/`, PhotoRoom import from `Pictures/Photoroom/` |
 | 2026-06-14 | **MadVision** private GitHub repo initialized; app display name → MadVision; source-only `.gitignore` |
 | 2026-06-07 | Android v2.5.2: Bulk saves PNGs to **DCIM/BULK** + `bulk_done.txt` tracker |
 | 2026-06-07 | Android v2.5.1: Bulk mode detects existing catalog PNGs via `product_images` (same as Smart) |
 | 2026-06-07 | Android v2.5.0: Design queue **sortOrder preserved** on print/Done; AGENT **Smart/Bulk** mode — bulk barcode-only captures in `bulk_captures` + `bulk_images/` |
+| 2026-06-16 | **Visio Ai 2.0**: white-label fork (`com.oasismall.visioai`); metallic theme + logo; To shoot tab restored; Batch txt → To shoot; AGENT scan card shows price + last price change; APK `VisioAI-debug.apk` |
 | 2026-06-06 | Android v2.4.4: Create asset returns to article detail; PARAY body key **5 digits**; designation search on unknown barcode |
 | 2026-06-06 | Android v2.4.3: Article detail **Create asset** — opens AGENT camera + cutout for any article |
 | 2026-06-06 | Android v2.4.2: Design **Done** list capped at **50** articles (oldest auto-removed) |
@@ -571,6 +574,7 @@ It:
 
 | Date | Change |
 |------|--------|
+| 2026-06-16 | **Visio Ai v2.3.0**: Batch txt routes not-in-CSV lines to **batch_camera_queue**; Camera batch scan-first (lock barcode → shoot → proceed); unknown barcode → create designation + CSV fuzzy match (Proceed sub-barcode / Add to To share); APK 2.3.0 (230) |
 | 2026-06-07 | Android v2.5.2: Bulk PNGs → `DCIM/BULK/{barcode}.png`; `bulk_done.txt` logs completed barcodes |
 | 2026-06-07 | Android v2.5.1: Bulk mode **Replace/Skip** now sees catalog-linked PNGs (`resolveScannedBarcode` + `product_images`), not only `{barcode}.png` on disk |
 | 2026-06-07 | Android v2.5.0: Design cart keeps **sortOrder** when moving To print ↔ Done; AGENT **Bulk** mode — scan barcode → replace/skip → `{barcode}.png` in `bulk_images/` + `bulk_captures` (Room v11) |

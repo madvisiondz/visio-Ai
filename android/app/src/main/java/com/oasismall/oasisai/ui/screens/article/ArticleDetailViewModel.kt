@@ -32,6 +32,14 @@ class ArticleDetailViewModel(
         }
     }
 
+    fun addToPhotoshootCart() {
+        val article = _article.value ?: return
+        if (article.hasAppGalleryImage()) return
+        viewModelScope.launch {
+            repository.addToCart(article.id, CartType.PHOTOSHOOT, CartSourceTags.ARTICLE)
+        }
+    }
+
     fun markTicketVerified() {
         viewModelScope.launch {
             val id = _article.value?.id ?: return@launch

@@ -2,6 +2,34 @@
 
 > What has been built. Update at end of each work session.
 
+## 2026-06-16 — Visio Ai v2.3.0 scan-first camera batch + queue
+
+- [x] Batch txt **3-way routing**: PNG → To share, missing PNG → To shoot, not in CSV → **batch_camera_queue**
+- [x] Camera batch **scan-first** (like AGENT): lock barcode → shoot → Proceed; JPEG + `.visio.json` sidecar
+- [x] Unknown barcode: **Create designation** with CSV fuzzy match → **Proceed** (sub-barcode link) or **Add to To share**
+- [x] Queue list on Batch txt; tap designation → camera batch focused item; auto-advance on Proceed
+- [x] Room v13: `batch_camera_queue`; APK **2.3.0** (code 230)
+
+---
+
+## 2026-06-16 — Visio Ai v2.2.0 export + camera batch
+
+- [x] Settings **Export PNG database** → `Download/VisioAi/Product_images[date]/` (metadata preserved)
+- [x] Batch txt **Camera batch**: shoot → barcode → daily folder + `.visio.json` sidecar
+- [x] **PhotoRoom import** screen: match `Pictures/Photoroom/` PNGs → product_images
+- [x] APK **2.2.0** (code 220)
+
+---
+
+## 2026-06-16 — Visio Ai 2.0 white-label fork
+
+- [x] Rebrand: **Visio Ai** (`com.oasismall.visioai`, v2.0.0 code 200), metallic theme, new launcher
+- [x] **To shoot** bottom nav restored; wired from Articles, Article detail, Batch txt
+- [x] AGENT scan card: designation, barcode, price, last price change date
+- [x] APK: `VisioAI-debug.apk`
+
+---
+
 ## 2026-06-07 — Bulk Download/BULK fix (v2.5.3)
 
 - [x] Switched bulk PNG + tracker from DCIM to **Download/BULK** (`MediaStore.Downloads`)

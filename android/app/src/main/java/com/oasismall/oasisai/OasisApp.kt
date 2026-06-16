@@ -16,6 +16,9 @@ import com.oasismall.oasisai.domain.PrintGenerator
 import com.oasismall.oasisai.domain.PromoService
 import com.oasismall.oasisai.domain.ReadyPngLoader
 import com.oasismall.oasisai.domain.bulk.BulkCaptureStore
+import com.oasismall.oasisai.domain.visio.BatchCameraQueueStore
+import com.oasismall.oasisai.domain.visio.CameraBatchStore
+import com.oasismall.oasisai.domain.visio.ProductImagesExporter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -34,6 +37,8 @@ class OasisApp : Application() {
                 MIGRATION_8_9,
                 MIGRATION_9_10,
                 MIGRATION_10_11,
+                MIGRATION_11_12,
+                MIGRATION_12_13,
             )
             .fallbackToDestructiveMigration(true)
             .build()
@@ -51,6 +56,15 @@ class OasisApp : Application() {
     val parayImportManager: ParayImportManager by lazy { ParayImportManager(this) }
     val bulkCaptureStore: BulkCaptureStore by lazy {
         BulkCaptureStore(this, database.bulkCaptureDao())
+    }
+    val batchCameraQueueStore: BatchCameraQueueStore by lazy {
+        BatchCameraQueueStore(database.batchCameraQueueDao())
+    }
+    val cameraBatchStore: CameraBatchStore by lazy {
+        CameraBatchStore(this, database.cameraBatchDao(), repository, imageMatcher)
+    }
+    val productImagesExporter: ProductImagesExporter by lazy {
+        ProductImagesExporter(this, imageMatcher)
     }
 
     override fun onCreate() {
@@ -155,5 +169,49 @@ private val MIGRATION_10_11 = object : Migration(10, 11) {
         )
         db.execSQL("CREATE INDEX IF NOT EXISTS index_bulk_captures_capturedAt ON bulk_captures(capturedAt)")
         db.execSQL("CREATE INDEX IF NOT EXISTS index_bulk_captures_syncStatus ON bulk_captures(syncStatus)")
+    }
+}
+
+private val MIGRATION_11_12 = object : Migration(11, 12) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS camera_batch_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                batchDate TEXT NOT NULL,
+                shotPath TEXT NOT NULL,
+                shotFileName TEXT NOT NULL,
+                barcode TEXT NOT NULL,
+                designation TEXT NOT NULL,
+                codeart TEXT,
+                price REAL,
+                articleId INTEGER,
+                capturedAt INTEGER NOT NULL,
+                status TEXT NOT NULL,
+                photoroomPath TEXT
+            )
+            """.trimIndent(),
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_camera_batch_items_batchDate ON camera_batch_items(batchDate)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_camera_batch_items_status ON camera_batch_items(status)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_camera_batch_items_barcode ON camera_batch_items(barcode)")
+    }
+}
+
+private val MIGRATION_12_13 = object : Migration(12, 13) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS batch_camera_queue (
+                id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                designation TEXT NOT NULL,
+                sortOrder INTEGER NOT NULL,
+                done INTEGER NOT NULL DEFAULT 0,
+                createdAt INTEGER NOT NULL
+            )
+            """.trimIndent(),
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_batch_camera_queue_done ON batch_camera_queue(done)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_batch_camera_queue_sortOrder ON batch_camera_queue(sortOrder)")
     }
 }

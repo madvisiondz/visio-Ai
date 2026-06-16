@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -50,8 +51,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.oasismall.oasisai.data.model.AgentCaptureMode
 import com.oasismall.oasisai.ui.screens.scanner.BarcodeCameraPreview
+import com.oasismall.oasisai.util.PriceFormatter
 import com.oasismall.oasisai.util.createCheckShootCaptureUri
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @Composable
 fun CheckShootScreen(
@@ -350,7 +355,8 @@ private fun CheckShootArticlePopup(
     Card(
         modifier = modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.97f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.97f)),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(
@@ -366,19 +372,33 @@ private fun CheckShootArticlePopup(
                     }
                 }
             }
-            Text("Barcode: ${scan.barcode}", style = MaterialTheme.typography.bodyMedium)
+            val designationLabel = when {
+                scan.inGestiumCatalog && scan.linkedViaBodyKey ->
+                    "${scan.designation} (same 9-digit code — in catalog)"
+                scan.inGestiumCatalog && scan.linkedViaAlternate ->
+                    "${scan.designation} (linked barcode)"
+                scan.inGestiumCatalog -> scan.designation ?: scan.barcode
+                else -> "Not in catalog — lock for PARAY suggestions"
+            }
             Text(
-                when {
-                    scan.inGestiumCatalog && scan.linkedViaBodyKey ->
-                        "${scan.designation} (same 9-digit code — in catalog)"
-                    scan.inGestiumCatalog && scan.linkedViaAlternate ->
-                        "${scan.designation} (linked barcode)"
-                    scan.inGestiumCatalog -> scan.designation ?: scan.barcode
-                    else -> "Not in catalog — lock for PARAY suggestions"
-                },
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Medium,
+                designationLabel,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
             )
+            Text("Barcode: ${scan.barcode}", style = MaterialTheme.typography.bodyMedium)
+            if (scan.price != null) {
+                Text(
+                    PriceFormatter.format(scan.price),
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Text(
+                    priceChangedLabel(scan.lastPriceChangedAt),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             if (scan.hasShareablePng) {
                 Text(
                     "PNG in Oasis — create asset to replace with a new cutout",
@@ -463,7 +483,7 @@ private fun CheckShootArticlePopup(
                 }
                 if (!modelReady) {
                     Text(
-                        "Install latest OasisAI-debug.apk for offline cutout",
+                        "Cutout model missing from this install — ask for a full Visio Ai build",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.error,
                     )
@@ -483,4 +503,10 @@ private fun CheckShootArticlePopup(
             }
         }
     }
+}
+
+private fun priceChangedLabel(changedAt: Long?): String {
+    if (changedAt == null) return "Price: no change recorded"
+    val fmt = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
+    return "Price last changed: ${fmt.format(Date(changedAt))}"
 }

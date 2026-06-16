@@ -1,4 +1,4 @@
-# Build Oasis AI APK and copy to OasisAI-debug.apk (repo root).
+# Build Visio Ai APK and copy to VisioAI-debug.apk (repo root).
 # Run from repo root:  .\BUILD-APK.ps1
 
 $ErrorActionPreference = "Stop"
@@ -13,12 +13,18 @@ $env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
 $env:ANDROID_HOME = "$env:LOCALAPPDATA\Android\Sdk"
 $env:ANDROID_SDK_ROOT = $env:ANDROID_HOME
 
+$modelPath = Join-Path $Android "app\src\main\assets\u2netp.onnx"
+if (-not (Test-Path $modelPath) -or (Get-Item $modelPath).Length -lt 4000000) {
+    Write-Host "==> u2netp.onnx missing - downloading cutout model..."
+    & (Join-Path $Root "scripts\download-u2netp-tflite.ps1")
+}
+
 Set-Location $Android
-Write-Host "==> Building Oasis AI..."
+Write-Host "==> Building Visio Ai..."
 .\gradlew.bat clean assembleDebug --no-daemon
 if ($LASTEXITCODE -ne 0) {
     Write-Host ""
-    Write-Host "BUILD FAILED. Try: Android Studio > Open android folder > Build > Build APK(s)"
+    Write-Host "BUILD FAILED. Try Android Studio: Open android folder, Build APK(s)"
     exit $LASTEXITCODE
 }
 
@@ -26,7 +32,7 @@ $src = Join-Path $env:LOCALAPPDATA "OasisAI-android-build\outputs\apk\debug\app-
 if (-not (Test-Path $src)) {
     $src = Join-Path $Android "app\build\outputs\apk\debug\app-debug.apk"
 }
-$dest = Join-Path $Root "OasisAI-debug.apk"
+$dest = Join-Path $Root "VisioAI-debug.apk"
 Copy-Item $src $dest -Force
 $info = Get-Item $dest
 Write-Host ""

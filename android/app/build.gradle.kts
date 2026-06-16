@@ -25,11 +25,11 @@ android {
     buildToolsVersion = "36.0.0"
 
     defaultConfig {
-        applicationId = "com.oasismall.oasisai"
+        applicationId = "com.oasismall.visioai"
         minSdk = 26
         targetSdk = 34
-        versionCode = 53
-        versionName = "2.5.3"
+        versionCode = 230
+        versionName = "2.3.0"
 
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

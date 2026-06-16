@@ -589,3 +589,19 @@
 **User:** Bulk mode does not see existing PNGs that Smart mode finds on scan.
 
 **Assistant:** **v2.5.1**: `refreshBulkScan` falls back to `resolveScannedBarcode` → `product_images.imagePath` (catalog-linked designation filenames), plus `bulk_captures` row lookup. APK code 51.
+
+---
+
+## Session 68 — 2026-06-16
+
+**User:** Rebrand to **Visio Ai 2.0** (separate app from Oasis AI until paid); new logo; restore **To shoot** wired with Articles + Batch; AGENT card shows designation + barcode + price + last price change; metallic theme from logo.
+
+**Assistant:** **Visio Ai 2.0** (`com.oasismall.visioai`, code 200): metallic charcoal/steel theme, launcher from `app logo.png`, **To shoot** bottom nav + Batch txt routing + Article/Home buttons, AGENT popup enriched with price history, APK `VisioAI-debug.apk`.
+
+---
+
+## Session 69 — 2026-06-16
+
+**User:** Batch camera scan-first (like AGENT); unknown barcode create designation with CSV match (Proceed sub-barcode / Add to To share); Batch txt 3-way routing with clickable camera batch queue.
+
+**Assistant:** **Visio Ai v2.3.0** (code 230): `batch_camera_queue` + scan-first camera batch; Batch txt To share / To shoot / queue list; designation fuzzy match actions; APK `VisioAI-debug.apk`.

@@ -45,6 +45,7 @@ import java.util.Locale
 fun CartScreen(
     viewModel: CartViewModel,
     onArticleClick: (Long) -> Unit,
+    onOpenAgent: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val items by viewModel.items.collectAsStateWithLifecycle()
@@ -55,13 +56,13 @@ fun CartScreen(
         CartType.SHARE -> "Ready to share"
         CartType.DESIGN -> "Design"
         CartType.DESIGN_DONE -> "Design — Done"
-        CartType.PHOTOSHOOT -> "Legacy queue"
+        CartType.PHOTOSHOOT -> "To shoot"
     }
     val emptyHint = when (viewModel.cartType) {
         CartType.SHARE -> "Add articles that already have images in the Oasis gallery (for sharing or print later)."
         CartType.DESIGN -> "Use the Design tab for shelf label layout."
         CartType.DESIGN_DONE -> "Printed or sent articles appear in Done on the Design tab."
-        CartType.PHOTOSHOOT -> "Use the AGENT tab to capture product photos."
+        CartType.PHOTOSHOOT -> "Articles needing a photo — from Batch txt, Articles search, or Article detail. Use AGENT to capture."
     }
 
     val shareableCount = items.count { !it.imagePath.isNullOrBlank() }
@@ -159,6 +160,13 @@ fun CartScreen(
                     }
                 }
             }
+            if (viewModel.cartType == CartType.PHOTOSHOOT && onOpenAgent != null) {
+                item {
+                    Button(onClick = onOpenAgent, modifier = Modifier.fillMaxWidth()) {
+                        Text("Open AGENT — scan & capture")
+                    }
+                }
+            }
             if (items.isNotEmpty()) {
                 item { CartSourceLegend() }
                 item {
@@ -215,12 +223,13 @@ fun CartRoute(
     cartType: CartType,
     factory: OasisViewModelFactory,
     onArticleClick: (Long) -> Unit,
+    onOpenAgent: (() -> Unit)? = null,
 ) {
     val viewModel: CartViewModel = viewModel(
         key = "cart_${cartType.name}",
         factory = factory.cartViewModelFactory(cartType),
     )
-    CartScreen(viewModel, onArticleClick)
+    CartScreen(viewModel, onArticleClick, onOpenAgent)
 }
 
 private fun PreselectionWithArticle.toArticleWithImage() = ArticleWithImage(
