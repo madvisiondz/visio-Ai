@@ -11,6 +11,7 @@ import com.oasismall.oasisai.domain.ImportService
 import com.oasismall.oasisai.domain.ReadyPngLoader
 import com.oasismall.oasisai.domain.ReadyPngModel
 import com.oasismall.oasisai.domain.visio.ProductImagesExporter
+import com.oasismall.oasisai.domain.visio.PhotoroomStorage
 import com.oasismall.oasisai.util.TaskProgress
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -69,8 +70,31 @@ class SettingsViewModel(
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DatabaseOverview())
 
+    private val _photoroomFolderLabel = MutableStateFlow(PhotoroomStorage.DEFAULT_DISPLAY_PATH)
+    val photoroomFolderLabel: StateFlow<String> = _photoroomFolderLabel.asStateFlow()
+
+    private val _photoroomCustomFolder = MutableStateFlow(false)
+    val photoroomCustomFolder: StateFlow<Boolean> = _photoroomCustomFolder.asStateFlow()
+
     init {
         refreshPngCountsLight()
+    }
+
+    fun refreshPhotoroomFolder(context: Context) {
+        _photoroomFolderLabel.value = PhotoroomStorage.displayPath(context)
+        _photoroomCustomFolder.value = PhotoroomStorage.isCustomFolder(context)
+    }
+
+    fun setPhotoroomFolder(context: Context, treeUri: Uri) {
+        val label = PhotoroomStorage.saveFolderTree(context, treeUri)
+        refreshPhotoroomFolder(context)
+        showMessage("PhotoRoom folder set to $label")
+    }
+
+    fun clearPhotoroomFolder(context: Context) {
+        PhotoroomStorage.clearFolderTree(context)
+        refreshPhotoroomFolder(context)
+        showMessage("PhotoRoom folder reset to ${PhotoroomStorage.DEFAULT_DISPLAY_PATH}")
     }
 
     fun refreshPngCountsLight() {

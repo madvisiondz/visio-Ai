@@ -26,6 +26,7 @@
 
 ## Phase 3 — Polish (in progress)
 
+- [x] **v2.4.0** Sub-barcode confirm + deferred PhotoRoom link + per-barcode images + removable chips (Room v14)
 - [x] v2.5.0 Design queue order preserved; AGENT Bulk mode + `bulk_captures` (Room v11)
 - [x] v2.4.0 Design Done sub-cart + per-article copy count (+ button); Room v10 `copyCount`
 - [x] v1.5.0 Design screen: in-app Oasis Print shelf labels; To share → Add to Design; A4 JPEG export; History → Settings
@@ -49,7 +50,9 @@
 - [x] Stamper gallery launch crash fix and zero-start event history
 - [x] Stamper last-card fix, larger scrollable cards, and enriched shared PNG metadata
 - [x] Replace repo image database from `G:\DATA BASE` and support barcode-only PNG filenames
-- [x] One-by-one Share cart queue with article text attached per PNG file
+- [x] v2.4.5 Cart flavor rows — `variantBarcode` on preselection; parent + sub-barcodes coexist in To share & Design
+
+---
 - [x] Batch txt screen routes designation lists to To share / To shoot / **Camera batch queue** automatically
 - [x] To shoot source labels/colors (Manual / Batch txt / Check & shoot / Stamper)
 - [x] **Visio Ai 2.0**: To shoot bottom nav restored (2026-06-16)

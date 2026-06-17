@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.oasismall.oasisai.data.db.dao.ArticleWithImage
 import com.oasismall.oasisai.data.model.CartType
+import com.oasismall.oasisai.data.repository.ArticlePanelMeta
 import com.oasismall.oasisai.data.repository.OasisRepository
 import com.oasismall.oasisai.ui.components.CartSourceTags
 import com.oasismall.oasisai.util.hasAppGalleryImage
@@ -18,9 +19,13 @@ class ArticleDetailViewModel(
     private val _article = MutableStateFlow<ArticleWithImage?>(null)
     val article: StateFlow<ArticleWithImage?> = _article.asStateFlow()
 
+    private val _meta = MutableStateFlow<ArticlePanelMeta?>(null)
+    val meta: StateFlow<ArticlePanelMeta?> = _meta.asStateFlow()
+
     fun load(articleId: Long) {
         viewModelScope.launch {
             _article.value = repository.getArticleWithImageById(articleId)
+            _meta.value = repository.getArticlePanelMeta(articleId)
         }
     }
 
@@ -40,11 +45,27 @@ class ArticleDetailViewModel(
         }
     }
 
+    fun addToDesignCart() {
+        val article = _article.value ?: return
+        if (!article.hasAppGalleryImage()) return
+        viewModelScope.launch {
+            repository.addToCart(article.id, CartType.DESIGN, CartSourceTags.ARTICLE)
+        }
+    }
+
     fun markTicketVerified() {
         viewModelScope.launch {
             val id = _article.value?.id ?: return@launch
             repository.markTicketVerified(id)
-            _article.value = repository.getArticleWithImageById(id)
+            load(id)
+        }
+    }
+
+    fun removeSubBarcode(barcode: String) {
+        val articleId = _article.value?.id ?: return
+        viewModelScope.launch {
+            repository.unlinkAlternateBarcode(articleId, barcode)
+            load(articleId)
         }
     }
 }

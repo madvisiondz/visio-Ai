@@ -25,44 +25,46 @@ class CartViewModel(
     val items = repository.observeCart(cartType)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    private val _selectedArticleIds = MutableStateFlow<Set<Long>>(emptySet())
-    val selectedArticleIds: StateFlow<Set<Long>> = _selectedArticleIds.asStateFlow()
+    private val _selectedPreselectionIds = MutableStateFlow<Set<Long>>(emptySet())
+    val selectedPreselectionIds: StateFlow<Set<Long>> = _selectedPreselectionIds.asStateFlow()
 
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message.asStateFlow()
 
-    fun toggleSelection(articleId: Long) {
-        _selectedArticleIds.value = _selectedArticleIds.value.let { selected ->
-            if (articleId in selected) selected - articleId else selected + articleId
+    fun toggleSelection(preselectionId: Long) {
+        _selectedPreselectionIds.value = _selectedPreselectionIds.value.let { selected ->
+            if (preselectionId in selected) selected - preselectionId else selected + preselectionId
         }
     }
 
     fun selectAllShareable() {
-        _selectedArticleIds.value = items.value
+        _selectedPreselectionIds.value = items.value
             .filter { !it.imagePath.isNullOrBlank() }
-            .map { it.articleId }
+            .map { it.preselectionId }
             .toSet()
     }
 
     fun clearSelection() {
-        _selectedArticleIds.value = emptySet()
+        _selectedPreselectionIds.value = emptySet()
     }
 
-    fun remove(articleId: Long) {
-        _selectedArticleIds.value = _selectedArticleIds.value - articleId
-        viewModelScope.launch { repository.removeFromCart(articleId, cartType) }
+    fun remove(preselectionId: Long) {
+        _selectedPreselectionIds.value = _selectedPreselectionIds.value - preselectionId
+        viewModelScope.launch { repository.removeFromCart(preselectionId) }
     }
 
     fun clear() {
-        _selectedArticleIds.value = emptySet()
+        _selectedPreselectionIds.value = emptySet()
         viewModelScope.launch { repository.clearCart(cartType) }
     }
 
     fun markSelectedSent() {
-        val ids = _selectedArticleIds.value.toList()
+        val ids = items.value
+            .filter { it.preselectionId in _selectedPreselectionIds.value }
+            .map { it.articleId }
         viewModelScope.launch {
             repository.markProductImagesSent(ids)
-            _selectedArticleIds.value = emptySet()
+            _selectedPreselectionIds.value = emptySet()
         }
     }
 
@@ -82,12 +84,13 @@ class CartViewModel(
         viewModelScope.launch {
             var added = 0
             shareable.forEach { item ->
-                if (!repository.isInCart(item.articleId, CartType.DESIGN)) {
-                    repository.addToCart(item.articleId, CartType.DESIGN, item.note)
+                val variant = item.variantBarcode.takeIf { it.isNotEmpty() }
+                if (!repository.isInCart(item.articleId, CartType.DESIGN, variant)) {
+                    repository.addToCart(item.articleId, CartType.DESIGN, item.note, variant)
                     added++
                 }
             }
-            _selectedArticleIds.value = emptySet()
+            _selectedPreselectionIds.value = emptySet()
             _message.value = if (added > 0) {
                 "Added $added article(s) to Design — open Design tab → Shelf labels."
             } else {
@@ -118,7 +121,7 @@ class CartViewModel(
                     ExportShareHelper.sharePngFiles(context, shareableItems, summary)
                 }
                 repository.markProductImagesSent(shareableItems.map { it.articleId })
-                _selectedArticleIds.value = emptySet()
+                _selectedPreselectionIds.value = emptySet()
                 val names = shareableItems.joinToString(", ") { PngShareHelper.targetFileName(it) }
                 "Sharing ${shareableItems.size} file(s) as documents: $names. In Telegram they must appear as files (not photo preview)."
             }.onSuccess { msg ->

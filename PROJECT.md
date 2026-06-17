@@ -51,6 +51,18 @@ OASIS MALL operates at scale with fragmented workflows:
 
 | Area | Choice |
 |------|--------|
+| 2026-06-17 | **Visio Ai v2.4.5**: Cart rows keyed by **variant barcode** — parent + each sub-flavor coexist in To share & Design; PhotoRoom sub-bc import auto-adds that flavor to To share |
+| 2026-06-17 | **Visio Ai v2.4.4**: Shelf label export **300 DPI** + **JPEG 100%**; full-res product decode on tickets |
+| 2026-06-17 | **Visio Ai v2.4.3**: Fix Articles search crash — unique list keys for sub-barcode rows; safer search expansion |
+| 2026-06-17 | **Visio Ai v2.4.2**: PhotoRoom import list — **Remove** button per pending card |
+| 2026-06-17 | **Visio Ai v2.4.1**: New sub-barcodes always require a photo (no add-without-image); existing sub-barcodes unchanged |
+| 2026-06-17 | **Visio Ai v2.4.0**: Sub-barcode **confirm → shoot? → PhotoRoom import → link**; per-sub-barcode images; articles search shows designation twice; removable sub-barcode chips |
+| 2026-06-16 | **Visio Ai v2.3.7**: PhotoRoom import auto-adds linked PNGs to **To share** (removed from pending list only after cart add) |
+| 2026-06-16 | **Visio Ai v2.3.6**: Unified scrollable **ArticleActionPanel** (price/print history, SUB-BC, batch shoot); sub-barcode auto-link on camera batch scan |
+| 2026-06-16 | **Visio Ai v2.3.5**: Fix Import detail empty list — skip enriching 26k UNCHANGED rows; meaningful-only query |
+| 2026-06-16 | **Visio Ai v2.3.4**: Import change list shows product thumbnail (or “No image”); **Add to To share** / **Add to To shoot** from Import detail + Report |
+| 2026-06-16 | **Visio Ai v2.3.3**: Camera batch **known-article fast path** (skip scan → shoot → PhotoRoom wait); PhotoRoom import index + all-pending queue |
+| 2026-06-16 | **Visio Ai v2.3.1**: Settings **PhotoRoom folder** selector (SAF tree URI); Camera batch import reads from chosen folder or default `Pictures/Photoroom` |
 | 2026-06-16 | **Visio Ai v2.3.0**: Batch txt **3-way routing** (To share / To shoot / **Camera batch queue**); scan-first camera batch (like AGENT) with create designation, CSV match → Proceed (sub-barcode) or Add to To share; queue auto-advance; Room `batch_camera_queue` (v13) |
 | 2026-06-16 | **Visio Ai v2.2.0**: Settings **Export PNG database** → `Download/VisioAi/Product_images[date]/`; **Camera batch** on Batch txt → shoot to `Batch_images[date]/`, PhotoRoom import from `Pictures/Photoroom/` |
 | 2026-06-14 | **MadVision** private GitHub repo initialized; app display name → MadVision; source-only `.gitignore` |
@@ -574,6 +586,19 @@ It:
 
 | Date | Change |
 |------|--------|
+| 2026-06-17 | **Visio Ai v2.4.5**: DB v15 `preselection_items.variantBarcode`; cart unique `(articleId, cartType, variantBarcode)`; sub-bc image in cart queries; PhotoRoom sub-bc → To share as flavor row |
+| 2026-06-17 | **Visio Ai v2.4.4**: Design shelf preset — 300 DPI page, JPEG quality 100, sharper product PNG decode |
+| 2026-06-17 | **Visio Ai v2.4.3**: Articles search crash fix — `id+barcode` list keys; batch sub-bc lookup; search fallback |
+| 2026-06-17 | **Visio Ai v2.4.2**: PhotoRoom import pending cards — **Remove** drops queue row + batch JPEG |
+| 2026-06-17 | **Visio Ai v2.4.1**: Sub-barcode add always shoots photo; legacy sub-barcodes without images kept as-is |
+| 2026-06-17 | **Visio Ai v2.4.0**: Sub-barcode confirm + optional batch shoot; link deferred until PhotoRoom import; `article_alternate_barcodes.imagePath`; search duplicate designation rows; tap sub-barcode chip to remove |
+| 2026-06-16 | **Visio Ai v2.3.7**: PhotoRoom import auto-adds imported PNGs to **To share** cart |
+| 2026-06-16 | **Visio Ai v2.3.6**: Article detail **Add sub-barcode & batch shoot**; shared scrollable article panel on AGENT/Scanner/Camera batch with last price + last printed |
+| 2026-06-16 | **Visio Ai v2.3.5**: Import detail fix — meaningful changes query; stop storing UNCHANGED rows |
+| 2026-06-16 | **Visio Ai v2.3.4**: Import detail + Report CSV change rows show linked PNG (or “No image”); route to To share (has image) or To shoot (no image) |
+| 2026-06-16 | **Visio Ai v2.3.3**: Known-article camera batch skips scan; PhotoRoom import hardened (barcode/designation/PNG metadata matching) |
+| 2026-06-16 | **Visio Ai v2.3.2**: Design Done manual only (Mark as sent / Mark as printed); Done list by date + remove row |
+| 2026-06-16 | **Visio Ai v2.3.1**: Settings PhotoRoom folder picker (persisted SAF URI); import/rescan uses selected folder |
 | 2026-06-16 | **Visio Ai v2.3.0**: Batch txt routes not-in-CSV lines to **batch_camera_queue**; Camera batch scan-first (lock barcode → shoot → proceed); unknown barcode → create designation + CSV fuzzy match (Proceed sub-barcode / Add to To share); APK 2.3.0 (230) |
 | 2026-06-07 | Android v2.5.2: Bulk PNGs → `DCIM/BULK/{barcode}.png`; `bulk_done.txt` logs completed barcodes |
 | 2026-06-07 | Android v2.5.1: Bulk mode **Replace/Skip** now sees catalog-linked PNGs (`resolveScannedBarcode` + `product_images`), not only `{barcode}.png` on disk |

@@ -9,6 +9,7 @@ import com.oasismall.oasisai.data.db.dao.ArticleWithImage
 import com.oasismall.oasisai.data.model.AgentCaptureMode
 import com.oasismall.oasisai.data.model.CartType
 import com.oasismall.oasisai.data.repository.OasisRepository
+import com.oasismall.oasisai.data.repository.SubBarcodeInfo
 import com.oasismall.oasisai.domain.ImageMatcher
 import com.oasismall.oasisai.domain.backgroundremoval.BackgroundRemovalOptions
 import com.oasismall.oasisai.domain.backgroundremoval.BackgroundRemovalService
@@ -44,6 +45,8 @@ data class CheckShootScan(
     val designation: String? = null,
     val price: Double? = null,
     val lastPriceChangedAt: Long? = null,
+    val lastPrintedAt: Long? = null,
+    val codeart: String? = null,
     val existingImagePath: String? = null,
     val inGestiumCatalog: Boolean = false,
     val linkedViaAlternate: Boolean = false,
@@ -97,8 +100,14 @@ class CheckShootViewModel(
     private val _subBcMode = MutableStateFlow(false)
     val subBcMode: StateFlow<Boolean> = _subBcMode.asStateFlow()
 
-    private val _subBarcodes = MutableStateFlow<List<String>>(emptyList())
-    val subBarcodes: StateFlow<List<String>> = _subBarcodes.asStateFlow()
+    private val _subBarcodes = MutableStateFlow<List<SubBarcodeInfo>>(emptyList())
+    val subBarcodes: StateFlow<List<SubBarcodeInfo>> = _subBarcodes.asStateFlow()
+
+    private val _subBarcodeConfirm = MutableStateFlow<String?>(null)
+    val subBarcodeConfirm: StateFlow<String?> = _subBarcodeConfirm.asStateFlow()
+
+    private val _openSubBcBatchShoot = MutableSharedFlow<Pair<Long, String>>(extraBufferCapacity = 1)
+    val openSubBcBatchShoot: SharedFlow<Pair<Long, String>> = _openSubBcBatchShoot.asSharedFlow()
 
     private val _agentMode = MutableStateFlow(loadAgentMode())
     val agentMode: StateFlow<AgentCaptureMode> = _agentMode.asStateFlow()
@@ -114,6 +123,8 @@ class CheckShootViewModel(
 
     private var debounceBarcode: String? = null
     private var debounceTimeMs = 0L
+    private var stableBarcode: String? = null
+    private var stableReadCount = 0
     private var pendingCaptureFile: File? = null
     private var pendingTeachCapture = false
     private var teachScannedBarcode: String? = null
@@ -182,6 +193,13 @@ class CheckShootViewModel(
         val trimmed = barcode.trim()
         if (trimmed.isEmpty()) return
         val now = System.currentTimeMillis()
+        if (trimmed == stableBarcode) {
+            stableReadCount++
+        } else {
+            stableBarcode = trimmed
+            stableReadCount = 1
+        }
+        if (stableReadCount < STABLE_READS_REQUIRED) return
         if (trimmed == debounceBarcode && now - debounceTimeMs < SCAN_DEBOUNCE_MS) return
         debounceBarcode = trimmed
         debounceTimeMs = now
@@ -196,6 +214,8 @@ class CheckShootViewModel(
             return
         }
         if (_isLocked.value) return
+        // Hold the current article card until the user locks or dismisses — avoids scan flicker.
+        if (_scan.value != null) return
         viewModelScope.launch { refreshScan(trimmed) }
     }
 
@@ -218,14 +238,40 @@ class CheckShootViewModel(
     private suspend fun handleSubBarcodeScanned(subBarcode: String) {
         val locked = _scan.value ?: return
         val articleId = locked.articleId ?: resolveArticleId(locked)
-        val designation = locked.designation ?: locked.barcode
-        val error = repository.linkSubBarcodeToMainArticle(articleId, locked.barcode, subBarcode)
+        val error = repository.validateSubBarcodeLink(articleId, locked.barcode, subBarcode)
         if (error != null) {
             _message.value = error
             return
         }
-        refreshSubBarcodes(articleId)
-        _message.value = "SUB-BC saved: $subBarcode → $designation"
+        _subBarcodeConfirm.value = subBarcode
+    }
+
+    fun confirmSubBarcodeAdd() {
+        val pending = _subBarcodeConfirm.value ?: return
+        _subBarcodeConfirm.value = null
+        val locked = _scan.value ?: return
+        viewModelScope.launch {
+            val articleId = locked.articleId ?: resolveArticleId(locked)
+            _openSubBcBatchShoot.emit(articleId to pending)
+        }
+    }
+
+    fun declineSubBarcodeAdd() {
+        _subBarcodeConfirm.value = null
+    }
+
+    fun removeSubBarcode(barcode: String) {
+        viewModelScope.launch {
+            val locked = _scan.value ?: return@launch
+            val articleId = locked.articleId ?: resolveArticleId(locked)
+            val error = repository.unlinkAlternateBarcode(articleId, barcode)
+            if (error != null) {
+                _message.value = error
+                return@launch
+            }
+            refreshSubBarcodes(articleId)
+            _message.value = "Removed sub-barcode $barcode"
+        }
     }
 
     private suspend fun refreshSubBarcodes(articleId: Long) {
@@ -500,6 +546,8 @@ class CheckShootViewModel(
         pendingTeachCapture = false
         debounceBarcode = null
         debounceTimeMs = 0L
+        stableBarcode = null
+        stableReadCount = 0
         _message.value = null
         paray.sessionStore.clear()
     }
@@ -508,6 +556,10 @@ class CheckShootViewModel(
         if (_isLocked.value || _phase.value != CheckShootPhase.SCANNING) return
         if (_paraySuggest.value != null || _suffixMatch.value != null) return
         _scan.value = null
+        stableBarcode = null
+        stableReadCount = 0
+        debounceBarcode = null
+        debounceTimeMs = 0L
     }
 
     fun addToShareCart() {
@@ -730,12 +782,15 @@ class CheckShootViewModel(
             ?.takeIf { it.isNotBlank() }
             ?.takeIf { File(it).exists() }
         val lastPriceChange = article?.id?.let { repository.getLatestPriceChange(it) }
+        val meta = article?.id?.let { repository.getArticlePanelMeta(it) }
         _scan.value = CheckShootScan(
             barcode = barcode,
             articleId = article?.id,
             designation = article?.designation,
             price = article?.price,
-            lastPriceChangedAt = lastPriceChange?.changedAt,
+            lastPriceChangedAt = lastPriceChange?.changedAt ?: meta?.lastPriceChangedAt,
+            lastPrintedAt = meta?.lastPrintedAt,
+            codeart = meta?.codeart,
             existingImagePath = existing,
             inGestiumCatalog = resolved != null,
             linkedViaAlternate = resolved != null && !resolved.primary,
@@ -801,7 +856,8 @@ class CheckShootViewModel(
     }
 
     companion object {
-        private const val SCAN_DEBOUNCE_MS = 1_500L
+        private const val SCAN_DEBOUNCE_MS = 3_000L
+        private const val STABLE_READS_REQUIRED = 4
         private const val PREFS_AGENT = "oasis_agent_prefs"
         private const val KEY_AGENT_MODE = "capture_mode"
     }

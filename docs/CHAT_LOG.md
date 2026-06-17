@@ -605,3 +605,107 @@
 **User:** Batch camera scan-first (like AGENT); unknown barcode create designation with CSV match (Proceed sub-barcode / Add to To share); Batch txt 3-way routing with clickable camera batch queue.
 
 **Assistant:** **Visio Ai v2.3.0** (code 230): `batch_camera_queue` + scan-first camera batch; Batch txt To share / To shoot / queue list; designation fuzzy match actions; APK `VisioAI-debug.apk`.
+
+---
+
+## Session 70 — 2026-06-16
+
+**User:** PhotoRoom image folder selector in Settings.
+
+**Assistant:** **Visio Ai v2.3.1**: Settings row to pick PhotoRoom folder via SAF; persisted URI used by Camera batch import; reset to default `Pictures/Photoroom`.
+
+---
+
+## Session 71 — 2026-06-16
+
+**User:** Design Send info should not auto-mark Done; add Mark as printed/sent buttons; Done list by date; remove from Done.
+
+**Assistant:** **Visio Ai v2.3.2**: Manual Done workflow; Done sorted newest-first with timestamp; Remove on Done rows.
+
+---
+
+## Session 72 — 2026-06-16
+
+**User:** After CSV import, price changes listed in history but no way to add them anywhere; want images on change rows and Add to To shoot / To share.
+
+**Assistant:** **Visio Ai v2.3.4**: `ImportChangeCard` on Import detail + Report — thumbnail or “No image”; **Add to To share** (has PNG) / **Add to To shoot** (no PNG); cart tag `SRC_IMPORT_CHANGE`.
+
+---
+
+## Session 73 — 2026-06-16
+
+**User:** Import history shows 18 price changes but Import #2 detail shows 0 changes (broken after v2.3.4).
+
+**Assistant:** **Visio Ai v2.3.5**: v2.3.4 tried to enrich all ~26k UNCHANGED rows; fixed with meaningful-only query + stop storing UNCHANGED on new imports.
+
+---
+
+## Session 74 — 2026-06-16
+
+**User:** Article cards need sub-barcode batch shoot, scrollable AGENT-style options everywhere, auto sub-barcode link on scan, last price + last printed.
+
+**Assistant:** **Visio Ai v2.3.6**: `ArticleActionPanel` on Article detail / AGENT / Scanner / Camera batch; **Add sub-barcode & batch shoot** from article; camera batch auto-links scanned barcode to parent article.
+
+---
+
+## Session 75 — 2026-06-16
+
+**User:** After PhotoRoom import, articles disappear — should auto go to To share.
+
+**Assistant:** **Visio Ai v2.3.7**: `importFromPhotoroom` now adds article to **To share** after PNG is linked; removes from To shoot only.
+
+---
+
+## Session 76 — 2026-06-17
+
+**User:** Sub-barcode needs final confirmation; always ask shoot?; link only after PhotoRoom import with per-sub-barcode image; designation shows twice in search; sub-barcode chips removable.
+
+**Assistant:** **Visio Ai v2.4.0**: confirm → shoot? dialogs (AGENT + camera batch); `pendingSubBarcodeLink` on batch items; DB v14 `imagePath` on alternates; search variants; tap chip to remove mistaken sub-barcodes.
+
+---
+
+## Session 77 — 2026-06-17
+
+**User:** AGENT barcode reader too sensitive; lock button as round corner FAB (~¼ inside card).
+
+**Assistant:** Scan stability (4 consecutive reads + 3s debounce); hold card until lock/dismiss; corner lock/unlock FAB on AGENT article popup.
+
+---
+
+## Session 78 — 2026-06-17
+
+**User:** Every new sub-barcode must have its own image; adding = shoot photo; keep existing sub-barcodes as before.
+
+**Assistant:** **Visio Ai v2.4.1**: Removed add-without-photo; confirm → shoot directly; link only after PhotoRoom import with image.
+
+---
+
+## Session 79 — 2026-06-17
+
+**User:** Remove button on PhotoRoom import list cards.
+
+**Assistant:** **Visio Ai v2.4.2**: **Remove** on each pending card — deletes batch JPEG + drops queue row (PhotoRoom PNG untouched).
+
+---
+
+## Session 80 — 2026-06-17
+
+**User:** Articles search crashes — likely sub-barcode duplicate rows.
+
+**Assistant:** **Visio Ai v2.4.3**: LazyColumn keys `id+barcode`; batch alternate lookup; try/catch fallback; cap expansion at 60 mains.
+
+---
+
+## Session 81 — 2026-06-17
+
+**User:** Shelf preset printed images low quality — want 100% quality.
+
+**Assistant:** **Visio Ai v2.4.4**: Shelf A4 **3508×2480** (300 DPI), JPEG **100%**, full-resolution PNG decode per ticket slot.
+
+---
+
+## Session 82 — 2026-06-17
+
+**User:** To-share & Design should load sub-articles (flavors) without replacing parent; PhotoRoom sub-bc PNG import should go to To-share directly.
+
+**Assistant:** **Visio Ai v2.4.5**: DB v15 `preselection_items.variantBarcode`; unique `(articleId, cartType, variantBarcode)`; cart SQL resolves sub-bc images; remove/copy/move by `preselectionId`; PhotoRoom sub-bc import adds flavor row to To share; Home/Scanner pass barcode when adding to cart.

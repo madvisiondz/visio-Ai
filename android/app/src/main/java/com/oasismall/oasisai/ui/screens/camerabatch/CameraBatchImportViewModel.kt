@@ -6,6 +6,7 @@ import com.oasismall.oasisai.data.db.entity.CameraBatchItemEntity
 import com.oasismall.oasisai.domain.visio.CameraBatchStore
 import com.oasismall.oasisai.domain.visio.PhotoroomStorage
 import com.oasismall.oasisai.domain.visio.VisioDownloadStorage
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -13,31 +14,33 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import java.io.File
+import kotlinx.coroutines.withContext
 
 data class PendingBatchRow(
     val item: CameraBatchItemEntity,
-    val photoroomPng: File?,
+    val photoroomPng: PhotoroomStorage.PngRef?,
 )
 
 class CameraBatchImportViewModel(
     private val store: CameraBatchStore,
 ) : ViewModel() {
     val batchFolder = VisioDownloadStorage.displayPath(store.batchFolderName())
-    val photoroomPath = PhotoroomStorage.DISPLAY_PATH
 
     private val refreshTick = MutableStateFlow(0)
 
+    private val _photoroomPath = MutableStateFlow(store.photoroomDisplayPath())
+    val photoroomPath: StateFlow<String> = _photoroomPath.asStateFlow()
+
     val pendingRows: StateFlow<List<PendingBatchRow>> = combine(
-        store.observePendingToday(),
+        store.observeAllPending(),
         refreshTick,
     ) { items, _ ->
         items.map { item ->
-            PendingBatchRow(item, PhotoroomStorage.findPngForBarcode(item.barcode))
+            PendingBatchRow(item, store.findPhotoroomPng(item.barcode, item.designation))
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    private val _photoroomPngCount = MutableStateFlow(PhotoroomStorage.listPngFiles().size)
+    private val _photoroomPngCount = MutableStateFlow(0)
     val photoroomPngCount: StateFlow<Int> = _photoroomPngCount.asStateFlow()
 
     private val _message = MutableStateFlow<String?>(null)
@@ -46,9 +49,18 @@ class CameraBatchImportViewModel(
     private val _busy = MutableStateFlow(false)
     val busy: StateFlow<Boolean> = _busy.asStateFlow()
 
+    init {
+        refreshPhotoroomList()
+    }
+
     fun refreshPhotoroomList() {
-        _photoroomPngCount.value = PhotoroomStorage.listPngFiles().size
-        refreshTick.value++
+        viewModelScope.launch(Dispatchers.IO) {
+            store.refreshPhotoroomIndex()
+            val pngs = store.listPhotoroomPngs()
+            _photoroomPath.value = store.photoroomDisplayPath()
+            _photoroomPngCount.value = pngs.size
+            refreshTick.value++
+        }
     }
 
     fun importOne(itemId: Long) {
@@ -68,13 +80,24 @@ class CameraBatchImportViewModel(
     fun importAllMatched() {
         viewModelScope.launch {
             _busy.value = true
-            val result = store.importAllPending()
+            val result = withContext(Dispatchers.IO) { store.importAllPending() }
             _message.value = buildString {
-                append("Imported ${result.imported}")
+                append("Imported ${result.imported} → To share")
                 if (result.failed > 0) append(", ${result.failed} still waiting")
                 if (result.errors.isNotEmpty()) append("\n${result.errors.joinToString("\n")}")
             }
             refreshPhotoroomList()
+            _busy.value = false
+        }
+    }
+
+    fun removePending(itemId: Long) {
+        viewModelScope.launch {
+            _busy.value = true
+            store.removePendingItem(itemId).fold(
+                onSuccess = { msg -> _message.value = msg },
+                onFailure = { e -> _message.value = e.message ?: "Could not remove" },
+            )
             _busy.value = false
         }
     }

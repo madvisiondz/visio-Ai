@@ -41,12 +41,13 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.oasismall.oasisai.OasisApp
-import com.oasismall.oasisai.domain.ReadyPngModel
+import com.oasismall.oasisai.domain.visio.PhotoroomStorage
 import com.oasismall.oasisai.domain.paray.ParayImportStatus
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -73,7 +74,13 @@ fun SettingsScreen(
     val app = context.applicationContext as OasisApp
     val overview by viewModel.overview.collectAsStateWithLifecycle()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val photoroomFolderLabel by viewModel.photoroomFolderLabel.collectAsStateWithLifecycle()
+    val photoroomCustomFolder by viewModel.photoroomCustomFolder.collectAsStateWithLifecycle()
     val parayImport by app.parayImportManager.state.collectAsStateWithLifecycle()
+
+    LaunchedEffect(Unit) {
+        viewModel.refreshPhotoroomFolder(context)
+    }
     val readyImagesPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenMultipleDocuments(),
     ) { uris ->
@@ -88,6 +95,17 @@ fun SettingsScreen(
                 Intent.FLAG_GRANT_READ_URI_PERMISSION,
             )
             viewModel.loadReadyPngFolder(context, uri)
+        }
+    }
+    val photoroomFolderPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree(),
+    ) { uri ->
+        if (uri != null) {
+            context.contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION,
+            )
+            viewModel.setPhotoroomFolder(context, uri)
         }
     }
     val parayFingerprintPicker = rememberLauncherForActivityResult(
@@ -224,6 +242,26 @@ fun SettingsScreen(
                     enabled = !busy,
                     onClick = { readyImagesPicker.launch(arrayOf("image/png")) },
                 )
+            }
+            item {
+                SettingsRow(
+                    title = "PhotoRoom folder",
+                    subtitle = "Current: $photoroomFolderLabel — used by Camera batch import (default ${PhotoroomStorage.DEFAULT_DISPLAY_PATH})",
+                    icon = Icons.Default.Image,
+                    enabled = !busy,
+                    onClick = { photoroomFolderPicker.launch(null) },
+                )
+            }
+            if (photoroomCustomFolder) {
+                item {
+                    SettingsRow(
+                        title = "Reset PhotoRoom folder",
+                        subtitle = "Go back to scanning ${PhotoroomStorage.DEFAULT_DISPLAY_PATH} on device storage",
+                        icon = Icons.Default.Refresh,
+                        enabled = !busy,
+                        onClick = { viewModel.clearPhotoroomFolder(context) },
+                    )
+                }
             }
             item {
                 SettingsRow(

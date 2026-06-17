@@ -7,7 +7,7 @@
 | UI | Jetpack Compose + Material 3 (Oasis orange `#FF5E13`, dark surfaces) |
 | Navigation | Navigation Compose |
 | State | ViewModel + StateFlow |
-| Database | Room (SQLite) |
+| Database | Room (SQLite) — **v15** (`preselection_items.variantBarcode`; v14: `article_alternate_barcodes.imagePath`, `camera_batch_items.pendingSubBarcodeLink`) |
 | Images | Coil lazy previews + local `files/product_images/` + FileProvider sharing |
 | Barcode | ML Kit (dependency) + manual entry |
 | Print export | Android `PdfDocument` |
@@ -53,7 +53,7 @@ com.oasismall.oasisai/
 1. **Designation-first** — article name is primary identity; barcode is lookup key
 2. **Offline-first** — all core flows work without internet
 3. **Pre-selection workflow** — catalog → pre-selection → template → export
-4. **Import diff** — never blind overwrite; compare and log changes
+4. **Import diff** — never blind overwrite; compare and log changes; enriched change UI routes rows to To share / To shoot carts
 5. **Print audit** — every batch stores price/designation/image snapshots
 
 ## Database tables

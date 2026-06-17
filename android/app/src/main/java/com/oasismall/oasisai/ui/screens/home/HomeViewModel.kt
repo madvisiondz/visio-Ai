@@ -71,15 +71,15 @@ class HomeViewModel(
         _query.value = value
     }
 
-    fun addToShareCart(articleId: Long) {
+    fun addToShareCart(articleId: Long, variantBarcode: String? = null) {
         viewModelScope.launch {
-            repository.addToCart(articleId, CartType.SHARE, CartSourceTags.HOME)
+            repository.addToCart(articleId, CartType.SHARE, CartSourceTags.HOME, variantBarcode)
         }
     }
 
-    fun addToPhotoshootCart(articleId: Long) {
+    fun addToPhotoshootCart(articleId: Long, variantBarcode: String? = null) {
         viewModelScope.launch {
-            repository.addToCart(articleId, CartType.PHOTOSHOOT, CartSourceTags.HOME)
+            repository.addToCart(articleId, CartType.PHOTOSHOOT, CartSourceTags.HOME, variantBarcode)
         }
     }
 }

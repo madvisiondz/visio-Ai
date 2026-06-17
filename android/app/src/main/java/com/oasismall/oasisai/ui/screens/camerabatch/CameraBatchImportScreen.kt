@@ -23,12 +23,16 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.oasismall.oasisai.util.PriceFormatter
@@ -41,9 +45,21 @@ fun CameraBatchImportScreen(
     onBack: () -> Unit,
 ) {
     val rows by viewModel.pendingRows.collectAsStateWithLifecycle()
+    val photoroomPath by viewModel.photoroomPath.collectAsStateWithLifecycle()
     val photoroomCount by viewModel.photoroomPngCount.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     val busy by viewModel.busy.collectAsStateWithLifecycle()
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.refreshPhotoroomList()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     Scaffold(
         topBar = {
@@ -64,7 +80,7 @@ fun CameraBatchImportScreen(
         ) {
             item {
                 Text(
-                    "Remove backgrounds in PhotoRoom, save PNGs to ${viewModel.photoroomPath}/, then import here into product_images.",
+                    "All pending shots (To shoot, Articles, AGENT, Batch). Rescan after PhotoRoom saves PNGs.",
                     style = MaterialTheme.typography.bodySmall,
                 )
                 Text(
@@ -106,7 +122,12 @@ fun CameraBatchImportScreen(
                 }
             }
             items(rows, key = { it.item.id }) { row ->
-                PendingImportCard(row = row, busy = busy, onImport = { viewModel.importOne(row.item.id) })
+                PendingImportCard(
+                    row = row,
+                    busy = busy,
+                    onImport = { viewModel.importOne(row.item.id) },
+                    onRemove = { viewModel.removePending(row.item.id) },
+                )
             }
         }
     }
@@ -117,6 +138,7 @@ private fun PendingImportCard(
     row: PendingBatchRow,
     busy: Boolean,
     onImport: () -> Unit,
+    onRemove: () -> Unit,
 ) {
     val found = row.photoroomPng != null
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -125,10 +147,11 @@ private fun PendingImportCard(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            val thumb: File? = row.photoroomPng ?: File(row.item.shotPath).takeIf { it.exists() }
-            if (thumb != null) {
+            val thumbSource: Any? = row.photoroomPng?.previewSource()
+                ?: File(row.item.shotPath).takeIf { it.exists() }
+            if (thumbSource != null) {
                 AsyncImage(
-                    model = thumb,
+                    model = thumbSource,
                     contentDescription = row.item.designation,
                     modifier = Modifier.size(72.dp),
                     contentScale = ContentScale.Crop,
@@ -146,8 +169,13 @@ private fun PendingImportCard(
                     style = MaterialTheme.typography.labelMedium,
                 )
             }
-            Button(onClick = onImport, enabled = found && !busy) {
-                Text("Import")
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Button(onClick = onImport, enabled = found && !busy) {
+                    Text("Import")
+                }
+                OutlinedButton(onClick = onRemove, enabled = !busy) {
+                    Text("Remove")
+                }
             }
         }
     }

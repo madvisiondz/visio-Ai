@@ -257,6 +257,31 @@ class ImageMatcher(
         return File(imagesDir, "$key.png")
     }
 
+    /** Saves PNG for a sub-barcode (separate from main article gallery image). */
+    suspend fun registerSubBarcodeImage(
+        subBarcode: String,
+        parentArticle: ArticleEntity,
+        sourceFile: File,
+    ): String {
+        val target = resolveTargetFileForSubBarcode(subBarcode)
+        sourceFile.copyTo(target, overwrite = true)
+        PngMetadata.writeArticleDetails(
+            file = target,
+            barcode = subBarcode.trim(),
+            designation = parentArticle.designation,
+            priceNow = parentArticle.price.takeIf { it > 0.0 },
+            priceBefore = parentArticle.previousPrice,
+            rayon = parentArticle.category,
+            codeart = parentArticle.codeart,
+        )
+        return target.absolutePath
+    }
+
+    fun resolveTargetFileForSubBarcode(subBarcode: String): File {
+        val key = PngMetadata.barcodeFileStem(subBarcode)
+        return File(imagesDir, "sub_$key.png")
+    }
+
     private suspend fun registerCapturedImageAtTarget(
         article: ArticleEntity,
         sourceFile: File,

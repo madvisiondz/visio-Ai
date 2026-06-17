@@ -64,6 +64,9 @@ import com.oasismall.oasisai.domain.design.DesignCartExpand
 import com.oasismall.oasisai.util.ExportShareHelper
 import com.oasismall.oasisai.util.PriceFormatter
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -190,7 +193,7 @@ private fun DesignHomeScreen(viewModel: DesignViewModel) {
                 item {
                     Text("To print", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                     Text(
-                        "Send info or print → articles move to Done · pull up to print again.",
+                        "Send info or print — then mark as sent/printed yourself. Pull up from Done to print again.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -198,6 +201,7 @@ private fun DesignHomeScreen(viewModel: DesignViewModel) {
                 item {
                     DesignQueueActions(
                         onSendInfo = { viewModel.sendCartInfo(context) },
+                        onMarkSent = viewModel::markQueueAsSent,
                         onImportPrices = { showImportDialog = true },
                     )
                 }
@@ -205,10 +209,10 @@ private fun DesignHomeScreen(viewModel: DesignViewModel) {
                     DesignQueueRow(
                         item = item,
                         onImageClick = { detailItem = item },
-                        onRemove = { viewModel.remove(item.articleId) },
+                        onRemove = { viewModel.remove(item.preselectionId) },
                         onPriceCommit = { text -> viewModel.updatePrice(item.articleId, text) },
-                        onIncrementCopy = { viewModel.incrementCopy(item.articleId) },
-                        onDecrementCopy = { viewModel.decrementCopy(item.articleId) },
+                        onIncrementCopy = { viewModel.incrementCopy(item.preselectionId) },
+                        onDecrementCopy = { viewModel.decrementCopy(item.preselectionId) },
                     )
                 }
                 item {
@@ -226,7 +230,7 @@ private fun DesignHomeScreen(viewModel: DesignViewModel) {
                         modifier = Modifier.padding(top = 8.dp),
                     )
                     Text(
-                        "Printed or sent for price check — pull up to add back to print queue. Keeps last 50.",
+                        "Printed or sent — newest first. Pull up to re-print, or remove from history. Keeps last 50.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -234,7 +238,8 @@ private fun DesignHomeScreen(viewModel: DesignViewModel) {
                 items(doneItems, key = { "done_${it.preselectionId}" }) { item ->
                     DesignDoneRow(
                         item = item,
-                        onPullUp = { viewModel.pullUpFromDone(item.articleId) },
+                        onPullUp = { viewModel.pullUpFromDone(item.preselectionId) },
+                        onRemove = { viewModel.removeFromDone(item.preselectionId) },
                     )
                 }
             }
@@ -245,17 +250,23 @@ private fun DesignHomeScreen(viewModel: DesignViewModel) {
 @Composable
 private fun DesignQueueActions(
     onSendInfo: () -> Unit,
+    onMarkSent: () -> Unit,
     onImportPrices: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Button(onClick = onSendInfo, modifier = Modifier.weight(1f)) {
-            Text("Send info")
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Button(onClick = onSendInfo, modifier = Modifier.weight(1f)) {
+                Text("Send info")
+            }
+            OutlinedButton(onClick = onImportPrices, modifier = Modifier.weight(1f)) {
+                Text("Import prices")
+            }
         }
-        OutlinedButton(onClick = onImportPrices, modifier = Modifier.weight(1f)) {
-            Text("Import prices")
+        OutlinedButton(onClick = onMarkSent, modifier = Modifier.fillMaxWidth()) {
+            Text("Mark as sent")
         }
     }
 }
@@ -310,6 +321,7 @@ private fun DetailLine(label: String, value: String) {
 private fun DesignDoneRow(
     item: PreselectionWithArticle,
     onPullUp: () -> Unit,
+    onRemove: () -> Unit,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -326,14 +338,28 @@ private fun DesignDoneRow(
                     "${PriceFormatter.formatNumber(item.price)} DA · ×${item.copyCount.coerceAtLeast(1)}",
                     style = MaterialTheme.typography.bodySmall,
                 )
+                Text(
+                    formatDoneTimestamp(item.addedAt),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
-            OutlinedButton(onClick = onPullUp) {
-                Icon(Icons.Default.KeyboardArrowUp, contentDescription = null)
-                Text("Pull up")
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                OutlinedButton(onClick = onPullUp) {
+                    Icon(Icons.Default.KeyboardArrowUp, contentDescription = null)
+                    Text("Pull up")
+                }
+                OutlinedButton(onClick = onRemove) {
+                    Icon(Icons.Default.Delete, contentDescription = null)
+                    Text("Remove")
+                }
             }
         }
     }
 }
+
+private fun formatDoneTimestamp(value: Long): String =
+    SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date(value))
 
 @Composable
 private fun DesignQueueRow(
@@ -345,8 +371,8 @@ private fun DesignQueueRow(
     onDecrementCopy: () -> Unit,
 ) {
     val copies = item.copyCount.coerceIn(1, 99)
-    var priceText by remember(item.articleId) { mutableStateOf(PriceFormatter.formatNumber(item.price)) }
-    var hadFocus by remember(item.articleId) { mutableStateOf(false) }
+    var priceText by remember(item.preselectionId) { mutableStateOf(PriceFormatter.formatNumber(item.price)) }
+    var hadFocus by remember(item.preselectionId) { mutableStateOf(false) }
     LaunchedEffect(item.price) {
         if (!hadFocus) priceText = PriceFormatter.formatNumber(item.price)
     }
@@ -459,7 +485,7 @@ private fun ReadyPrintScreen(viewModel: DesignViewModel) {
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                "Landscape A4 · 12 shelf labels (2×6) · JPEG quality 8/10. Share as file to avoid recompression.",
+                "Landscape A4 · 12 shelf labels (2×6) · 300 DPI · JPEG quality 100%. Share as file to avoid recompression.",
                 style = MaterialTheme.typography.bodyMedium,
             )
             if (pages > 1) {
@@ -495,12 +521,15 @@ private fun ReadyPrintScreen(viewModel: DesignViewModel) {
                 Button(
                     onClick = {
                         ExportShareHelper.shareJpegAsFile(context, File(jpegPath!!))
-                        viewModel.onPrintShared(pageIndex)
                     },
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text("Share as file") }
+                Button(
+                    onClick = { viewModel.markPageAsPrinted(pageIndex) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Mark as printed") }
                 OutlinedButton(onClick = viewModel::backToHome, modifier = Modifier.fillMaxWidth()) {
-                    Text("Done — back to Design")
+                    Text("Back to Design")
                 }
             }
         }

@@ -7,17 +7,29 @@ import com.oasismall.oasisai.data.db.entity.ImportEntity
 import com.oasismall.oasisai.data.db.entity.PrintBatchEntity
 import com.oasismall.oasisai.data.db.entity.PrintBatchItemEntity
 import com.oasismall.oasisai.data.model.ImportChangeType
+import com.oasismall.oasisai.data.repository.ImportChangeUiRow
 import com.oasismall.oasisai.data.repository.OasisRepository
+import com.oasismall.oasisai.ui.components.CartSourceTags
+import com.oasismall.oasisai.data.model.CartType
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class ReportCsvChangeRow(
     val change: ImportChangeEntity,
     val importFileName: String,
     val importDate: Long,
-)
+    val article: com.oasismall.oasisai.data.db.dao.ArticleWithImage? = null,
+) {
+    val uiRow: ImportChangeUiRow get() = ImportChangeUiRow(change = change, article = article)
+}
 
 data class ReportDesignPrintRow(
     val batch: PrintBatchEntity,
@@ -49,19 +61,28 @@ class ReportViewModel(
 ) : ViewModel() {
     val state: StateFlow<ReportUiState> = combine(
         repository.observeImports(),
-        repository.observeRecentCsvChanges(),
+        repository.observeRecentCsvChanges().flatMapLatest { changes ->
+            flow {
+                val enriched = withContext(Dispatchers.IO) {
+                    val rows = repository.enrichImportChanges(changes)
+                    rows.map { row -> row.change to row.article }
+                }
+                emit(enriched)
+            }
+        },
         repository.observeDesignShelfPrints(),
-    ) { imports, changes, designBatches ->
+    ) { imports, enrichedChanges, designBatches ->
         val importById = imports.associateBy { it.id }
         ReportUiState(
             latestImport = imports.firstOrNull(),
             previousImport = imports.getOrNull(1),
-            csvChanges = changes.map { change ->
+            csvChanges = enrichedChanges.map { (change, article) ->
                 val imp = importById[change.importId]
                 ReportCsvChangeRow(
                     change = change,
                     importFileName = imp?.fileName ?: "Import #${change.importId}",
                     importDate = imp?.importedAt ?: 0L,
+                    article = article,
                 )
             },
             designPrints = designBatches.map { batch ->
@@ -71,10 +92,23 @@ class ReportViewModel(
                 )
             },
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ReportUiState())
+    }.flowOn(Dispatchers.IO)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ReportUiState())
 
     suspend fun loadPrintItems(batchId: Long): List<PrintBatchItemEntity> =
         repository.getPrintBatchItems(batchId)
+
+    fun addToShareCart(articleId: Long) {
+        viewModelScope.launch {
+            repository.addToCart(articleId, CartType.SHARE, CartSourceTags.IMPORT_CHANGE)
+        }
+    }
+
+    fun addToPhotoshootCart(articleId: Long) {
+        viewModelScope.launch {
+            repository.addToCart(articleId, CartType.PHOTOSHOOT, CartSourceTags.IMPORT_CHANGE)
+        }
+    }
 }
 
 internal fun formatDate(epochMs: Long): String =

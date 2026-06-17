@@ -8,13 +8,18 @@ import com.oasismall.oasisai.domain.CsvParseResult
 import com.oasismall.oasisai.domain.CsvParser
 import com.oasismall.oasisai.domain.ImportResult
 import com.oasismall.oasisai.domain.ImportService
+import com.oasismall.oasisai.data.repository.ImportChangeUiRow
 import com.oasismall.oasisai.data.repository.OasisRepository
+import com.oasismall.oasisai.ui.components.CartSourceTags
+import com.oasismall.oasisai.data.model.CartType
 import com.oasismall.oasisai.util.TaskProgress
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -154,4 +159,22 @@ class ImportViewModel(
     }
 
     fun observeChanges(importId: Long) = repository.observeImportChanges(importId)
+
+    /** Meaningful changes only (excludes ~26k UNCHANGED rows per large import). */
+    fun observeChangesEnriched(importId: Long) =
+        repository.observeMeaningfulImportChanges(importId)
+            .mapLatest { repository.enrichImportChanges(it) }
+            .flowOn(Dispatchers.IO)
+
+    fun addToShareCart(articleId: Long) {
+        viewModelScope.launch {
+            repository.addToCart(articleId, CartType.SHARE, CartSourceTags.IMPORT_CHANGE)
+        }
+    }
+
+    fun addToPhotoshootCart(articleId: Long) {
+        viewModelScope.launch {
+            repository.addToCart(articleId, CartType.PHOTOSHOOT, CartSourceTags.IMPORT_CHANGE)
+        }
+    }
 }

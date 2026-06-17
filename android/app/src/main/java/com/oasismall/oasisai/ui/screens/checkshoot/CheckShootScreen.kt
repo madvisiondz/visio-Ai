@@ -14,6 +14,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -28,11 +33,12 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.TextButton
+import com.oasismall.oasisai.data.repository.SubBarcodeInfo
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -50,6 +56,9 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.oasismall.oasisai.data.model.AgentCaptureMode
+import com.oasismall.oasisai.ui.components.ArticleActionPanel
+import com.oasismall.oasisai.ui.components.ArticlePanelData
+import com.oasismall.oasisai.ui.components.OpenCameraBatchButton
 import com.oasismall.oasisai.ui.screens.scanner.BarcodeCameraPreview
 import com.oasismall.oasisai.util.PriceFormatter
 import com.oasismall.oasisai.util.createCheckShootCaptureUri
@@ -66,6 +75,8 @@ fun CheckShootScreen(
     startCapture: Boolean = false,
     returnArticleId: Long? = null,
     onReturnToArticle: (Long) -> Unit = {},
+    onOpenCameraBatch: (articleId: Long?) -> Unit = {},
+    onOpenSubBarcodeBatchShoot: (articleId: Long, subBarcode: String) -> Unit = { _, _ -> },
 ) {
     val context = LocalContext.current
     val scan by viewModel.scan.collectAsStateWithLifecycle()
@@ -77,6 +88,7 @@ fun CheckShootScreen(
     val message by viewModel.message.collectAsStateWithLifecycle()
     val subBcMode by viewModel.subBcMode.collectAsStateWithLifecycle()
     val subBarcodes by viewModel.subBarcodes.collectAsStateWithLifecycle()
+    val subBarcodeConfirm by viewModel.subBarcodeConfirm.collectAsStateWithLifecycle()
     val agentMode by viewModel.agentMode.collectAsStateWithLifecycle()
     val bulkScan by viewModel.bulkScan.collectAsStateWithLifecycle()
     val bulkCount by viewModel.bulkCaptureCount.collectAsStateWithLifecycle()
@@ -139,13 +151,41 @@ fun CheckShootScreen(
         }
     }
 
+    LaunchedEffect(Unit) {
+        viewModel.openSubBcBatchShoot.collect { (articleId, subBarcode) ->
+            onOpenSubBarcodeBatchShoot(articleId, subBarcode)
+        }
+    }
+
+    subBarcodeConfirm?.let { sub ->
+        AlertDialog(
+            onDismissRequest = viewModel::declineSubBarcodeAdd,
+            title = { Text("Add sub-barcode?") },
+            text = {
+                Text(
+                    "Link barcode $sub to this article? You will shoot a photo — " +
+                        "the sub-barcode is saved after PhotoRoom import.",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = viewModel::confirmSubBarcodeAdd) { Text("Add & shoot") }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::declineSubBarcodeAdd) { Text("Cancel") }
+            },
+        )
+    }
+
     Box(Modifier.fillMaxSize()) {
         if (hasCameraPermission && phase == CheckShootPhase.SCANNING) {
             BarcodeCameraPreview(
                 enabled = true,
                 barcodeScanEnabled = when {
                     isBulk -> bulkScan == null
-                    else -> (!isLocked || subBcMode) && paraySuggest == null && suffixMatch == null
+                    else -> {
+                        val holdCard = scan != null && !isLocked
+                        !holdCard && (!isLocked || subBcMode) && paraySuggest == null && suffixMatch == null
+                    }
                 },
                 onBarcodeDetected = viewModel::onBarcodeScanned,
                 modifier = Modifier.fillMaxSize(),
@@ -307,6 +347,8 @@ fun CheckShootScreen(
                     onAddToDesign = viewModel::addToDesignCart,
                     onCreateAsset = { launchCamera() },
                     onToggleSubBc = viewModel::toggleSubBcAcquisition,
+                    onOpenCameraBatch = onOpenCameraBatch,
+                    onRemoveSubBarcode = if (isLocked) viewModel::removeSubBarcode else null,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .navigationBarsPadding()
@@ -341,7 +383,7 @@ private fun CheckShootArticlePopup(
     scan: CheckShootScan,
     isLocked: Boolean,
     subBcMode: Boolean,
-    subBarcodes: List<String>,
+    subBarcodes: List<SubBarcodeInfo>,
     modelReady: Boolean,
     onLock: () -> Unit,
     onUnlock: () -> Unit,
@@ -350,163 +392,82 @@ private fun CheckShootArticlePopup(
     onAddToDesign: () -> Unit,
     onCreateAsset: () -> Unit,
     onToggleSubBc: () -> Unit,
+    onOpenCameraBatch: (articleId: Long?) -> Unit,
+    onRemoveSubBarcode: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f)),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.97f)),
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text("Article", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                if (isLocked) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                        Text(" Locked", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
-                    }
-                }
-            }
-            val designationLabel = when {
-                scan.inGestiumCatalog && scan.linkedViaBodyKey ->
-                    "${scan.designation} (same 9-digit code — in catalog)"
-                scan.inGestiumCatalog && scan.linkedViaAlternate ->
-                    "${scan.designation} (linked barcode)"
-                scan.inGestiumCatalog -> scan.designation ?: scan.barcode
-                else -> "Not in catalog — lock for PARAY suggestions"
-            }
-            Text(
-                designationLabel,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text("Barcode: ${scan.barcode}", style = MaterialTheme.typography.bodyMedium)
-            if (scan.price != null) {
-                Text(
-                    PriceFormatter.format(scan.price),
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                Text(
-                    priceChangedLabel(scan.lastPriceChangedAt),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            if (scan.hasShareablePng) {
-                Text(
-                    "PNG in Oasis — create asset to replace with a new cutout",
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                AsyncImage(
-                    model = File(scan.existingImagePath!!),
-                    contentDescription = "Existing PNG",
-                    modifier = Modifier.fillMaxWidth().height(140.dp).clip(RoundedCornerShape(8.dp)),
-                )
-            } else {
-                Text(
-                    "No PNG — shoot photo, background removed automatically",
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
+    val cornerFabSize = 52.dp
+    val fabOverlap = 13.dp
 
-            if (!isLocked) {
-                Button(onClick = onLock, modifier = Modifier.fillMaxWidth()) {
-                    Icon(Icons.Default.Lock, contentDescription = null)
-                    Text(if (scan.inGestiumCatalog) " Lock this barcode" else " Lock — ask PARAY")
-                }
-                TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
-                    Text("Dismiss — keep scanning")
-                }
+    Box(modifier = modifier.fillMaxWidth()) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = cornerFabSize - fabOverlap, end = cornerFabSize - fabOverlap),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f)),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.97f),
+            ),
+        ) {
+            ArticleActionPanel(
+                data = ArticlePanelData(
+                    articleId = scan.articleId,
+                    barcode = scan.barcode,
+                    designation = scan.designation ?: scan.barcode,
+                    price = scan.price,
+                    imagePath = scan.existingImagePath,
+                    codeart = scan.codeart,
+                    lastPriceChangedAt = scan.lastPriceChangedAt,
+                    lastPrintedAt = scan.lastPrintedAt,
+                    subBarcodes = subBarcodes,
+                    inGestiumCatalog = scan.inGestiumCatalog,
+                    linkedViaAlternate = scan.linkedViaAlternate,
+                    linkedViaBodyKey = scan.linkedViaBodyKey,
+                    isLocked = isLocked,
+                    subBcMode = subBcMode,
+                ),
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 12.dp),
+                scrollable = true,
+                maxHeight = 400.dp,
+                modelReady = modelReady,
+                showLockControls = !isLocked,
+                externalLockButton = true,
+                onLock = onLock,
+                onUnlock = onUnlock,
+                onDismiss = onDismiss,
+                onCreateAsset = if (isLocked) onCreateAsset else null,
+                onAddToShare = if (isLocked && scan.hasShareablePng) onAddToShare else null,
+                onAddToDesign = if (isLocked && scan.hasShareablePng) onAddToDesign else null,
+                onToggleSubBc = if (isLocked && scan.inGestiumCatalog) onToggleSubBc else null,
+                onOpenCameraBatch = if (isLocked && scan.inGestiumCatalog) onOpenCameraBatch else null,
+                onRemoveSubBarcode = onRemoveSubBarcode,
+            )
+        }
+
+        FloatingActionButton(
+            onClick = if (isLocked) onUnlock else onLock,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .size(cornerFabSize)
+                .offset(x = fabOverlap, y = -fabOverlap),
+            shape = CircleShape,
+            containerColor = if (isLocked) {
+                MaterialTheme.colorScheme.secondary
             } else {
-                if (subBcMode) {
-                    Surface(
-                        color = MaterialTheme.colorScheme.secondaryContainer,
-                        shape = RoundedCornerShape(8.dp),
-                    ) {
-                        Text(
-                            "SUB-BC active — scan flavor/color barcodes",
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        )
-                    }
-                }
-                if (subBarcodes.isNotEmpty()) {
-                    Text(
-                        "Sub-barcodes (${subBarcodes.size})",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Text(
-                        subBarcodes.joinToString(", "),
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Button(
-                        onClick = onCreateAsset,
-                        enabled = modelReady,
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Text(if (scan.hasShareablePng) "Create asset" else "Create asset")
-                    }
-                    if (subBcMode) {
-                        Button(
-                            onClick = onToggleSubBc,
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.secondary,
-                            ),
-                        ) {
-                            Text("SUB-BC ✓")
-                        }
-                    } else {
-                        OutlinedButton(
-                            onClick = onToggleSubBc,
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            Text("SUB-BC")
-                        }
-                    }
-                }
-                if (!modelReady) {
-                    Text(
-                        "Cutout model missing from this install — ask for a full Visio Ai build",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
-                if (scan.hasShareablePng) {
-                    OutlinedButton(onClick = onAddToShare, modifier = Modifier.fillMaxWidth()) {
-                        Text("Add to To share")
-                    }
-                    OutlinedButton(onClick = onAddToDesign, modifier = Modifier.fillMaxWidth()) {
-                        Text("Add to Design")
-                    }
-                }
-                OutlinedButton(onClick = onUnlock, modifier = Modifier.fillMaxWidth()) {
-                    Icon(Icons.Default.LockOpen, contentDescription = null)
-                    Text(" Unlock — scan next")
-                }
-            }
+                MaterialTheme.colorScheme.primary
+            },
+            contentColor = if (isLocked) {
+                MaterialTheme.colorScheme.onSecondary
+            } else {
+                MaterialTheme.colorScheme.onPrimary
+            },
+            elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp),
+        ) {
+            Icon(
+                imageVector = if (isLocked) Icons.Default.LockOpen else Icons.Default.Lock,
+                contentDescription = if (isLocked) "Unlock — scan next" else "Lock this article",
+            )
         }
     }
-}
-
-private fun priceChangedLabel(changedAt: Long?): String {
-    if (changedAt == null) return "Price: no change recorded"
-    val fmt = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
-    return "Price last changed: ${fmt.format(Date(changedAt))}"
 }

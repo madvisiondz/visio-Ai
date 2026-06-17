@@ -19,7 +19,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -47,6 +49,8 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.oasismall.oasisai.data.db.dao.ArticleWithImage
+import com.oasismall.oasisai.ui.components.ArticleActionPanel
+import com.oasismall.oasisai.ui.components.ArticlePanelData
 import com.oasismall.oasisai.ui.screens.scanner.BarcodeCameraPreview
 import com.oasismall.oasisai.util.PriceFormatter
 import com.oasismall.oasisai.util.createCheckShootCaptureUri
@@ -58,11 +62,17 @@ import java.io.File
 fun CameraBatchShootScreen(
     viewModel: CameraBatchShootViewModel,
     queueItemId: Long?,
+    articleId: Long?,
+    subBcAcquire: Boolean = false,
+    confirmedSubBarcode: String? = null,
     onBack: () -> Unit,
     onDoneShooting: () -> Unit,
+    onOpenPhotoroomImport: () -> Unit = {},
 ) {
     val context = LocalContext.current
-    LaunchedEffect(queueItemId) { viewModel.initQueue(queueItemId) }
+    LaunchedEffect(queueItemId, articleId, subBcAcquire, confirmedSubBarcode) {
+        viewModel.initSession(queueItemId, articleId, subBcAcquire, confirmedSubBarcode)
+    }
 
     val step by viewModel.step.collectAsStateWithLifecycle()
     val locked by viewModel.locked.collectAsStateWithLifecycle()
@@ -75,6 +85,11 @@ fun CameraBatchShootScreen(
     val message by viewModel.message.collectAsStateWithLifecycle()
     val saving by viewModel.saving.collectAsStateWithLifecycle()
     val shotCount by viewModel.shotCount.collectAsStateWithLifecycle()
+    val autoLaunchCamera by viewModel.autoLaunchCamera.collectAsStateWithLifecycle()
+    val subBcAcquireMode by viewModel.subBcAcquireMode.collectAsStateWithLifecycle()
+    val singleArticleMode by viewModel.singleArticleMode.collectAsStateWithLifecycle()
+    val subBarcodeConfirm by viewModel.subBarcodeConfirm.collectAsStateWithLifecycle()
+    val parentDesignation = locked?.designation
 
     var pendingCaptureFile by remember { mutableStateOf<File?>(null) }
     var hasCameraPermission by remember {
@@ -100,6 +115,32 @@ fun CameraBatchShootScreen(
         }
         pendingCaptureFile = pair.second
         takePictureLauncher.launch(pair.first)
+    }
+
+    LaunchedEffect(autoLaunchCamera, step, hasCameraPermission) {
+        if (autoLaunchCamera && step == CameraBatchShootStep.LOCKED && hasCameraPermission) {
+            viewModel.consumeAutoLaunchCamera()
+            launchCamera()
+        }
+    }
+
+    subBarcodeConfirm?.let { pending ->
+        AlertDialog(
+            onDismissRequest = viewModel::declineSubBarcodeAdd,
+            title = { Text("Add sub-barcode?") },
+            text = {
+                Text(
+                    "Link barcode ${pending.scannedBarcode} to ${parentDesignation ?: "this article"}? " +
+                        "Shoot a photo next — saved after PhotoRoom import.",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = viewModel::confirmSubBarcodeAdd) { Text("Add & shoot") }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::declineSubBarcodeAdd) { Text("Cancel") }
+            },
+        )
     }
 
     Scaffold(
@@ -145,7 +186,11 @@ fun CameraBatchShootScreen(
 
             when (step) {
                 CameraBatchShootStep.SCAN -> {
-                    Text("Scan barcode to lock", fontWeight = FontWeight.SemiBold)
+                    Text(
+                        if (subBcAcquireMode) "Scan new flavor barcode (sub-barcode)"
+                        else "Scan barcode to lock",
+                        fontWeight = FontWeight.SemiBold,
+                    )
                     if (!hasCameraPermission) {
                         Button(onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) }) {
                             Text("Allow camera")
@@ -159,7 +204,7 @@ fun CameraBatchShootScreen(
                     }
                 }
                 CameraBatchShootStep.LOCKED -> {
-                    locked?.let { scan -> LockedCard(scan) }
+                    locked?.let { scan -> LockedCard(scan, viewModel::removeSubBarcode) }
                     Button(onClick = ::launchCamera, modifier = Modifier.fillMaxWidth()) {
                         Text("Shoot product photo")
                     }
@@ -218,16 +263,32 @@ fun CameraBatchShootScreen(
                             enabled = !saving,
                             modifier = Modifier.weight(1f),
                         ) {
-                            Text(if (saving) "Saving…" else "Proceed — next")
+                            Text(if (saving) "Saving…" else "Proceed — save shot")
                         }
                         OutlinedButton(onClick = viewModel::retakePhoto, modifier = Modifier.weight(1f)) {
                             Text("Retake")
                         }
                     }
                 }
+                CameraBatchShootStep.AWAITING_PHOTOROOM -> {
+                    locked?.let { scan -> LockedCard(scan, viewModel::removeSubBarcode) }
+                    Text(
+                        "JPEG saved with barcode metadata. Remove background in PhotoRoom, save PNG to your PhotoRoom folder, then import.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Button(onClick = onOpenPhotoroomImport, modifier = Modifier.fillMaxWidth()) {
+                        Text("Open PhotoRoom import")
+                    }
+                    OutlinedButton(onClick = viewModel::shootAgainSameArticle, modifier = Modifier.fillMaxWidth()) {
+                        Text("Shoot again — same article")
+                    }
+                    OutlinedButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) {
+                        Text("Back")
+                    }
+                }
             }
 
-            if (step == CameraBatchShootStep.SCAN && shotCount > 0) {
+            if (step == CameraBatchShootStep.SCAN && shotCount > 0 && !singleArticleMode) {
                 OutlinedButton(onClick = onDoneShooting, modifier = Modifier.fillMaxWidth()) {
                     Text("Done shooting → PhotoRoom import ($shotCount)")
                 }
@@ -237,30 +298,28 @@ fun CameraBatchShootScreen(
 }
 
 @Composable
-private fun LockedCard(scan: CameraBatchLockedState) {
+private fun LockedCard(scan: CameraBatchLockedState, onRemoveSubBarcode: ((String) -> Unit)? = null) {
     Card(modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Text(" Locked", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
-            }
-            Text(scan.designation, fontWeight = FontWeight.SemiBold)
-            Text("Barcode: ${scan.barcode}", style = MaterialTheme.typography.bodySmall)
-            scan.price?.let {
-                Text(PriceFormatter.format(it), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-            }
-            if (!scan.inCatalog) {
-                Text("Not in CSV — create designation or link to existing", color = MaterialTheme.colorScheme.error)
-            }
-            scan.imagePath?.let { path ->
-                AsyncImage(
-                    model = File(path),
-                    contentDescription = "Existing PNG",
-                    modifier = Modifier.fillMaxWidth().height(100.dp),
-                    contentScale = ContentScale.Fit,
-                )
-            }
-        }
+        ArticleActionPanel(
+            data = ArticlePanelData(
+                articleId = scan.articleId,
+                barcode = scan.barcode,
+                designation = scan.designation,
+                price = scan.price,
+                imagePath = scan.imagePath,
+                codeart = scan.codeart,
+                lastPriceChangedAt = scan.lastPriceChangedAt,
+                lastPrintedAt = scan.lastPrintedAt,
+                subBarcodes = scan.subBarcodes,
+                inGestiumCatalog = scan.inCatalog,
+                linkedViaAlternate = scan.linkedViaAlternate,
+                isLocked = true,
+            ),
+            modifier = Modifier.padding(14.dp),
+            scrollable = true,
+            maxHeight = 360.dp,
+            onRemoveSubBarcode = onRemoveSubBarcode,
+        )
     }
 }
 
@@ -285,7 +344,7 @@ private fun MatchPickerCard(match: ArticleWithImage, viewModel: CameraBatchShoot
                 style = MaterialTheme.typography.bodySmall,
             )
             Button(onClick = viewModel::proceedSubBarcode, modifier = Modifier.fillMaxWidth()) {
-                Text("Proceed — shoot & link sub-barcode")
+                Text("Proceed — shoot sub-barcode photo")
             }
             OutlinedButton(onClick = viewModel::addMatchToShareAndUnlock, modifier = Modifier.fillMaxWidth()) {
                 Text("Add to To share & unlock")

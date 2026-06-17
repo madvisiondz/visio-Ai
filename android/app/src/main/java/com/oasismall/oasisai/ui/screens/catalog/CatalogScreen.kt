@@ -64,7 +64,7 @@ fun CatalogScreen(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                items(articles, key = { it.id }) { article ->
+                items(articles, key = { "${it.id}_${it.barcode}" }) { article ->
                     ArticleCard(
                         article = article,
                         onClick = { onArticleClick(article.id) },

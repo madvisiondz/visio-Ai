@@ -10,16 +10,30 @@ CSV file (content URI or assets sample)
         ??? detect NEW / PRICE_CHANGED / RENAMED / REMOVED
         ??? write articles + import_changes + article_price_history
     ??? ImageMatcher.syncImagesForArticles()
-    ??? UI: Import summary + ImportDetailScreen
+    ??? UI: Import summary + ImportDetailScreen (enriched rows: PNG thumbnail, Add to To share / To shoot)
 ```
 
 ## 2. Article search & catalog
 
 ```
 User query
-    ??? ArticleDao.searchWithImages(designation LIKE)
-    ??? LEFT JOIN product_images
-    ??? CatalogScreen list
+    → ArticleDao.searchWithImages(designation LIKE)
+    → OasisRepository.buildSearchResults: append sub-barcode variant rows (same designation, sub imagePath)
+    → Home / Catalog list (main + each sub-barcode as separate row)
+```
+
+## 2a. Sub-barcode acquisition (v2.4.0)
+
+```
+Scan sub-barcode (AGENT SUB-BC or Article → Add sub-barcode & batch shoot)
+    → validateSubBarcodeLink (no DB write yet)
+    → Confirm add?
+    → Confirm add? → shoot photo (required for new sub-barcodes)
+        → Camera batch → JPEG → PhotoRoom PNG → importFromPhotoroom
+        → registerSubBarcodeImage → article_alternate_barcodes.imagePath
+    → importFromPhotoroom adds **sub-barcode flavor row** to To share (`variantBarcode` on preselection_items)
+    → Legacy sub-barcodes without imagePath: unchanged (fallback to main article image)
+    → Tap sub-barcode chip → unlinkAlternateBarcode
 ```
 
 ## 3. Barcode scanner
@@ -65,6 +79,8 @@ Add to cart from:
     Article detail? SRC_ARTICLE (pink)
     (default)     ? SRC_MANUAL (gray)
 UI: colored card border + label on To share and To shoot; legend on both carts
+
+**v2.4.5 cart variants:** `preselection_items.variantBarcode` (empty = main article barcode). Unique key `(articleId, cartType, variantBarcode)` — parent and each sub-barcode flavor are separate rows. Cart queries resolve `imagePath` from `article_alternate_barcodes` when variant is set.
 ```
 
 ## 5a. PARAY PC fingerprints → phone (Option A)
@@ -213,6 +229,7 @@ Articles search box
 Settings -> Report
     -> Latest vs previous Gestium CSV import summary
     -> import_changes: NEW / PRICE_CHANGED / RENAMED / REMOVED (old -> new values)
+    -> each row: join article + product_images; Add to To share (has PNG) or To shoot (no PNG)
     -> Design shelf JPEG exports logged as print_batches (templateName "Design — …")
 ```
 

@@ -35,10 +35,20 @@ sealed class OasisRoute(val route: String) {
     data object Promo : OasisRoute("promo")
     data object Images : OasisRoute("images")
     data object BatchTxt : OasisRoute("batch_txt")
-    data object CameraBatchShoot : OasisRoute("camera_batch_shoot?queueItemId={queueItemId}") {
-        fun create(queueItemId: Long? = null): String {
-            val id = queueItemId?.toString() ?: ""
-            return "camera_batch_shoot?queueItemId=$id"
+    data object CameraBatchShoot : OasisRoute(
+        "camera_batch_shoot?queueItemId={queueItemId}&articleId={articleId}&subBcAcquire={subBcAcquire}&confirmedSubBarcode={confirmedSubBarcode}",
+    ) {
+        fun create(
+            queueItemId: Long? = null,
+            articleId: Long? = null,
+            subBcAcquire: Boolean = false,
+            confirmedSubBarcode: String? = null,
+        ): String {
+            val q = queueItemId?.toString() ?: ""
+            val a = articleId?.toString() ?: ""
+            val sub = if (subBcAcquire) "true" else "false"
+            val bc = confirmedSubBarcode?.trim().orEmpty()
+            return "camera_batch_shoot?queueItemId=$q&articleId=$a&subBcAcquire=$sub&confirmedSubBarcode=$bc"
         }
     }
     data object CameraBatchImport : OasisRoute("camera_batch_import")

@@ -13,7 +13,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -26,15 +25,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.oasismall.oasisai.data.model.ImportChangeType
+import com.oasismall.oasisai.ui.components.ImportChangeCard
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -214,15 +211,10 @@ fun ImportDetailScreen(
     importId: Long,
     viewModel: ImportViewModel,
     onBack: () -> Unit,
+    onArticleClick: (Long) -> Unit = {},
 ) {
-    val changes by viewModel.observeChanges(importId).collectAsStateWithLifecycle(initialValue = emptyList())
-    var showUnchanged by remember { mutableStateOf(false) }
-
-    val visibleChanges = if (showUnchanged) {
-        changes
-    } else {
-        changes.filter { it.changeType != ImportChangeType.UNCHANGED.name }
-    }
+    val changesFlow = remember(importId) { viewModel.observeChangesEnriched(importId) }
+    val changes by changesFlow.collectAsStateWithLifecycle(initialValue = emptyList())
 
     Scaffold(
         topBar = {
@@ -242,22 +234,15 @@ fun ImportDetailScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             item {
-                FilterChip(
-                    selected = showUnchanged,
-                    onClick = { showUnchanged = !showUnchanged },
-                    label = { Text(if (showUnchanged) "Hide unchanged" else "Show unchanged") },
-                )
-                Text("${visibleChanges.size} changes shown", style = MaterialTheme.typography.bodySmall)
+                Text("${changes.size} changes shown", style = MaterialTheme.typography.bodySmall)
             }
-            items(visibleChanges, key = { it.id }) { change ->
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(12.dp)) {
-                        Text(change.designation, fontWeight = FontWeight.SemiBold)
-                        Text("${change.changeType} — ${change.barcode}")
-                        change.oldValue?.let { Text("Old: $it") }
-                        change.newValue?.let { Text("New: $it") }
-                    }
-                }
+            items(changes, key = { it.change.id }) { row ->
+                ImportChangeCard(
+                    row = row,
+                    onArticleClick = onArticleClick,
+                    onAddToShare = viewModel::addToShareCart,
+                    onAddToShoot = viewModel::addToPhotoshootCart,
+                )
             }
         }
     }

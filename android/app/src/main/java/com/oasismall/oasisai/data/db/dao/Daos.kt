@@ -50,8 +50,10 @@ data class PreselectionWithArticle(
     val preselectionId: Long,
     val articleId: Long,
     val sortOrder: Int,
+    val addedAt: Long,
     val note: String?,
     val intendedTemplateType: String?,
+    val variantBarcode: String = "",
     val designation: String,
     val barcode: String,
     val price: Double,
@@ -469,6 +471,15 @@ interface ImportChangeDao {
     @Query("SELECT * FROM import_changes WHERE importId = :importId ORDER BY changeType, designation")
     fun observeByImport(importId: Long): Flow<List<ImportChangeEntity>>
 
+    @Query(
+        """
+        SELECT * FROM import_changes
+        WHERE importId = :importId AND changeType != 'UNCHANGED'
+        ORDER BY changeType, designation
+        """,
+    )
+    fun observeMeaningfulByImport(importId: Long): Flow<List<ImportChangeEntity>>
+
     @Query("SELECT * FROM import_changes WHERE importId = :importId ORDER BY changeType, designation")
     suspend fun getByImport(importId: Long): List<ImportChangeEntity>
 
@@ -585,18 +596,27 @@ interface PreselectionDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(item: PreselectionItemEntity): Long
 
-    @Query("DELETE FROM preselection_items WHERE articleId = :articleId AND cartType = :cartType")
-    suspend fun remove(articleId: Long, cartType: String)
+    @Query("DELETE FROM preselection_items WHERE articleId = :articleId AND cartType = :cartType AND variantBarcode = :variantBarcode")
+    suspend fun removeVariant(articleId: Long, cartType: String, variantBarcode: String)
+
+    @Query("DELETE FROM preselection_items WHERE id = :preselectionId")
+    suspend fun removeById(preselectionId: Long)
 
     @Query("DELETE FROM preselection_items WHERE cartType = :cartType")
     suspend fun clear(cartType: String)
 
     @Query(
         """
-        SELECT p.id AS preselectionId, p.articleId, p.sortOrder, p.note, p.intendedTemplateType,
-               p.copyCount,
-               a.designation, a.barcode, a.price, a.previousPrice, a.codeart, a.category,
-               (SELECT i.imagePath FROM product_images i WHERE i.articleId = a.id ORDER BY i.id DESC LIMIT 1) AS imagePath,
+        SELECT p.id AS preselectionId, p.articleId, p.sortOrder, p.addedAt, p.note, p.intendedTemplateType,
+               p.copyCount, p.variantBarcode,
+               a.designation,
+               CASE WHEN p.variantBarcode != '' THEN p.variantBarcode ELSE a.barcode END AS barcode,
+               a.price, a.previousPrice, a.codeart, a.category,
+               COALESCE(
+                 (SELECT ab.imagePath FROM article_alternate_barcodes ab
+                  WHERE ab.articleId = a.id AND ab.barcode = p.variantBarcode AND p.variantBarcode != ''),
+                 (SELECT i.imagePath FROM product_images i WHERE i.articleId = a.id ORDER BY i.id DESC LIMIT 1)
+               ) AS imagePath,
                (SELECT i.createdAt FROM product_images i WHERE i.articleId = a.id ORDER BY i.id DESC LIMIT 1) AS imageCreatedAt,
                (SELECT i.lastSentAt FROM product_images i WHERE i.articleId = a.id ORDER BY i.id DESC LIMIT 1) AS imageLastSentAt
         FROM preselection_items p
@@ -607,6 +627,28 @@ interface PreselectionDao {
     )
     fun observeWithArticles(cartType: String): Flow<List<PreselectionWithArticle>>
 
+    @Query(
+        """
+        SELECT p.id AS preselectionId, p.articleId, p.sortOrder, p.addedAt, p.note, p.intendedTemplateType,
+               p.copyCount, p.variantBarcode,
+               a.designation,
+               CASE WHEN p.variantBarcode != '' THEN p.variantBarcode ELSE a.barcode END AS barcode,
+               a.price, a.previousPrice, a.codeart, a.category,
+               COALESCE(
+                 (SELECT ab.imagePath FROM article_alternate_barcodes ab
+                  WHERE ab.articleId = a.id AND ab.barcode = p.variantBarcode AND p.variantBarcode != ''),
+                 (SELECT i.imagePath FROM product_images i WHERE i.articleId = a.id ORDER BY i.id DESC LIMIT 1)
+               ) AS imagePath,
+               (SELECT i.createdAt FROM product_images i WHERE i.articleId = a.id ORDER BY i.id DESC LIMIT 1) AS imageCreatedAt,
+               (SELECT i.lastSentAt FROM product_images i WHERE i.articleId = a.id ORDER BY i.id DESC LIMIT 1) AS imageLastSentAt
+        FROM preselection_items p
+        JOIN articles a ON a.id = p.articleId
+        WHERE p.cartType = :cartType
+        ORDER BY p.addedAt DESC, p.sortOrder ASC
+        """,
+    )
+    fun observeDoneWithArticles(cartType: String): Flow<List<PreselectionWithArticle>>
+
     @Query("SELECT COUNT(*) FROM preselection_items WHERE cartType = :cartType")
     suspend fun count(cartType: String): Int
 
@@ -614,19 +656,31 @@ interface PreselectionDao {
     fun observeCount(cartType: String): Flow<Int>
 
     @Query(
-        "SELECT EXISTS(SELECT 1 FROM preselection_items WHERE articleId = :articleId AND cartType = :cartType)",
+        """
+        SELECT EXISTS(
+            SELECT 1 FROM preselection_items
+            WHERE articleId = :articleId AND cartType = :cartType AND variantBarcode = :variantBarcode
+        )
+        """,
     )
-    suspend fun isInCart(articleId: Long, cartType: String): Boolean
+    suspend fun isInCart(articleId: Long, cartType: String, variantBarcode: String): Boolean
+
+    @Query("SELECT * FROM preselection_items WHERE id = :id")
+    suspend fun getById(id: Long): PreselectionItemEntity?
 
     @Query(
-        "SELECT * FROM preselection_items WHERE articleId = :articleId AND cartType = :cartType LIMIT 1",
+        """
+        SELECT * FROM preselection_items
+        WHERE articleId = :articleId AND cartType = :cartType AND variantBarcode = :variantBarcode
+        LIMIT 1
+        """,
     )
-    suspend fun getItem(articleId: Long, cartType: String): PreselectionItemEntity?
+    suspend fun getItem(articleId: Long, cartType: String, variantBarcode: String): PreselectionItemEntity?
 
     @Query(
-        "UPDATE preselection_items SET copyCount = :copyCount WHERE articleId = :articleId AND cartType = :cartType",
+        "UPDATE preselection_items SET copyCount = :copyCount WHERE id = :preselectionId",
     )
-    suspend fun updateCopyCount(articleId: Long, cartType: String, copyCount: Int)
+    suspend fun updateCopyCountById(preselectionId: Long, copyCount: Int)
 
     @Query(
         """
@@ -681,6 +735,17 @@ interface PrintBatchDao {
 
     @Query("SELECT * FROM print_batch_items WHERE batchId = :batchId ORDER BY sortOrder")
     suspend fun getItems(batchId: Long): List<PrintBatchItemEntity>
+
+    @Query(
+        """
+        SELECT pb.createdAt FROM print_batch_items pbi
+        INNER JOIN print_batches pb ON pb.id = pbi.batchId
+        WHERE pbi.articleId = :articleId
+        ORDER BY pb.createdAt DESC
+        LIMIT 1
+        """,
+    )
+    suspend fun getLatestPrintAtForArticle(articleId: Long): Long?
 
     @Update
     suspend fun update(batch: PrintBatchEntity)
@@ -745,6 +810,31 @@ interface ArticleAlternateBarcodeDao {
 
     @Query(
         """
+        SELECT * FROM article_alternate_barcodes
+        WHERE articleId IN (:articleIds)
+        ORDER BY articleId ASC, addedAt ASC
+        """,
+    )
+    suspend fun getByArticleIds(articleIds: List<Long>): List<ArticleAlternateBarcodeEntity>
+
+    @Query("UPDATE article_alternate_barcodes SET imagePath = :imagePath WHERE barcode = :barcode")
+    suspend fun updateImagePath(barcode: String, imagePath: String)
+
+    @Query("DELETE FROM article_alternate_barcodes WHERE barcode = :barcode")
+    suspend fun deleteByBarcode(barcode: String)
+
+    @Query(
+        """
+        SELECT * FROM article_alternate_barcodes
+        WHERE barcode LIKE '%' || :pattern || '%' ESCAPE '\'
+        ORDER BY addedAt ASC
+        LIMIT 80
+        """,
+    )
+    suspend fun searchByBarcodeLike(pattern: String): List<ArticleAlternateBarcodeEntity>
+
+    @Query(
+        """
         SELECT ab.barcode AS alternateBarcode, a.barcode AS primaryBarcode
         FROM article_alternate_barcodes ab
         INNER JOIN articles a ON a.id = ab.articleId
@@ -783,6 +873,15 @@ interface CameraBatchDao {
     )
     suspend fun getForDateAndStatus(date: String, status: String): List<CameraBatchItemEntity>
 
+    @Query(
+        """
+        SELECT * FROM camera_batch_items
+        WHERE status = :status
+        ORDER BY capturedAt DESC
+        """,
+    )
+    suspend fun getAllByStatus(status: String): List<CameraBatchItemEntity>
+
     @Query("SELECT * FROM camera_batch_items WHERE batchDate = :date ORDER BY capturedAt ASC")
     fun observeForDate(date: String): Flow<List<CameraBatchItemEntity>>
 
@@ -800,6 +899,27 @@ interface CameraBatchDao {
 
     @Query("UPDATE camera_batch_items SET status = :status, photoroomPath = :photoroomPath WHERE id = :id")
     suspend fun updateStatus(id: Long, status: String, photoroomPath: String?)
+
+    @Query(
+        """
+        SELECT * FROM camera_batch_items
+        WHERE status = :status
+        ORDER BY capturedAt DESC
+        """,
+    )
+    fun observeByStatus(status: String): Flow<List<CameraBatchItemEntity>>
+
+    @Query(
+        """
+        SELECT * FROM camera_batch_items
+        WHERE batchDate = :date AND barcode = :barcode AND status = :status
+        LIMIT 1
+        """,
+    )
+    suspend fun getPendingByBarcode(date: String, barcode: String, status: String): CameraBatchItemEntity?
+
+    @Query("DELETE FROM camera_batch_items WHERE id = :id")
+    suspend fun deleteById(id: Long)
 
     @Query("SELECT * FROM camera_batch_items WHERE id = :id LIMIT 1")
     suspend fun getById(id: Long): CameraBatchItemEntity?

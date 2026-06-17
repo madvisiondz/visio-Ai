@@ -46,6 +46,7 @@ class PhoneSyncDeltaBuilder(
             if (masterHasImage) continue
 
             val alternates = repository.getAlternateBarcodesForArticle(row.articleId)
+                .map { it.barcode }
                 .filter { it !in masterAlternateBarcodes }
 
             outbound.add(

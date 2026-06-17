@@ -39,6 +39,8 @@ class OasisApp : Application() {
                 MIGRATION_10_11,
                 MIGRATION_11_12,
                 MIGRATION_12_13,
+                MIGRATION_13_14,
+                MIGRATION_14_15,
             )
             .fallbackToDestructiveMigration(true)
             .build()
@@ -213,5 +215,30 @@ private val MIGRATION_12_13 = object : Migration(12, 13) {
         )
         db.execSQL("CREATE INDEX IF NOT EXISTS index_batch_camera_queue_done ON batch_camera_queue(done)")
         db.execSQL("CREATE INDEX IF NOT EXISTS index_batch_camera_queue_sortOrder ON batch_camera_queue(sortOrder)")
+    }
+}
+
+private val MIGRATION_13_14 = object : Migration(13, 14) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE article_alternate_barcodes ADD COLUMN imagePath TEXT")
+        db.execSQL(
+            "ALTER TABLE camera_batch_items ADD COLUMN pendingSubBarcodeLink INTEGER NOT NULL DEFAULT 0",
+        )
+        db.execSQL("ALTER TABLE camera_batch_items ADD COLUMN linkParentArticleId INTEGER")
+    }
+}
+
+private val MIGRATION_14_15 = object : Migration(14, 15) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "ALTER TABLE preselection_items ADD COLUMN variantBarcode TEXT NOT NULL DEFAULT ''",
+        )
+        db.execSQL("DROP INDEX IF EXISTS index_preselection_items_articleId_cartType")
+        db.execSQL(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS index_preselection_items_articleId_cartType_variantBarcode
+            ON preselection_items(articleId, cartType, variantBarcode)
+            """.trimIndent(),
+        )
     }
 }

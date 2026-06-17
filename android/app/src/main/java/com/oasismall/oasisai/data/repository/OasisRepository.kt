@@ -29,11 +29,18 @@ import com.oasismall.oasisai.util.BarcodeSuffixMatcher
 import com.oasismall.oasisai.util.NameNormalizer
 import com.oasismall.oasisai.util.SearchQuery
 import androidx.room.withTransaction
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
+import java.io.File
 
 class OasisRepository(private val db: OasisDatabase) {
 
@@ -65,14 +72,73 @@ class OasisRepository(private val db: OasisDatabase) {
         }
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun observeArticles(query: String): Flow<List<ArticleWithImage>> {
-        val search = SearchQuery.prepare(query) ?: return kotlinx.coroutines.flow.flowOf(emptyList())
-        return db.articleDao().searchWithImages(search.sqlPattern).map { articles ->
-            articles
-                .filter { SearchQuery.matches(it, search) }
-                .sortedWith(compareBy({ SearchQuery.score(it, search) }, { it.designation }))
-                .take(200)
+        val search = SearchQuery.prepare(query) ?: return flowOf(emptyList())
+        return db.articleDao().searchWithImages(search.sqlPattern).flatMapLatest { articles ->
+            flow {
+                val results = runCatching { buildSearchResults(articles, search) }
+                    .getOrElse { fallbackSearchResults(articles, search) }
+                emit(results)
+            }.flowOn(Dispatchers.IO)
         }
+    }
+
+    private suspend fun buildSearchResults(
+        articles: List<ArticleWithImage>,
+        search: SearchQuery.SmartSearch,
+    ): List<ArticleWithImage> {
+        val mains = articles
+            .filter { SearchQuery.matches(it, search) }
+            .sortedWith(compareBy({ SearchQuery.score(it, search) }, { it.designation }))
+            .take(60)
+        if (mains.isEmpty()) return emptyList()
+        val mainIds = mains.map { it.id }.toSet()
+        val alternatesByArticle = if (mainIds.isEmpty()) {
+            emptyMap()
+        } else {
+            db.articleAlternateBarcodeDao()
+                .getByArticleIds(mainIds.toList())
+                .groupBy { it.articleId }
+        }
+        val variants = mutableListOf<ArticleWithImage>()
+        for (parent in mains) {
+            for (alt in alternatesByArticle[parent.id].orEmpty()) {
+                variants += parent.asSubBarcodeVariant(alt.barcode, alt.imagePath)
+            }
+        }
+        for (alt in db.articleAlternateBarcodeDao().searchByBarcodeLike(search.sqlPattern)) {
+            if (alt.articleId in mainIds) continue
+            val parent = db.articleDao().getWithImageById(alt.articleId) ?: continue
+            val variant = parent.asSubBarcodeVariant(alt.barcode, alt.imagePath)
+            if (SearchQuery.matches(variant, search)) variants += variant
+        }
+        return (mains + variants)
+            .distinctBy { "${it.id}_${it.barcode}" }
+            .sortedWith(compareBy({ SearchQuery.score(it, search) }, { it.designation }, { it.barcode }))
+            .take(200)
+    }
+
+    private fun fallbackSearchResults(
+        articles: List<ArticleWithImage>,
+        search: SearchQuery.SmartSearch,
+    ): List<ArticleWithImage> =
+        articles
+            .filter { SearchQuery.matches(it, search) }
+            .sortedWith(compareBy({ SearchQuery.score(it, search) }, { it.designation }))
+            .take(200)
+
+    private fun ArticleWithImage.asSubBarcodeVariant(
+        subBarcode: String,
+        subImagePath: String?,
+    ): ArticleWithImage {
+        val path = subImagePath?.takeIf { File(it).exists() } ?: imagePath
+        val hasSubImage = !subImagePath.isNullOrBlank() && File(subImagePath).exists()
+        return copy(
+            barcode = subBarcode,
+            imagePath = path,
+            imageStatus = if (hasSubImage) com.oasismall.oasisai.data.model.ImageStatus.FOUND.name else imageStatus,
+        )
     }
 
     suspend fun searchArticlesForPicker(query: String, limit: Int = 40): List<ArticleWithImage> {
@@ -99,6 +165,9 @@ class OasisRepository(private val db: OasisDatabase) {
     fun observeImportChanges(importId: Long): Flow<List<ImportChangeEntity>> =
         db.importChangeDao().observeByImport(importId)
 
+    fun observeMeaningfulImportChanges(importId: Long): Flow<List<ImportChangeEntity>> =
+        db.importChangeDao().observeMeaningfulByImport(importId)
+
     fun observeRecentCsvChanges(limit: Int = 300): Flow<List<ImportChangeEntity>> =
         db.importChangeDao().observeRecentChanges(limit)
 
@@ -106,7 +175,10 @@ class OasisRepository(private val db: OasisDatabase) {
         db.printBatchDao().observeDesignShelfPrints(limit)
 
     fun observeCart(cartType: CartType): Flow<List<PreselectionWithArticle>> =
-        db.preselectionDao().observeWithArticles(cartType.name)
+        when (cartType) {
+            CartType.DESIGN_DONE -> db.preselectionDao().observeDoneWithArticles(cartType.name)
+            else -> db.preselectionDao().observeWithArticles(cartType.name)
+        }
 
     fun observeCartCount(cartType: CartType): Flow<Int> =
         db.preselectionDao().observeCount(cartType.name)
@@ -135,7 +207,8 @@ class OasisRepository(private val db: OasisDatabase) {
         val trimmed = barcode.trim()
         db.articleDao().getWithImageByBarcode(trimmed)?.let { return it }
         val alt = db.articleAlternateBarcodeDao().getByBarcode(trimmed) ?: return null
-        return db.articleDao().getWithImageById(alt.articleId)
+        val parent = db.articleDao().getWithImageById(alt.articleId) ?: return null
+        return parent.asSubBarcodeVariant(alt.barcode, alt.imagePath)
     }
 
     /**
@@ -167,6 +240,7 @@ class OasisRepository(private val db: OasisDatabase) {
 
         return null
     }
+
     suspend fun getArticleWithImageByDesignation(designation: String): ArticleWithImage? {
         val normalized = NameNormalizer.normalize(designation)
         if (normalized.isBlank()) return null
@@ -219,20 +293,38 @@ class OasisRepository(private val db: OasisDatabase) {
         return results
     }
 
-    suspend fun linkAlternateBarcode(articleId: Long, barcode: String) {
+    suspend fun linkAlternateBarcode(articleId: Long, barcode: String, imagePath: String? = null) {
         val trimmed = barcode.trim()
         if (trimmed.isEmpty()) return
         db.articleAlternateBarcodeDao().insert(
-            ArticleAlternateBarcodeEntity(articleId = articleId, barcode = trimmed),
+            ArticleAlternateBarcodeEntity(
+                articleId = articleId,
+                barcode = trimmed,
+                imagePath = imagePath,
+            ),
         )
         logArticleEvent(articleId, "ALT_BARCODE", "Linked alternate barcode $trimmed")
     }
+
+    /** @return null when valid, or a short error message. */
+    suspend fun validateSubBarcodeLink(
+        articleId: Long,
+        mainBarcode: String,
+        subBarcode: String,
+    ): String? = subBarcodeLinkError(articleId, mainBarcode, subBarcode)
 
     /**
      * Link a flavor/color sub-barcode to the locked main article (not in Gestium CSV).
      * @return null on success, or a short error message.
      */
     suspend fun linkSubBarcodeToMainArticle(
+        articleId: Long,
+        mainBarcode: String,
+        subBarcode: String,
+        imagePath: String? = null,
+    ): String? = commitSubBarcodeLink(articleId, mainBarcode, subBarcode, imagePath)
+
+    private suspend fun subBarcodeLinkError(
         articleId: Long,
         mainBarcode: String,
         subBarcode: String,
@@ -255,9 +347,36 @@ class OasisRepository(private val db: OasisDatabase) {
                 "Barcode already linked to another article."
             }
         }
-        linkAlternateBarcode(articleId, sub)
+        return null
+    }
+
+    suspend fun commitSubBarcodeLink(
+        articleId: Long,
+        mainBarcode: String,
+        subBarcode: String,
+        imagePath: String? = null,
+    ): String? {
+        val err = subBarcodeLinkError(articleId, mainBarcode, subBarcode)
+        if (err != null) return err
+        val sub = subBarcode.trim()
+        val main = mainBarcode.trim()
+        linkAlternateBarcode(articleId, sub, imagePath)
         logArticleEvent(articleId, "SUB_BC", "Sub-barcode $sub → main $main")
         return null
+    }
+
+    suspend fun unlinkAlternateBarcode(articleId: Long, barcode: String): String? {
+        val trimmed = barcode.trim()
+        val alt = db.articleAlternateBarcodeDao().getByBarcode(trimmed) ?: return "Sub-barcode not found."
+        if (alt.articleId != articleId) return "Sub-barcode not linked to this article."
+        alt.imagePath?.let { path -> runCatching { File(path).delete() } }
+        db.articleAlternateBarcodeDao().deleteByBarcode(trimmed)
+        logArticleEvent(articleId, "SUB_BC_REMOVE", "Removed sub-barcode $trimmed")
+        return null
+    }
+
+    suspend fun updateAlternateBarcodeImage(barcode: String, imagePath: String) {
+        db.articleAlternateBarcodeDao().updateImagePath(barcode.trim(), imagePath)
     }
 
     suspend fun getAllArticles(): List<ArticleEntity> = db.articleDao().getAll()
@@ -321,6 +440,13 @@ class OasisRepository(private val db: OasisDatabase) {
     suspend fun getImportById(id: Long): ImportEntity? = db.importDao().getById(id)
     suspend fun getImportChanges(importId: Long): List<ImportChangeEntity> =
         db.importChangeDao().getByImport(importId)
+
+    suspend fun enrichImportChanges(changes: List<ImportChangeEntity>): List<ImportChangeUiRow> =
+        changes.map { change ->
+            val article = change.articleId?.let { getArticleWithImageById(it) }
+                ?: getArticleWithImageByBarcode(change.barcode)
+            ImportChangeUiRow(change = change, article = article)
+        }
     suspend fun getTemplateById(id: Long): PrintTemplateEntity? = db.printTemplateDao().getById(id)
     suspend fun getPrintBatch(id: Long): PrintBatchEntity? = db.printBatchDao().getById(id)
     suspend fun getPrintBatchItems(batchId: Long): List<PrintBatchItemEntity> =
@@ -382,52 +508,81 @@ class OasisRepository(private val db: OasisDatabase) {
         db.articleDao().clearNeedsTicketUpdate(articleId)
     }
 
-    suspend fun addToCart(articleId: Long, cartType: CartType, note: String? = null) {
+    suspend fun addToCart(
+        articleId: Long,
+        cartType: CartType,
+        note: String? = null,
+        variantBarcode: String? = null,
+    ) {
+        val article = db.articleDao().getById(articleId) ?: return
+        val variant = normalizeCartVariant(article.barcode, variantBarcode)
+        if (db.preselectionDao().isInCart(articleId, cartType.name, variant)) return
         val count = db.preselectionDao().count(cartType.name)
         db.preselectionDao().insert(
             PreselectionItemEntity(
                 articleId = articleId,
                 cartType = cartType.name,
+                variantBarcode = variant,
                 sortOrder = count,
                 note = note,
             ),
         )
-        logArticleEvent(articleId, "ADDED_TO_${cartType.name}", "Added to ${cartType.name.lowercase()} cart")
+        val detail = if (variant.isNotEmpty()) {
+            "Added to ${cartType.name.lowercase()} cart (flavor $variant)"
+        } else {
+            "Added to ${cartType.name.lowercase()} cart"
+        }
+        logArticleEvent(articleId, "ADDED_TO_${cartType.name}", detail)
     }
 
-    suspend fun removeFromCart(articleId: Long, cartType: CartType) =
-        db.preselectionDao().remove(articleId, cartType.name)
+    suspend fun removeFromCart(preselectionId: Long) {
+        val item = db.preselectionDao().getById(preselectionId) ?: return
+        db.preselectionDao().removeById(preselectionId)
+        logArticleEvent(item.articleId, "REMOVED_FROM_${item.cartType}", "Removed from cart")
+    }
+
+    suspend fun removeFromCart(articleId: Long, cartType: CartType, variantBarcode: String? = null) {
+        val article = db.articleDao().getById(articleId) ?: return
+        val variant = normalizeCartVariant(article.barcode, variantBarcode)
+        db.preselectionDao().removeVariant(articleId, cartType.name, variant)
+        logArticleEvent(articleId, "REMOVED_FROM_${cartType.name}", "Removed from cart")
+    }
 
     suspend fun clearCart(cartType: CartType) = db.preselectionDao().clear(cartType.name)
 
-    suspend fun isInCart(articleId: Long, cartType: CartType): Boolean =
-        db.preselectionDao().isInCart(articleId, cartType.name)
+    suspend fun isInCart(
+        articleId: Long,
+        cartType: CartType,
+        variantBarcode: String? = null,
+    ): Boolean {
+        val article = db.articleDao().getById(articleId) ?: return false
+        val variant = normalizeCartVariant(article.barcode, variantBarcode)
+        return db.preselectionDao().isInCart(articleId, cartType.name, variant)
+    }
 
     suspend fun getLatestPriceChange(articleId: Long) =
         db.articlePriceHistoryDao().getLatestForArticle(articleId)
 
-    suspend fun incrementDesignCopyCount(articleId: Long) {
-        val item = db.preselectionDao().getItem(articleId, CartType.DESIGN.name) ?: return
+    suspend fun incrementDesignCopyCount(preselectionId: Long) {
+        val item = db.preselectionDao().getById(preselectionId) ?: return
         val next = (item.copyCount + 1).coerceAtMost(99)
-        db.preselectionDao().updateCopyCount(articleId, CartType.DESIGN.name, next)
+        db.preselectionDao().updateCopyCountById(preselectionId, next)
     }
 
-    suspend fun decrementDesignCopyCount(articleId: Long) {
-        val item = db.preselectionDao().getItem(articleId, CartType.DESIGN.name) ?: return
+    suspend fun decrementDesignCopyCount(preselectionId: Long) {
+        val item = db.preselectionDao().getById(preselectionId) ?: return
         val next = (item.copyCount - 1).coerceAtLeast(1)
-        db.preselectionDao().updateCopyCount(articleId, CartType.DESIGN.name, next)
+        db.preselectionDao().updateCopyCountById(preselectionId, next)
     }
 
-    suspend fun moveDesignItemsToDone(articleIds: List<Long>) {
-        if (articleIds.isEmpty()) return
-        val idSet = articleIds.toSet()
+    suspend fun moveDesignItemsToDone(preselectionIds: List<Long>) {
+        if (preselectionIds.isEmpty()) return
+        val idSet = preselectionIds.toSet()
         db.withTransaction {
-            val ordered = db.preselectionDao()
+            db.preselectionDao()
                 .getAllInCart(CartType.DESIGN.name)
-                .filter { it.articleId in idSet }
-            ordered.forEach { item ->
-                moveCartItem(item.articleId, CartType.DESIGN, CartType.DESIGN_DONE)
-            }
+                .filter { it.id in idSet }
+                .forEach { item -> moveCartItemById(item.id, CartType.DESIGN, CartType.DESIGN_DONE) }
             trimDesignDoneCart(DESIGN_DONE_MAX)
         }
     }
@@ -442,22 +597,44 @@ class OasisRepository(private val db: OasisDatabase) {
         }
     }
 
-    suspend fun restoreDesignItemFromDone(articleId: Long) {
-        moveCartItem(articleId, CartType.DESIGN_DONE, CartType.DESIGN)
+    suspend fun restoreDesignItemFromDone(preselectionId: Long) {
+        moveCartItemById(preselectionId, CartType.DESIGN_DONE, CartType.DESIGN)
     }
 
-    private suspend fun moveCartItem(articleId: Long, from: CartType, to: CartType) {
-        val item = db.preselectionDao().getItem(articleId, from.name) ?: return
-        db.preselectionDao().remove(articleId, from.name)
+    private suspend fun moveCartItemById(preselectionId: Long, from: CartType, to: CartType) {
+        val item = db.preselectionDao().getById(preselectionId) ?: return
+        if (item.cartType != from.name) return
+        val now = System.currentTimeMillis()
+        db.preselectionDao().removeById(preselectionId)
         db.preselectionDao().insert(
-            item.copy(
-                id = 0,
-                cartType = to.name,
-                sortOrder = item.sortOrder,
-                addedAt = item.addedAt,
-            ),
+            when (to) {
+                CartType.DESIGN_DONE -> item.copy(
+                    id = 0,
+                    cartType = to.name,
+                    sortOrder = db.preselectionDao().count(to.name),
+                    addedAt = now,
+                )
+                CartType.DESIGN -> item.copy(
+                    id = 0,
+                    cartType = to.name,
+                    sortOrder = db.preselectionDao().count(to.name),
+                    addedAt = now,
+                )
+                else -> item.copy(
+                    id = 0,
+                    cartType = to.name,
+                    sortOrder = item.sortOrder,
+                    addedAt = item.addedAt,
+                )
+            },
         )
-        logArticleEvent(articleId, "DESIGN_CART_MOVE", "$from → $to")
+        logArticleEvent(item.articleId, "DESIGN_CART_MOVE", "$from → $to")
+    }
+
+    private fun normalizeCartVariant(mainBarcode: String, variantBarcode: String?): String {
+        val variant = variantBarcode?.trim().orEmpty()
+        if (variant.isEmpty() || variant == mainBarcode.trim()) return ""
+        return variant
     }
 
     suspend fun logSearchQuery(query: String) {
@@ -592,8 +769,29 @@ class OasisRepository(private val db: OasisDatabase) {
     suspend fun getPhoneSyncAlternatePairs(): List<PhoneSyncAlternatePair> =
         db.articleAlternateBarcodeDao().getAllPairs()
 
-    suspend fun getAlternateBarcodesForArticle(articleId: Long): List<String> =
-        db.articleAlternateBarcodeDao().getByArticleId(articleId).map { it.barcode }
+    suspend fun getAlternateBarcodesForArticle(articleId: Long): List<SubBarcodeInfo> =
+        db.articleAlternateBarcodeDao().getByArticleId(articleId).map {
+            SubBarcodeInfo(barcode = it.barcode, imagePath = it.imagePath?.takeIf { p -> File(p).exists() })
+        }
+
+    suspend fun getArticlePanelMeta(articleId: Long): ArticlePanelMeta {
+        val article = db.articleDao().getById(articleId)
+        return ArticlePanelMeta(
+            codeart = article?.codeart,
+            lastPriceChangedAt = db.articlePriceHistoryDao().getLatestForArticle(articleId)?.changedAt,
+            lastPrintedAt = db.printBatchDao().getLatestPrintAtForArticle(articleId),
+            subBarcodes = getAlternateBarcodesForArticle(articleId),
+        )
+    }
+
+    suspend fun linkScannedBarcodeAsSubBarcode(
+        parentArticleId: Long,
+        scannedBarcode: String,
+        imagePath: String? = null,
+    ): String? {
+        val parent = db.articleDao().getById(parentArticleId) ?: return "Article not found."
+        return linkSubBarcodeToMainArticle(parentArticleId, parent.barcode, scannedBarcode, imagePath)
+    }
 
     suspend fun logPhoneSyncReceived(
         deviceName: String,
@@ -621,4 +819,21 @@ data class ResolvedBarcodeArticle(
     val article: ArticleWithImage,
     val primary: Boolean,
     val linkedViaBodyKey: Boolean,
+)
+
+data class ImportChangeUiRow(
+    val change: ImportChangeEntity,
+    val article: ArticleWithImage?,
+)
+
+data class SubBarcodeInfo(
+    val barcode: String,
+    val imagePath: String? = null,
+)
+
+data class ArticlePanelMeta(
+    val codeart: String? = null,
+    val lastPriceChangedAt: Long? = null,
+    val lastPrintedAt: Long? = null,
+    val subBarcodes: List<SubBarcodeInfo> = emptyList(),
 )

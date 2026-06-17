@@ -174,12 +174,14 @@ data class ProductImageEntity(
             onDelete = ForeignKey.CASCADE,
         ),
     ],
-    indices = [Index(value = ["articleId", "cartType"], unique = true)],
+    indices = [Index(value = ["articleId", "cartType", "variantBarcode"], unique = true)],
 )
 data class PreselectionItemEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val articleId: Long,
     val cartType: String,
+    /** Sub-barcode flavor key; empty = main article barcode. */
+    val variantBarcode: String = "",
     val addedAt: Long = System.currentTimeMillis(),
     val sortOrder: Int = 0,
     val note: String? = null,
@@ -275,6 +277,8 @@ data class ArticleAlternateBarcodeEntity(
     val articleId: Long,
     val barcode: String,
     val addedAt: Long = System.currentTimeMillis(),
+    /** Per-sub-barcode PNG path (separate from main article gallery image). */
+    val imagePath: String? = null,
 )
 
 @Entity(
@@ -328,6 +332,9 @@ data class CameraBatchItemEntity(
     val capturedAt: Long = System.currentTimeMillis(),
     val status: String = CameraBatchStatus.AWAITING_PHOTOROOM.name,
     val photoroomPath: String? = null,
+    /** When true, sub-barcode is linked to [linkParentArticleId] only after PhotoRoom import. */
+    val pendingSubBarcodeLink: Boolean = false,
+    val linkParentArticleId: Long? = null,
 )
 
 /** Designation lines from Batch txt not found in CSV — camera capture queue. */

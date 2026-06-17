@@ -135,6 +135,9 @@ fun OasisNavHost(factory: OasisViewModelFactory) {
                 HomeScreen(
                     viewModel = vm,
                     onArticleClick = { navController.navigate(OasisRoute.ArticleDetail.create(it)) },
+                    onOpenCameraBatch = { articleId ->
+                        navController.navigate(OasisRoute.CameraBatchShoot.create(null, articleId))
+                    },
                 )
             }
             composable(OasisRoute.Settings.route) {
@@ -230,6 +233,18 @@ fun OasisNavHost(factory: OasisViewModelFactory) {
                     onReturnToArticle = {
                         navController.popBackStack()
                     },
+                    onOpenCameraBatch = { articleId ->
+                        navController.navigate(OasisRoute.CameraBatchShoot.create(null, articleId))
+                    },
+                    onOpenSubBarcodeBatchShoot = { articleId, subBarcode ->
+                        navController.navigate(
+                            OasisRoute.CameraBatchShoot.create(
+                                articleId = articleId,
+                                subBcAcquire = true,
+                                confirmedSubBarcode = subBarcode,
+                            ),
+                        )
+                    },
                 )
             }
             composable(
@@ -258,6 +273,9 @@ fun OasisNavHost(factory: OasisViewModelFactory) {
                     factory = factory,
                     onArticleClick = { navController.navigate(OasisRoute.ArticleDetail.create(it)) },
                     onOpenAgent = { navController.navigate(OasisRoute.CheckShoot.create()) },
+                    onOpenCameraBatch = { articleId ->
+                        navController.navigate(OasisRoute.CameraBatchShoot.create(null, articleId))
+                    },
                 )
             }
             composable(OasisRoute.WorkHistory.route) {
@@ -289,7 +307,12 @@ fun OasisNavHost(factory: OasisViewModelFactory) {
             ) { entry ->
                 val importId = entry.arguments?.getLong("importId") ?: return@composable
                 val vm: ImportViewModel = viewModel(factory = factory)
-                ImportDetailScreen(importId, vm, onBack = { navController.popBackStack() })
+                ImportDetailScreen(
+                    importId = importId,
+                    viewModel = vm,
+                    onBack = { navController.popBackStack() },
+                    onArticleClick = { navController.navigate(OasisRoute.ArticleDetail.create(it)) },
+                )
             }
             composable(OasisRoute.Catalog.route) {
                 val vm: CatalogViewModel = viewModel(factory = factory)
@@ -316,6 +339,12 @@ fun OasisNavHost(factory: OasisViewModelFactory) {
                                 returnArticleId = articleId,
                             ),
                         )
+                    },
+                    onOpenCameraBatch = { id ->
+                        navController.navigate(OasisRoute.CameraBatchShoot.create(null, id))
+                    },
+                    onOpenSubBarcodeBatchShoot = { id ->
+                        navController.navigate(OasisRoute.CameraBatchShoot.create(articleId = id, subBcAcquire = true))
                     },
                 )
             }
@@ -347,17 +376,42 @@ fun OasisNavHost(factory: OasisViewModelFactory) {
                         defaultValue = ""
                         nullable = true
                     },
+                    navArgument("articleId") {
+                        type = NavType.StringType
+                        defaultValue = ""
+                        nullable = true
+                    },
+                    navArgument("subBcAcquire") {
+                        type = NavType.StringType
+                        defaultValue = "false"
+                    },
+                    navArgument("confirmedSubBarcode") {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    },
                 ),
             ) { backStackEntry ->
                 val queueItemId = backStackEntry.arguments
                     ?.getString("queueItemId")
                     ?.toLongOrNull()
+                val articleId = backStackEntry.arguments
+                    ?.getString("articleId")
+                    ?.toLongOrNull()
+                val subBcAcquire = backStackEntry.arguments
+                    ?.getString("subBcAcquire") == "true"
+                val confirmedSubBarcode = backStackEntry.arguments
+                    ?.getString("confirmedSubBarcode")
+                    ?.takeIf { !it.isNullOrBlank() }
                 val vm: CameraBatchShootViewModel = viewModel(factory = factory)
                 CameraBatchShootScreen(
                     viewModel = vm,
                     queueItemId = queueItemId,
+                    articleId = articleId,
+                    subBcAcquire = subBcAcquire,
+                    confirmedSubBarcode = confirmedSubBarcode,
                     onBack = { navController.popBackStack() },
                     onDoneShooting = { navController.navigate(OasisRoute.CameraBatchImport.route) },
+                    onOpenPhotoroomImport = { navController.navigate(OasisRoute.CameraBatchImport.route) },
                 )
             }
             composable(OasisRoute.CameraBatchImport.route) {

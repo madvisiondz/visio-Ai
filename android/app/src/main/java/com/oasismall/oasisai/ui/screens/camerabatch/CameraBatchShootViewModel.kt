@@ -7,11 +7,13 @@ import com.oasismall.oasisai.data.db.entity.BatchCameraQueueEntity
 import com.oasismall.oasisai.data.db.entity.CameraBatchItemEntity
 import com.oasismall.oasisai.data.model.CartType
 import com.oasismall.oasisai.data.repository.OasisRepository
+import com.oasismall.oasisai.data.repository.SubBarcodeInfo
 import com.oasismall.oasisai.domain.visio.BatchCameraQueueStore
 import com.oasismall.oasisai.domain.visio.CameraBatchStore
 import com.oasismall.oasisai.domain.visio.VisioDownloadStorage
 import com.oasismall.oasisai.ui.components.CartSourceTags
 import com.oasismall.oasisai.util.hasAppGalleryImage
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -22,6 +24,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 enum class CameraBatchShootStep {
@@ -30,6 +33,7 @@ enum class CameraBatchShootStep {
     CREATE_DESIGNATION,
     PICK_MATCH,
     PREVIEW,
+    AWAITING_PHOTOROOM,
 }
 
 data class CameraBatchLockedState(
@@ -40,7 +44,13 @@ data class CameraBatchLockedState(
     val imagePath: String?,
     val articleId: Long?,
     val linkedViaAlternate: Boolean = false,
+    val codeart: String? = null,
+    val lastPriceChangedAt: Long? = null,
+    val lastPrintedAt: Long? = null,
+    val subBarcodes: List<SubBarcodeInfo> = emptyList(),
 )
+
+data class SubBarcodeDialogState(val scannedBarcode: String)
 
 class CameraBatchShootViewModel(
     private val repository: OasisRepository,
@@ -73,6 +83,15 @@ class CameraBatchShootViewModel(
     private val _pickedMatch = MutableStateFlow<ArticleWithImage?>(null)
     val pickedMatch: StateFlow<ArticleWithImage?> = _pickedMatch.asStateFlow()
 
+    private val _knownArticleId = MutableStateFlow<Long?>(null)
+    val knownArticleId: StateFlow<Long?> = _knownArticleId.asStateFlow()
+
+    private val _singleArticleMode = MutableStateFlow(false)
+    val singleArticleMode: StateFlow<Boolean> = _singleArticleMode.asStateFlow()
+
+    private val _autoLaunchCamera = MutableStateFlow(false)
+    val autoLaunchCamera: StateFlow<Boolean> = _autoLaunchCamera.asStateFlow()
+
     @OptIn(ExperimentalCoroutinesApi::class)
     val designationMatches: StateFlow<List<ArticleWithImage>> = _designationInput
         .map { it.trim() }
@@ -88,7 +107,23 @@ class CameraBatchShootViewModel(
     private val _saving = MutableStateFlow(false)
     val saving: StateFlow<Boolean> = _saving.asStateFlow()
 
-    fun initQueue(queueItemId: Long?) {
+    private val _subBcAcquireMode = MutableStateFlow(false)
+    val subBcAcquireMode: StateFlow<Boolean> = _subBcAcquireMode.asStateFlow()
+
+    private val _parentArticle = MutableStateFlow<ArticleWithImage?>(null)
+
+    private val _subBarcodeConfirm = MutableStateFlow<SubBarcodeDialogState?>(null)
+    val subBarcodeConfirm: StateFlow<SubBarcodeDialogState?> = _subBarcodeConfirm.asStateFlow()
+
+    private val _deferSubBarcodeLink = MutableStateFlow(false)
+    private val _pendingLinkParentId = MutableStateFlow<Long?>(null)
+
+    fun initSession(
+        queueItemId: Long?,
+        articleId: Long?,
+        subBcAcquire: Boolean = false,
+        confirmedSubBarcode: String? = null,
+    ) {
         viewModelScope.launch {
             val item = when {
                 queueItemId != null -> queueStore.getById(queueItemId)
@@ -98,39 +133,178 @@ class CameraBatchShootViewModel(
             if (item != null) {
                 _message.value = "Batch capture: ${item.designation}"
             }
+            if (articleId != null && articleId > 0L) {
+                _knownArticleId.value = articleId
+                val article = repository.getArticleWithImageById(articleId)
+                if (article != null) {
+                    if (subBcAcquire) {
+                        _subBcAcquireMode.value = true
+                        _singleArticleMode.value = true
+                        _parentArticle.value = article
+                        _locked.value = null
+                        _step.value = CameraBatchShootStep.SCAN
+                        _message.value = "Scan new flavor barcode for ${article.designation}"
+                        confirmedSubBarcode?.trim()?.takeIf { it.length >= 8 }?.let { sub ->
+                            val err = repository.validateSubBarcodeLink(article.id, article.barcode, sub)
+                            if (err != null) {
+                                _message.value = err
+                            } else {
+                                lockForSubBarcodeShoot(sub)
+                            }
+                        }
+                    } else {
+                        _singleArticleMode.value = true
+                        lockFromArticle(article)
+                        _autoLaunchCamera.value = true
+                        _message.value = "Ready — shoot ${article.designation}"
+                    }
+                } else {
+                    _message.value = "Article not found — scan barcode."
+                }
+            }
         }
     }
 
+    fun consumeAutoLaunchCamera() {
+        _autoLaunchCamera.value = false
+    }
+
     fun onBarcodeScanned(barcode: String) {
-        if (_locked.value != null) return
         val trimmed = barcode.trim()
         if (trimmed.length < 8) return
+        if (_subBcAcquireMode.value && _parentArticle.value != null && _locked.value == null) {
+            viewModelScope.launch { promptSubBarcodeConfirm(trimmed) }
+            return
+        }
+        if (_locked.value != null) return
         viewModelScope.launch { lockBarcode(trimmed) }
+    }
+
+    private suspend fun promptSubBarcodeConfirm(scannedBarcode: String) {
+        val parent = _parentArticle.value ?: return
+        val err = repository.validateSubBarcodeLink(parent.id, parent.barcode, scannedBarcode)
+        if (err != null) {
+            _message.value = err
+            return
+        }
+        _subBarcodeConfirm.value = SubBarcodeDialogState(scannedBarcode)
+    }
+
+    fun confirmSubBarcodeAdd() {
+        val pending = _subBarcodeConfirm.value ?: return
+        _subBarcodeConfirm.value = null
+        viewModelScope.launch { lockForSubBarcodeShoot(pending.scannedBarcode) }
+    }
+
+    fun declineSubBarcodeAdd() {
+        _subBarcodeConfirm.value = null
+    }
+
+    private suspend fun lockForSubBarcodeShoot(subBarcode: String) {
+        val parent = _parentArticle.value ?: _pendingLinkParentId.value?.let { repository.getArticleWithImageById(it) }
+            ?: return
+        _deferSubBarcodeLink.value = true
+        _pendingLinkParentId.value = parent.id
+        val meta = repository.getArticlePanelMeta(parent.id)
+        _locked.value = CameraBatchLockedState(
+            barcode = subBarcode,
+            inCatalog = true,
+            designation = parent.designation,
+            price = parent.price.takeIf { it > 0.0 },
+            imagePath = parent.imagePath?.takeIf { File(it).exists() },
+            articleId = parent.id,
+            linkedViaAlternate = true,
+            codeart = meta.codeart,
+            lastPriceChangedAt = meta.lastPriceChangedAt,
+            lastPrintedAt = meta.lastPrintedAt,
+            subBarcodes = meta.subBarcodes,
+        )
+        _step.value = CameraBatchShootStep.LOCKED
+        _autoLaunchCamera.value = true
+        _message.value = "Shoot photo for sub-barcode $subBarcode — saved after PhotoRoom import"
+    }
+
+    fun removeSubBarcode(barcode: String) {
+        val parentId = _parentArticle.value?.id ?: _locked.value?.articleId ?: return
+        viewModelScope.launch {
+            val err = repository.unlinkAlternateBarcode(parentId, barcode)
+            if (err != null) {
+                _message.value = err
+                return@launch
+            }
+            val meta = repository.getArticlePanelMeta(parentId)
+            _locked.value = _locked.value?.copy(subBarcodes = meta.subBarcodes)
+            _message.value = "Removed sub-barcode $barcode"
+        }
+    }
+
+    private suspend fun enrichLockedState(
+        article: ArticleWithImage,
+        barcode: String,
+        inCatalog: Boolean,
+        linkedViaAlternate: Boolean,
+    ): CameraBatchLockedState {
+        val meta = repository.getArticlePanelMeta(article.id)
+        return CameraBatchLockedState(
+            barcode = barcode,
+            inCatalog = inCatalog,
+            designation = article.designation,
+            price = article.price.takeIf { it > 0.0 },
+            imagePath = article.imagePath?.takeIf { File(it).exists() },
+            articleId = article.id,
+            linkedViaAlternate = linkedViaAlternate,
+            codeart = meta.codeart,
+            lastPriceChangedAt = meta.lastPriceChangedAt,
+            lastPrintedAt = meta.lastPrintedAt,
+            subBarcodes = meta.subBarcodes,
+        )
+    }
+
+    private suspend fun lockFromArticle(article: ArticleWithImage) {
+        _locked.value = enrichLockedState(article, article.barcode, inCatalog = true, linkedViaAlternate = false)
+        _step.value = CameraBatchShootStep.LOCKED
     }
 
     private suspend fun lockBarcode(barcode: String) {
         val resolved = repository.resolveScannedBarcode(barcode)
         val article = resolved?.article
+            ?: _knownArticleId.value?.let { repository.getArticleWithImageById(it) }
         val queueHint = _currentQueueItem.value?.designation
-        _locked.value = CameraBatchLockedState(
-            barcode = barcode,
-            inCatalog = resolved != null,
-            designation = article?.designation ?: queueHint ?: barcode,
-            price = article?.price?.takeIf { it > 0.0 },
-            imagePath = article?.imagePath?.takeIf { File(it).exists() },
-            articleId = article?.id,
-            linkedViaAlternate = resolved != null && !resolved.primary,
-        )
+        _locked.value = if (article != null) {
+            enrichLockedState(
+                article = article,
+                barcode = barcode,
+                inCatalog = resolved != null,
+                linkedViaAlternate = resolved != null && !resolved.primary,
+            )
+        } else {
+            CameraBatchLockedState(
+                barcode = barcode,
+                inCatalog = false,
+                designation = queueHint ?: barcode,
+                price = null,
+                imagePath = null,
+                articleId = _knownArticleId.value,
+            )
+        }
         _step.value = CameraBatchShootStep.LOCKED
         _message.value = null
     }
 
     fun unlockForNextScan() {
-        _locked.value = null
         _pendingJpeg.value?.delete()
         _pendingJpeg.value = null
         _designationInput.value = ""
         _pickedMatch.value = null
+        _deferSubBarcodeLink.value = false
+        _pendingLinkParentId.value = null
+        if (_subBcAcquireMode.value) {
+            _locked.value = null
+            _step.value = CameraBatchShootStep.SCAN
+            _message.value = "Scan next flavor barcode"
+            return
+        }
+        _locked.value = null
         _step.value = CameraBatchShootStep.SCAN
     }
 
@@ -153,18 +327,14 @@ class CameraBatchShootViewModel(
         val locked = _locked.value ?: return
         val match = _pickedMatch.value ?: return
         viewModelScope.launch {
-            val err = repository.linkSubBarcodeToMainArticle(
-                articleId = match.id,
-                mainBarcode = match.barcode,
-                subBarcode = locked.barcode,
-            )
+            val err = repository.validateSubBarcodeLink(match.id, match.barcode, locked.barcode)
             if (err != null) {
                 _message.value = err
                 return@launch
             }
-            _message.value = "Sub-barcode linked to ${match.designation} — shoot this flavor."
             _pickedMatch.value = null
-            lockBarcode(locked.barcode)
+            _pendingLinkParentId.value = match.id
+            lockForSubBarcodeShoot(locked.barcode)
         }
     }
 
@@ -206,30 +376,51 @@ class CameraBatchShootViewModel(
         _pendingJpeg.value?.delete()
         _pendingJpeg.value = null
         _step.value = CameraBatchShootStep.LOCKED
+        if (_singleArticleMode.value) {
+            _autoLaunchCamera.value = true
+        }
     }
 
     fun confirmAndSave() {
         val jpeg = _pendingJpeg.value ?: return
         val locked = _locked.value ?: return
+        val pendingLink = _deferSubBarcodeLink.value
+        val linkParentId = _pendingLinkParentId.value ?: _parentArticle.value?.id
         viewModelScope.launch {
             _saving.value = true
             runCatching {
-                store.saveTaggedShot(
-                    sourceJpeg = jpeg,
-                    barcode = locked.barcode,
-                    hintDesignation = _currentQueueItem.value?.designation ?: locked.designation,
-                )
+                withContext(Dispatchers.IO) {
+                    store.saveTaggedShot(
+                        sourceJpeg = jpeg,
+                        barcode = locked.barcode,
+                        hintDesignation = _currentQueueItem.value?.designation ?: locked.designation,
+                        hintArticleId = locked.articleId ?: _knownArticleId.value,
+                        pendingSubBarcodeLink = pendingLink && linkParentId != null,
+                        linkParentArticleId = if (pendingLink) linkParentId else null,
+                    )
+                }
             }.fold(
                 onSuccess = { item ->
                     _currentQueueItem.value?.id?.let { queueStore.markDone(it) }
-                    val next = queueStore.nextPending()
-                    _currentQueueItem.value = next
                     _pendingJpeg.value = null
-                    unlockForNextScan()
-                    _message.value = if (next != null) {
-                        "Saved ${item.shotFileName} — next: ${next.designation}"
+                    _deferSubBarcodeLink.value = false
+                    _pendingLinkParentId.value = null
+                    if (_singleArticleMode.value) {
+                        _step.value = CameraBatchShootStep.AWAITING_PHOTOROOM
+                        _message.value = if (pendingLink) {
+                            "Saved ${item.shotFileName}. Edit in PhotoRoom, import — sub-barcode links after import."
+                        } else {
+                            "Saved ${item.shotFileName}. Edit in PhotoRoom, then open PhotoRoom import."
+                        }
                     } else {
-                        "Saved ${item.shotFileName} — queue complete"
+                        val next = queueStore.nextPending()
+                        _currentQueueItem.value = next
+                        unlockForNextScan()
+                        _message.value = if (next != null) {
+                            "Saved ${item.shotFileName} — next: ${next.designation}"
+                        } else {
+                            "Saved ${item.shotFileName} — queue complete"
+                        }
                     }
                 },
                 onFailure = { e ->
@@ -238,6 +429,20 @@ class CameraBatchShootViewModel(
             )
             _saving.value = false
         }
+    }
+
+    fun shootAgainSameArticle() {
+        if (_subBcAcquireMode.value) {
+            _locked.value = null
+            _deferSubBarcodeLink.value = false
+            _pendingLinkParentId.value = null
+            _step.value = CameraBatchShootStep.SCAN
+            _message.value = "Scan next flavor barcode"
+            return
+        }
+        _step.value = CameraBatchShootStep.LOCKED
+        _autoLaunchCamera.value = true
+        _message.value = "Shoot again — same article."
     }
 
     fun showMessage(value: String) {

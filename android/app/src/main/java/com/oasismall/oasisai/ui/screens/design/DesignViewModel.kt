@@ -61,25 +61,25 @@ class DesignViewModel(
         _message.value = null
     }
 
-    fun remove(articleId: Long) {
-        viewModelScope.launch { repository.removeFromCart(articleId, CartType.DESIGN) }
+    fun remove(preselectionId: Long) {
+        viewModelScope.launch { repository.removeFromCart(preselectionId) }
     }
 
     fun clearDesign() {
         viewModelScope.launch { repository.clearCart(CartType.DESIGN) }
     }
 
-    fun incrementCopy(articleId: Long) {
-        viewModelScope.launch { repository.incrementDesignCopyCount(articleId) }
+    fun incrementCopy(preselectionId: Long) {
+        viewModelScope.launch { repository.incrementDesignCopyCount(preselectionId) }
     }
 
-    fun decrementCopy(articleId: Long) {
-        viewModelScope.launch { repository.decrementDesignCopyCount(articleId) }
+    fun decrementCopy(preselectionId: Long) {
+        viewModelScope.launch { repository.decrementDesignCopyCount(preselectionId) }
     }
 
-    fun pullUpFromDone(articleId: Long) {
+    fun pullUpFromDone(preselectionId: Long) {
         viewModelScope.launch {
-            repository.restoreDesignItemFromDone(articleId)
+            repository.restoreDesignItemFromDone(preselectionId)
             _message.value = "Moved back to print queue."
         }
     }
@@ -92,10 +92,43 @@ class DesignViewModel(
         }
         _message.value = null
         ExportShareHelper.shareDesignCartInfo(context, cart)
+        _message.value = "Sent info for ${cart.size} article(s) — tap Mark as sent when finished."
+    }
+
+    fun markQueueAsSent() {
+        val cart = items.value
+        if (cart.isEmpty()) {
+            _message.value = "Nothing in print queue."
+            return
+        }
         viewModelScope.launch {
-            val orderedIds = cart.sortedBy { it.sortOrder }.map { it.articleId }
+            val orderedIds = cart.sortedBy { it.sortOrder }.map { it.preselectionId }
             repository.moveDesignItemsToDone(orderedIds)
-            _message.value = "Sent ${cart.size} article(s) — moved to Done."
+            _message.value = "Marked ${orderedIds.size} article(s) as sent."
+        }
+    }
+
+    fun markPageAsPrinted(pageIndex: Int) {
+        viewModelScope.launch {
+            val pageIdSet = itemsForPage(pageIndex).map { it.preselectionId }.toSet()
+            val orderedIds = items.value
+                .filter { it.preselectionId in pageIdSet }
+                .sortedBy { it.sortOrder }
+                .map { it.preselectionId }
+            if (orderedIds.isEmpty()) {
+                _message.value = "No articles on this page."
+                return@launch
+            }
+            repository.moveDesignItemsToDone(orderedIds)
+            _message.value = "Marked ${orderedIds.size} article(s) as printed."
+            backToHome()
+        }
+    }
+
+    fun removeFromDone(preselectionId: Long) {
+        viewModelScope.launch {
+            repository.removeFromCart(preselectionId)
+            _message.value = "Removed from Done."
         }
     }
 
@@ -179,7 +212,7 @@ class DesignViewModel(
                 }
             }.onSuccess { file ->
                 val pageSlots = itemsForPage(pageIndex)
-                val pageItems = pageSlots.distinctBy { it.articleId }
+                val pageItems = pageSlots.distinctBy { it.preselectionId }
                 repository.recordDesignShelfPrint(pageIndex, file.absolutePath, pageItems)
                 _shelfPageIndex.value = pageIndex
                 _readyJpegPath.value = file.absolutePath
@@ -190,18 +223,6 @@ class DesignViewModel(
                 _message.value = e.message ?: "Export failed"
             }
             _isRendering.value = false
-        }
-    }
-
-    fun onPrintShared(pageIndex: Int) {
-        viewModelScope.launch {
-            val pageIdSet = itemsForPage(pageIndex).map { it.articleId }.toSet()
-            val orderedIds = items.value
-                .filter { it.articleId in pageIdSet }
-                .sortedBy { it.sortOrder }
-                .map { it.articleId }
-            repository.moveDesignItemsToDone(orderedIds)
-            _message.value = "Printed page moved to Done (${orderedIds.size} article(s))."
         }
     }
 

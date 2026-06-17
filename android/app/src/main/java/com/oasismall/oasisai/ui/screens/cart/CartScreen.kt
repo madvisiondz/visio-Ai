@@ -34,6 +34,7 @@ import com.oasismall.oasisai.data.model.CartType
 import com.oasismall.oasisai.ui.OasisViewModelFactory
 import com.oasismall.oasisai.ui.components.ArticleCard
 import com.oasismall.oasisai.ui.components.CartSourceLegend
+import com.oasismall.oasisai.ui.components.OpenCameraBatchButton
 import com.oasismall.oasisai.ui.components.cartSourceStyle
 import com.oasismall.oasisai.ui.components.sourceBorder
 import java.text.SimpleDateFormat
@@ -46,10 +47,11 @@ fun CartScreen(
     viewModel: CartViewModel,
     onArticleClick: (Long) -> Unit,
     onOpenAgent: (() -> Unit)? = null,
+    onOpenCameraBatch: ((articleId: Long?) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val items by viewModel.items.collectAsStateWithLifecycle()
-    val selectedIds by viewModel.selectedArticleIds.collectAsStateWithLifecycle()
+    val selectedIds by viewModel.selectedPreselectionIds.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
 
     val title = when (viewModel.cartType) {
@@ -66,7 +68,7 @@ fun CartScreen(
     }
 
     val shareableCount = items.count { !it.imagePath.isNullOrBlank() }
-    val selectedItems = items.filter { it.articleId in selectedIds && !it.imagePath.isNullOrBlank() }
+    val selectedItems = items.filter { it.preselectionId in selectedIds && !it.imagePath.isNullOrBlank() }
 
     Scaffold(topBar = { TopAppBar(title = { Text("$title (${items.size})") }) }) { padding ->
         LazyColumn(
@@ -193,12 +195,12 @@ fun CartScreen(
                         trailing = {
                             if (viewModel.cartType == CartType.SHARE) {
                                 Checkbox(
-                                    checked = item.articleId in selectedIds,
+                                    checked = item.preselectionId in selectedIds,
                                     enabled = !item.imagePath.isNullOrBlank(),
-                                    onCheckedChange = { viewModel.toggleSelection(item.articleId) },
+                                    onCheckedChange = { viewModel.toggleSelection(item.preselectionId) },
                                 )
                             }
-                            IconButton(onClick = { viewModel.remove(item.articleId) }) {
+                            IconButton(onClick = { viewModel.remove(item.preselectionId) }) {
                                 Icon(Icons.Default.Delete, contentDescription = "Remove")
                             }
                         },
@@ -208,8 +210,14 @@ fun CartScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    if (viewModel.cartType == CartType.PHOTOSHOOT && onOpenCameraBatch != null) {
+                        OpenCameraBatchButton(
+                            onClick = onOpenCameraBatch,
+                            articleId = item.articleId,
+                        )
+                    }
                     OutlinedButton(
-                        onClick = { viewModel.remove(item.articleId) },
+                        onClick = { viewModel.remove(item.preselectionId) },
                         modifier = Modifier.fillMaxWidth(),
                     ) { Text("Remove from cart") }
                 }
@@ -224,12 +232,13 @@ fun CartRoute(
     factory: OasisViewModelFactory,
     onArticleClick: (Long) -> Unit,
     onOpenAgent: (() -> Unit)? = null,
+    onOpenCameraBatch: ((articleId: Long?) -> Unit)? = null,
 ) {
     val viewModel: CartViewModel = viewModel(
         key = "cart_${cartType.name}",
         factory = factory.cartViewModelFactory(cartType),
     )
-    CartScreen(viewModel, onArticleClick, onOpenAgent)
+    CartScreen(viewModel, onArticleClick, onOpenAgent, onOpenCameraBatch)
 }
 
 private fun PreselectionWithArticle.toArticleWithImage() = ArticleWithImage(

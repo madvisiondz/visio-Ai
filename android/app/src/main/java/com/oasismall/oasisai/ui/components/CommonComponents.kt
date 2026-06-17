@@ -25,6 +25,8 @@ import coil.compose.AsyncImage
 import com.oasismall.oasisai.data.db.dao.ArticleWithImage
 import com.oasismall.oasisai.data.model.ArticleChangeStatus
 import com.oasismall.oasisai.data.model.ImageStatus
+import com.oasismall.oasisai.data.model.ImportChangeType
+import com.oasismall.oasisai.data.repository.ImportChangeUiRow
 import com.oasismall.oasisai.util.PriceFormatter
 import com.oasismall.oasisai.util.hasAppGalleryImage
 import java.io.File
@@ -200,5 +202,139 @@ fun ScanResultPanel(
                 Text("Open article detail")
             }
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ImportChangeCard(
+    row: ImportChangeUiRow,
+    modifier: Modifier = Modifier,
+    metaLine: String? = null,
+    onArticleClick: ((Long) -> Unit)? = null,
+    onAddToShare: ((Long) -> Unit)? = null,
+    onAddToShoot: ((Long) -> Unit)? = null,
+) {
+    val change = row.change
+    val article = row.article
+    val articleId = article?.id ?: change.articleId
+    val hasImage = article?.hasAppGalleryImage() == true
+    val canRoute = articleId != null && change.changeType != ImportChangeType.REMOVED.name
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        onClick = {
+            if (onArticleClick != null && articleId != null) {
+                onArticleClick(articleId)
+            }
+        },
+        enabled = onArticleClick != null && articleId != null,
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                ImportChangeThumbnail(article)
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(change.designation, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        "${changeTypeLabelShort(change.changeType)} — ${change.barcode}",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    change.oldValue?.let { old ->
+                        Text(
+                            "Was: ${formatImportChangeValue(change.changeType, old)}",
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                    change.newValue?.let { new ->
+                        Text(
+                            "Now: ${formatImportChangeValue(change.changeType, new)}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                    metaLine?.let {
+                        Text(
+                            it,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+            if (canRoute && (onAddToShare != null || onAddToShoot != null)) {
+                if (hasImage && onAddToShare != null) {
+                    Button(
+                        onClick = { onAddToShare(articleId!!) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("Add to To share")
+                    }
+                } else if (!hasImage && onAddToShoot != null) {
+                    Button(
+                        onClick = { onAddToShoot(articleId!!) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("Add to To shoot")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ImportChangeThumbnail(article: ArticleWithImage?) {
+    val path = article?.imagePath
+    if (article != null && !path.isNullOrBlank() && File(path).exists()) {
+        AsyncImage(
+            model = File(path),
+            contentDescription = article.designation,
+            modifier = Modifier.size(56.dp),
+            contentScale = ContentScale.Fit,
+        )
+    } else {
+        Surface(
+            modifier = Modifier.size(56.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant,
+        ) {
+            Text(
+                "No image",
+                modifier = Modifier.padding(8.dp),
+                style = MaterialTheme.typography.labelSmall,
+            )
+        }
+    }
+}
+
+private fun changeTypeLabelShort(type: String): String = when (type) {
+    ImportChangeType.NEW.name -> "New"
+    ImportChangeType.PRICE_CHANGED.name -> "Price changed"
+    ImportChangeType.RENAMED.name -> "Renamed"
+    ImportChangeType.REMOVED.name -> "Removed"
+    ImportChangeType.UNCHANGED.name -> "Unchanged"
+    else -> type.replace('_', ' ')
+}
+
+private fun formatImportChangeValue(changeType: String, value: String): String =
+    if (changeType == ImportChangeType.PRICE_CHANGED.name) {
+        value.toDoubleOrNull()?.let { PriceFormatter.format(it) } ?: value
+    } else {
+        value
+    }
+
+@Composable
+fun OpenCameraBatchButton(
+    onClick: (articleId: Long?) -> Unit,
+    articleId: Long? = null,
+    modifier: Modifier = Modifier.fillMaxWidth(),
+) {
+    OutlinedButton(onClick = { onClick(articleId) }, modifier = modifier) {
+        Text("Open camera batch (free scan)")
     }
 }

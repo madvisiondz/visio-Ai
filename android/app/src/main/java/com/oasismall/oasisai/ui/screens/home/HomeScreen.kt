@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.oasismall.oasisai.data.db.dao.ArticleWithImage
 import com.oasismall.oasisai.ui.components.ArticleCard
+import com.oasismall.oasisai.ui.components.OpenCameraBatchButton
 import com.oasismall.oasisai.util.hasAppGalleryImage
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -34,6 +35,7 @@ import com.oasismall.oasisai.util.hasAppGalleryImage
 fun HomeScreen(
     viewModel: HomeViewModel,
     onArticleClick: (Long) -> Unit,
+    onOpenCameraBatch: (articleId: Long?) -> Unit = {},
 ) {
     val query by viewModel.query.collectAsStateWithLifecycle()
     val result by viewModel.searchResult.collectAsStateWithLifecycle()
@@ -81,24 +83,26 @@ fun HomeScreen(
                     }
                     if (result.withImage.isNotEmpty()) {
                         item { SectionHeader("In Oasis gallery (${result.withImage.size})") }
-                        items(result.withImage, key = { "ok_${it.id}" }) { article ->
+                        items(result.withImage, key = { "ok_${it.id}_${it.barcode}" }) { article ->
                             HomeArticleRow(
                                 article = article,
                                 canShare = true,
                                 onArticleClick = onArticleClick,
-                                onShare = { viewModel.addToShareCart(article.id) },
+                                onShare = { viewModel.addToShareCart(article.id, article.barcode) },
+                                onOpenCameraBatch = onOpenCameraBatch,
                             )
                         }
                     }
                     if (result.withoutImage.isNotEmpty()) {
                         item { SectionHeader("Needs photo (${result.withoutImage.size})") }
-                        items(result.withoutImage, key = { "miss_${it.id}" }) { article ->
+                        items(result.withoutImage, key = { "miss_${it.id}_${it.barcode}" }) { article ->
                             HomeArticleRow(
                                 article = article,
                                 canShare = false,
                                 onArticleClick = onArticleClick,
-                                onShare = { viewModel.addToShareCart(article.id) },
-                                onShoot = { viewModel.addToPhotoshootCart(article.id) },
+                                onShare = { viewModel.addToShareCart(article.id, article.barcode) },
+                                onShoot = { viewModel.addToPhotoshootCart(article.id, article.barcode) },
+                                onOpenCameraBatch = onOpenCameraBatch,
                             )
                         }
                     }
@@ -138,6 +142,7 @@ private fun HomeArticleRow(
     canShare: Boolean,
     onArticleClick: (Long) -> Unit,
     onShare: () -> Unit,
+    onOpenCameraBatch: (Long?) -> Unit,
     onShoot: (() -> Unit)? = null,
 ) {
     val shareEnabled = canShare && article.hasAppGalleryImage()
@@ -148,6 +153,7 @@ private fun HomeArticleRow(
                 Text("Add to To shoot")
             }
         }
+        OpenCameraBatchButton(onClick = onOpenCameraBatch, articleId = article.id)
         Button(
             onClick = onShare,
             enabled = shareEnabled,

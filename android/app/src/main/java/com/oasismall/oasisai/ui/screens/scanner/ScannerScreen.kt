@@ -34,7 +34,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.oasismall.oasisai.ui.components.ScanResultPanel
+import com.oasismall.oasisai.ui.components.ArticleActionPanel
+import com.oasismall.oasisai.ui.components.ArticlePanelData
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,6 +54,9 @@ fun ScannerScreen(
     }
 
     val result by viewModel.result.collectAsStateWithLifecycle()
+    val panelMeta by viewModel.panelMeta.collectAsStateWithLifecycle()
+    val scannedBarcode by viewModel.scannedBarcode.collectAsStateWithLifecycle()
+    val linkedViaAlternate by viewModel.linkedViaAlternate.collectAsStateWithLifecycle()
     val notFound by viewModel.notFound.collectAsStateWithLifecycle()
     val lastScanned by viewModel.lastScannedBarcode.collectAsStateWithLifecycle()
 
@@ -145,12 +149,22 @@ fun ScannerScreen(
 
             result?.let { article ->
                 item {
-                    ScanResultPanel(
-                        article = article,
+                    ArticleActionPanel(
+                        data = ArticlePanelData.fromArticle(
+                            article = article,
+                            meta = panelMeta,
+                            scannedBarcode = scannedBarcode,
+                            linkedViaAlternate = linkedViaAlternate,
+                        ),
+                        scrollable = true,
+                        maxHeight = 520.dp,
+                        onCreateAsset = { onCreateAsset(scannedBarcode ?: article.barcode) },
                         onAddToShare = { viewModel.addToShareCart(article) },
-                        onMarkVerified = { viewModel.markTicketVerified(article.id) },
+                        onAddToShoot = { viewModel.addToPhotoshootCart(article) },
+                        onAddToDesign = { viewModel.addToDesignCart(article) },
+                        onMarkTicketVerified = { viewModel.markTicketVerified(article.id) },
                         onOpenDetail = { onArticleClick(article.id) },
-                        onCreateAsset = { onCreateAsset(article.barcode) },
+                        onRemoveSubBarcode = viewModel::removeSubBarcode,
                     )
                 }
             }

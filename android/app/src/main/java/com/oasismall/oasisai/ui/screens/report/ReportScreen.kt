@@ -32,6 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.oasismall.oasisai.data.db.entity.PrintBatchItemEntity
+import com.oasismall.oasisai.ui.components.ImportChangeCard
 import com.oasismall.oasisai.util.PriceFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -109,9 +110,12 @@ fun ReportScreen(
                     val rows = state.csvChangesByType[type].orEmpty()
                     item { ChangeTypeChip(changeTypeLabel(type), rows.size) }
                     items(rows, key = { "csv_${it.change.id}" }) { row ->
-                        CsvChangeCard(
-                            row = row,
+                        ImportChangeCard(
+                            row = row.uiRow,
+                            metaLine = "${row.importFileName} · ${formatDate(row.importDate)}",
                             onArticleClick = onArticleClick,
+                            onAddToShare = viewModel::addToShareCart,
+                            onAddToShoot = viewModel::addToPhotoshootCart,
                         )
                     }
                 }
@@ -193,33 +197,6 @@ private fun ChangeTypeChip(label: String, count: Int) {
         color = MaterialTheme.colorScheme.primary,
         modifier = Modifier.padding(top = 4.dp, bottom = 2.dp),
     )
-}
-
-@Composable
-private fun CsvChangeCard(
-    row: ReportCsvChangeRow,
-    onArticleClick: (Long) -> Unit,
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        onClick = { row.change.articleId?.let(onArticleClick) },
-    ) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(row.change.designation, fontWeight = FontWeight.SemiBold)
-            Text("Barcode: ${row.change.barcode}", style = MaterialTheme.typography.bodySmall)
-            row.change.oldValue?.let { old ->
-                Text("Was: $old", style = MaterialTheme.typography.bodyMedium)
-            }
-            row.change.newValue?.let { new ->
-                Text("Now: $new", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
-            }
-            Text(
-                "${row.importFileName} · ${formatDate(row.importDate)}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
 }
 
 @Composable

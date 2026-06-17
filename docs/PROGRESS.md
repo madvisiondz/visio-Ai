@@ -2,6 +2,107 @@
 
 > What has been built. Update at end of each work session.
 
+## 2026-06-17 — Visio Ai v2.4.5 Cart flavor rows (sub-barcodes)
+
+- [x] DB v15: `preselection_items.variantBarcode`; unique index `(articleId, cartType, variantBarcode)`
+- [x] To share & Design lists show **parent + each sub-barcode** as separate cart rows (sub image from `article_alternate_barcodes`)
+- [x] Remove/copy/move by `preselectionId` (no longer replaces parent when adding flavor)
+- [x] PhotoRoom sub-barcode import → auto-add **that sub-barcode** to To share (not parent-only)
+- [x] Articles search **Add to To share** passes scanned barcode as cart variant
+- [x] APK **2.4.5** (code 245)
+
+---
+
+## 2026-06-17 — Visio Ai v2.4.4 Shelf print quality
+
+- [x] Shelf A4 **3508×2480** (300 DPI, was 150 DPI)
+- [x] JPEG export **quality 100** (was 80)
+- [x] Product PNGs decoded at full slot resolution + bilinear filter on draw
+- [x] APK **2.4.4** (code 244)
+
+---
+
+## 2026-06-17 — Visio Ai v2.4.3 Articles search crash fix
+
+- [x] LazyColumn keys `id_barcode` for sub-barcode variant rows
+- [x] Safer `observeArticles` — batch alternates, capped expansion, fallback
+- [x] APK **2.4.3** (code 243)
+
+---
+
+## 2026-06-17 — Visio Ai v2.4.1 Sub-barcode always needs photo
+
+- [x] Removed **add without photo** — confirm → shoot immediately
+- [x] Sub-barcode linked only after PhotoRoom import with `imagePath`
+- [x] Legacy sub-barcodes (no image) unchanged — still show parent image fallback
+- [x] APK **2.4.1** (code 241)
+
+---
+
+## 2026-06-17 — Visio Ai v2.4.0 Sub-barcode confirm + per-barcode images
+
+- [x] Sub-barcode scan → **confirm add** → **shoot this article?** (yes = batch camera + PhotoRoom wait; no = link without image)
+- [x] Sub-barcode linked **after PhotoRoom import** when shooting (`pendingSubBarcodeLink` on `camera_batch_items`)
+- [x] DB v14: `article_alternate_barcodes.imagePath`; per-sub-barcode PNG (`sub_{barcode}.png`)
+- [x] Articles search shows **main + each sub-barcode** as separate rows (same designation, own image)
+- [x] Scanner/resolve returns sub-barcode's own image
+- [x] **Tap sub-barcode chip** to remove (AGENT, article detail, scanner, camera batch)
+- [x] APK **2.4.0** (code 240)
+
+---
+
+## 2026-06-16 — Visio Ai v2.3.7 PhotoRoom → To share
+
+- [x] After PhotoRoom import, articles auto-added to **To share** (tag `SRC_BATCH_CAMERA`)
+- [x] Removed from **To shoot** when import completes
+- [x] APK **2.3.7** (code 237)
+
+---
+
+## 2026-06-16 — Visio Ai v2.3.6 Article action panel + sub-barcode batch shoot
+
+- [x] Shared **ArticleActionPanel** — scrollable, last price change + last printed, SUB-BC, all cart actions
+- [x] Article detail **Add sub-barcode & batch shoot** → scan flavor barcode → auto-link → shoot
+- [x] Camera batch auto-links unknown scan to known article as sub-barcode
+- [x] Scanner resolves sub-barcodes via `resolveScannedBarcode`
+- [x] APK **2.3.6** (code 236)
+
+---
+
+## 2026-06-16 — Visio Ai v2.3.5 Import detail empty list fix
+
+- [x] Import detail queries **meaningful changes only** (excludes UNCHANGED) before image enrichment
+- [x] New imports no longer write ~26k UNCHANGED rows to `import_changes`
+- [x] APK **2.3.5** (code 235)
+
+---
+
+## 2026-06-16 — Visio Ai v2.3.4 Import change cart actions
+
+- [x] **Import detail** + **Report** CSV change rows show linked product PNG or “No image”
+- [x] **Add to To share** when article has gallery PNG; **Add to To shoot** when missing
+- [x] Cart origin tag `SRC_IMPORT_CHANGE`
+- [x] APK **2.3.4** (code 234)
+
+---
+
+## 2026-06-16 — Visio Ai v2.3.2 Design Done workflow fix
+
+- [x] **Send info** / **Share as file** no longer auto-move to Done
+- [x] **Mark as sent** (home queue) and **Mark as printed** (print screen) — manual only
+- [x] Done list sorted by date/time (newest first); timestamp shown; **Remove** per row
+- [x] APK **2.3.2** (code 232)
+
+---
+
+## 2026-06-16 — Visio Ai v2.3.1 PhotoRoom folder picker
+
+- [x] Settings **PhotoRoom folder** — SAF folder selector (persisted URI)
+- [x] Camera batch import + rescan use selected folder; reset to default `Pictures/Photoroom`
+- [x] APK **2.3.1** (code 231)
+
+---
+
 ## 2026-06-16 — Visio Ai v2.3.0 scan-first camera batch + queue
 
 - [x] Batch txt **3-way routing**: PNG → To share, missing PNG → To shoot, not in CSV → **batch_camera_queue**

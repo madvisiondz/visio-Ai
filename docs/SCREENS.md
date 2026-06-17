@@ -4,25 +4,25 @@
 
 | Screen | Route | Status | Notes |
 |--------|-------|--------|-------|
-| Home / Articles | `home` | Done | **Smart search**; split has image / needs photo; **Add to To shoot** on missing PNG |
+| Home / Articles | `home` | Done | **Smart search**; split has image / needs photo; **Add to To shoot**; **Open camera batch** on each result |
 | PARAY home | `paray_home` | Done | PARAY's own UI + `paray_home/` folder; office links to Design / AGENT / import |
 | PARAY neural load | `paray_import` | Done | Fingerprint import progress, neural profile, memory growth; foreground service (background-safe) |
-| Settings | `settings` | Done | IMAGE ASSETS folder load, Oasis PNG model, **Import PARAY fingerprints**, phone sync, re-index, Report |
+| Settings | `settings` | Done | IMAGE ASSETS load, **PhotoRoom folder** picker, Export PNG database, re-index, Report |
 | Gallery link (placeholder) | `gallery_link` | Planned | Pick PNGs → scan → rename workflow |
 | Import Center | `import` | Done | From Settings; CSV picker, preview, Confirm/Cancel in scroll (all screen sizes); history |
-| Import Detail | `import/{importId}` | Done | Per-import change log |
+| Import Detail | `import/{importId}` | Done | Per-import change log; thumbnail + **Add to To share** / **To shoot** |
 | Article Catalog | `catalog` | Done | Search, filters, add to pre-selection |
-| Article Detail | `article/{articleId}` | Done | **Create asset**; **Add to To shoot** (no PNG) / To share; Remove background |
+| Article Detail | `article/{articleId}` | Done | Scrollable panel; **Add sub-barcode & batch shoot** (confirm flow); tap sub-barcode chip to remove |
 | Background removal | `background_removal/{articleId}` | Done | U2NetP offline cutout; crop/threshold; before/after; Accept links to article |
 | Barcode Scanner | `scanner` | Done | Settings only (legacy lookup); add to To share |
 | Batch txt | `batch_txt` | Done | Paste designation list → **To share** / **To shoot** / **Camera batch queue** (tap line to capture) |
-| Camera batch shoot | `camera_batch_shoot?queueItemId=` | Done | **Scan barcode first** → shoot → Proceed; create designation + CSV match (Proceed sub-barcode / To share); queue auto-advance |
-| PhotoRoom import | `camera_batch_import` | Done | Pending list; import PNGs from `Pictures/Photoroom/` into product_images |
-| To shoot cart | `photoshoot_cart` | Done | **Bottom nav**; origin colors; Open AGENT; tap → Article detail |
-| AGENT | `check_shoot` | Done | Scan card: designation + barcode + **price** + **last price change**; Smart/Bulk; PARAY, SUB-BC |
-| To share cart | `share_cart` | Done | **Add all/selected to Design** + **Share all as files**; origin color legend + colored card borders; full-page scroll |
-| Design | `design` | Done | **Bottom nav** (brush); **To print** + **Done** sub-cart (max 50, pull up, **queue order preserved**); **− / +** copy stepper; **Send info** / **Import prices**; 12-up A4 (2×6) JPEG |
-| Report | `report` | Done | **Settings → Report**; CSV old→new changes + Design shelf prints (scrollable) |
+| Camera batch shoot | `camera_batch_shoot?queueItemId=` | Done | Sub-barcode: **confirm** → **shoot?** → save → PhotoRoom → import links sub-bc; removable chips |
+| PhotoRoom import | `camera_batch_import` | Done | Pending list; Import / **Remove** per card; import all matched |
+| To shoot cart | `photoshoot_cart` | Done | **Bottom nav**; **Open camera batch** per article; Open AGENT; origin colors |
+| AGENT | `check_shoot` | Done | SUB-BC: confirm → shoot? → batch camera; tap sub-barcode chip to remove |
+| To share cart | `share_cart` | Done | **Add all/selected to Design** + **Share all as files**; **parent + sub-barcode flavors** as separate rows (v2.4.5); origin color legend |
+| Design | `design` | Done | **Bottom nav** (brush); **To print** + **Done**; each cart flavor row independent (remove/copy by preselectionId) |
+| Report | `report` | Done | **Settings → Report**; CSV changes with image + cart actions + Design shelf prints |
 | Work History | `history` | Done | **Settings → Work history**; records searched/scanned/cart/linked/sent actions |
 | Pre-selection | `preselection` | Legacy | Older print cart workflow |
 | Print Generator | `print` | Done | Template pick, promo options, PDF export |

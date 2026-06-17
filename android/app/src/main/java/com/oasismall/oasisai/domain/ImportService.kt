@@ -151,17 +151,8 @@ class ImportService(
                                 newValue = row.designation,
                             ),
                         )
-                    } else {
-                        changes.add(
-                            ImportChangeEntity(
-                                importId = importId,
-                                articleId = existing.id,
-                                barcode = row.barcode,
-                                designation = row.designation,
-                                changeType = ImportChangeType.UNCHANGED.name,
-                            ),
-                        )
                     }
+                    // Unchanged rows are counted in unchangedCount but not stored — avoids 26k+ log rows per import.
                 }
                 if (index == 0 || index % 500 == 0 || index == totalRows - 1) {
                     val percent = 15 + ((index + 1) * 45 / totalRows)
