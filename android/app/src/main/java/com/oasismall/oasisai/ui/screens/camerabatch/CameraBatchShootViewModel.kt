@@ -169,6 +169,8 @@ class CameraBatchShootViewModel(
         _autoLaunchCamera.value = false
     }
 
+    fun submitManualBarcode(barcode: String) = onBarcodeScanned(barcode)
+
     fun onBarcodeScanned(barcode: String) {
         val trimmed = barcode.trim()
         if (trimmed.length < 8) return

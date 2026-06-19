@@ -18,7 +18,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -36,6 +36,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.oasismall.oasisai.ui.components.ArticleActionPanel
 import com.oasismall.oasisai.ui.components.ArticlePanelData
+import com.oasismall.oasisai.ui.components.ManualBarcodeEntrySection
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -45,7 +46,6 @@ fun ScannerScreen(
     onCreateAsset: (String) -> Unit,
 ) {
     val context = LocalContext.current
-    var manualBarcode by remember { mutableStateOf("") }
     var hasCameraPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
@@ -79,10 +79,6 @@ fun ScannerScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
-                Text("Point camera at barcode or type manually to verify shelf tickets.")
-            }
-
-            item {
                 if (hasCameraPermission) {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -113,28 +109,15 @@ fun ScannerScreen(
             }
 
             item {
-                Text("Manual entry", style = MaterialTheme.typography.titleSmall)
-            }
-
-            item {
-                OutlinedTextField(
-                    value = manualBarcode,
-                    onValueChange = { manualBarcode = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Barcode") },
-                    singleLine = true,
+                ManualBarcodeEntrySection(
+                    onSubmit = { viewModel.onBarcodeScanned(it) },
+                    hint = "Point camera at barcode or type manually to verify shelf tickets.",
                 )
             }
 
             item {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(
-                        onClick = { viewModel.onBarcodeScanned(manualBarcode) },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) { Text("Look up") }
-                    Button(onClick = viewModel::reset, modifier = Modifier.fillMaxWidth()) {
-                        Text("Clear")
-                    }
+                OutlinedButton(onClick = viewModel::reset, modifier = Modifier.fillMaxWidth()) {
+                    Text("Clear result")
                 }
             }
 

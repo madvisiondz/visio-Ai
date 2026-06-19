@@ -14,7 +14,7 @@
 | Article Catalog | `catalog` | Done | Search, filters, add to pre-selection |
 | Article Detail | `article/{articleId}` | Done | Scrollable panel; **Add sub-barcode & batch shoot** (confirm flow); tap sub-barcode chip to remove |
 | Background removal | `background_removal/{articleId}` | Done | U2NetP offline cutout; crop/threshold; before/after; Accept links to article |
-| Barcode Scanner | `scanner` | Done | Settings only (legacy lookup); add to To share |
+| Barcode Scanner | `scanner` | Done | Settings; camera + **manual barcode entry** |
 | Batch txt | `batch_txt` | Done | Paste designation list → **To share** / **To shoot** / **Camera batch queue** (tap line to capture) |
 | Camera batch shoot | `camera_batch_shoot?queueItemId=` | Done | Sub-barcode: **confirm** → **shoot?** → save → PhotoRoom → import links sub-bc; removable chips |
 | PhotoRoom import | `camera_batch_import` | Done | Pending list; Import / **Remove** per card; import all matched |

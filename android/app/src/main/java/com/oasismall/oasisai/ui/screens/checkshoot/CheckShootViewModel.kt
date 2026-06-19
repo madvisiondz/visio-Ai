@@ -188,6 +188,16 @@ class CheckShootViewModel(
         onReady()
     }
 
+    fun submitManualBarcode(barcode: String) {
+        if (_phase.value != CheckShootPhase.SCANNING) return
+        val trimmed = barcode.trim()
+        if (trimmed.isEmpty()) return
+        stableBarcode = null
+        stableReadCount = 0
+        debounceBarcode = null
+        processBarcodeInput(trimmed, manual = true)
+    }
+
     fun onBarcodeScanned(barcode: String) {
         if (_phase.value != CheckShootPhase.SCANNING) return
         val trimmed = barcode.trim()
@@ -203,8 +213,12 @@ class CheckShootViewModel(
         if (trimmed == debounceBarcode && now - debounceTimeMs < SCAN_DEBOUNCE_MS) return
         debounceBarcode = trimmed
         debounceTimeMs = now
+        processBarcodeInput(trimmed, manual = false)
+    }
+
+    private fun processBarcodeInput(trimmed: String, manual: Boolean) {
         if (_agentMode.value == AgentCaptureMode.BULK) {
-            if (_bulkScan.value != null) return
+            if (!manual && _bulkScan.value != null) return
             viewModelScope.launch { refreshBulkScan(trimmed) }
             return
         }
@@ -214,8 +228,11 @@ class CheckShootViewModel(
             return
         }
         if (_isLocked.value) return
-        // Hold the current article card until the user locks or dismisses — avoids scan flicker.
-        if (_scan.value != null) return
+        if (!manual && _scan.value != null) return
+        if (manual && _scan.value != null && !_isLocked.value) {
+            _scan.value = null
+            _paraySuggest.value = null
+        }
         viewModelScope.launch { refreshScan(trimmed) }
     }
 

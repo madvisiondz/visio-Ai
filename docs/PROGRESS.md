@@ -2,6 +2,16 @@
 
 > What has been built. Update at end of each work session.
 
+## 2026-06-17 — Visio Ai v2.4.6 Manual barcode entry on all scanners
+
+- [x] Shared `ManualBarcodeEntrySection` + `ManualBarcodeEntryDialog`
+- [x] **AGENT**: “Type barcode” in header → dialog (bypasses camera debounce; works in SUB-BC mode)
+- [x] **Camera batch**: inline manual entry on scan step
+- [x] **Settings scanner**: refactored to shared component
+- [x] APK **2.4.6** (code 246)
+
+---
+
 ## 2026-06-17 — Visio Ai v2.4.5 Cart flavor rows (sub-barcodes)
 
 - [x] DB v15: `preselection_items.variantBarcode`; unique index `(articleId, cartType, variantBarcode)`

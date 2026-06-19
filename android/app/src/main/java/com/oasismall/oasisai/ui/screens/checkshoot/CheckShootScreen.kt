@@ -58,6 +58,7 @@ import coil.compose.AsyncImage
 import com.oasismall.oasisai.data.model.AgentCaptureMode
 import com.oasismall.oasisai.ui.components.ArticleActionPanel
 import com.oasismall.oasisai.ui.components.ArticlePanelData
+import com.oasismall.oasisai.ui.components.ManualBarcodeEntryDialog
 import com.oasismall.oasisai.ui.components.OpenCameraBatchButton
 import com.oasismall.oasisai.ui.screens.scanner.BarcodeCameraPreview
 import com.oasismall.oasisai.util.PriceFormatter
@@ -95,6 +96,7 @@ fun CheckShootScreen(
     val isBulk = agentMode == AgentCaptureMode.BULK
     var pendingCaptureFile by remember { mutableStateOf<File?>(null) }
     var captureLaunched by remember { mutableStateOf(false) }
+    var showManualBarcode by remember { mutableStateOf(false) }
     var hasCameraPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
@@ -176,6 +178,21 @@ fun CheckShootScreen(
         )
     }
 
+    if (showManualBarcode) {
+        ManualBarcodeEntryDialog(
+            onDismiss = { showManualBarcode = false },
+            onSubmit = {
+                viewModel.submitManualBarcode(it)
+                showManualBarcode = false
+            },
+            hint = if (subBcMode) {
+                "Type the flavor barcode digits to link to the locked article."
+            } else {
+                "Type digits when the camera can't read the label."
+            },
+        )
+    }
+
     Box(Modifier.fillMaxSize()) {
         if (hasCameraPermission && phase == CheckShootPhase.SCANNING) {
             BarcodeCameraPreview(
@@ -231,6 +248,11 @@ fun CheckShootScreen(
                         style = MaterialTheme.typography.labelSmall,
                     )
                 }
+                if (phase == CheckShootPhase.SCANNING && paraySuggest == null && suffixMatch == null) {
+                    TextButton(onClick = { showManualBarcode = true }) {
+                        Text("Type barcode", color = Color.White)
+                    }
+                }
             }
             Row(
                 Modifier
@@ -260,8 +282,8 @@ fun CheckShootScreen(
                 shape = RoundedCornerShape(12.dp),
             ) {
                 Text(
-                    if (isBulk) "Bulk — scan barcode → take photo or skip → next scan"
-                    else "Scan barcode → PARAY suggests match → lock → shoot or teach",
+                    if (isBulk) "Bulk — scan or type barcode → take photo or skip → next"
+                    else "Scan or type barcode → PARAY suggests match → lock → shoot or teach",
                     modifier = Modifier.padding(16.dp),
                     color = Color.White,
                     style = MaterialTheme.typography.bodyLarge,

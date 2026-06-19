@@ -51,6 +51,7 @@ OASIS MALL operates at scale with fragmented workflows:
 
 | Area | Choice |
 |------|--------|
+| 2026-06-17 | **Visio Ai v2.4.6**: Manual barcode entry on every camera scanner (AGENT, Camera batch, Settings scanner) |
 | 2026-06-17 | **Visio Ai v2.4.5**: Cart rows keyed by **variant barcode** — parent + each sub-flavor coexist in To share & Design; PhotoRoom sub-bc import auto-adds that flavor to To share |
 | 2026-06-17 | **Visio Ai v2.4.4**: Shelf label export **300 DPI** + **JPEG 100%**; full-res product decode on tickets |
 | 2026-06-17 | **Visio Ai v2.4.3**: Fix Articles search crash — unique list keys for sub-barcode rows; safer search expansion |
@@ -586,6 +587,7 @@ It:
 
 | Date | Change |
 |------|--------|
+| 2026-06-17 | **Visio Ai v2.4.6**: Shared `ManualBarcodeEntry` — type digits when label won't scan (AGENT dialog, Camera batch inline, Scanner) |
 | 2026-06-17 | **Visio Ai v2.4.5**: DB v15 `preselection_items.variantBarcode`; cart unique `(articleId, cartType, variantBarcode)`; sub-bc image in cart queries; PhotoRoom sub-bc → To share as flavor row |
 | 2026-06-17 | **Visio Ai v2.4.4**: Design shelf preset — 300 DPI page, JPEG quality 100, sharper product PNG decode |
 | 2026-06-17 | **Visio Ai v2.4.3**: Articles search crash fix — `id+barcode` list keys; batch sub-bc lookup; search fallback |

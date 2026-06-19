@@ -51,6 +51,7 @@ import coil.compose.AsyncImage
 import com.oasismall.oasisai.data.db.dao.ArticleWithImage
 import com.oasismall.oasisai.ui.components.ArticleActionPanel
 import com.oasismall.oasisai.ui.components.ArticlePanelData
+import com.oasismall.oasisai.ui.components.ManualBarcodeEntrySection
 import com.oasismall.oasisai.ui.screens.scanner.BarcodeCameraPreview
 import com.oasismall.oasisai.util.PriceFormatter
 import com.oasismall.oasisai.util.createCheckShootCaptureUri
@@ -200,6 +201,14 @@ fun CameraBatchShootScreen(
                             modifier = Modifier.fillMaxWidth().height(220.dp),
                             enabled = true,
                             onBarcodeDetected = viewModel::onBarcodeScanned,
+                        )
+                        ManualBarcodeEntrySection(
+                            onSubmit = viewModel::submitManualBarcode,
+                            hint = if (subBcAcquireMode) {
+                                "Type the new flavor barcode when the camera can't read it."
+                            } else {
+                                "Type barcode digits when the camera can't read the label."
+                            },
                         )
                     }
                 }

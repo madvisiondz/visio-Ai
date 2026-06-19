@@ -709,3 +709,11 @@
 **User:** To-share & Design should load sub-articles (flavors) without replacing parent; PhotoRoom sub-bc PNG import should go to To-share directly.
 
 **Assistant:** **Visio Ai v2.4.5**: DB v15 `preselection_items.variantBarcode`; unique `(articleId, cartType, variantBarcode)`; cart SQL resolves sub-bc images; remove/copy/move by `preselectionId`; PhotoRoom sub-bc import adds flavor row to To share; Home/Scanner pass barcode when adding to cart.
+
+---
+
+## Session 83 — 2026-06-17
+
+**User:** Manual barcode entry on every camera scanner — some product barcodes won't scan.
+
+**Assistant:** **Visio Ai v2.4.6**: Shared `ManualBarcodeEntry` component; AGENT “Type barcode” dialog; Camera batch inline entry; Settings scanner refactored; manual bypasses AGENT scan debounce.
