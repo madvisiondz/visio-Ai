@@ -9,6 +9,7 @@ import com.oasismall.oasisai.data.repository.OasisRepository
 import com.oasismall.oasisai.domain.ImageMatcher
 import com.oasismall.oasisai.domain.backgroundremoval.BackgroundRemovalService
 import com.oasismall.oasisai.domain.ImportService
+import com.oasismall.oasisai.domain.settings.ImportantRayonsStore
 import com.oasismall.oasisai.domain.paray.ParayAgent
 import com.oasismall.oasisai.domain.paray.ParayHome
 import com.oasismall.oasisai.domain.paray.ParayImportManager
@@ -19,6 +20,16 @@ import com.oasismall.oasisai.domain.bulk.BulkCaptureStore
 import com.oasismall.oasisai.domain.visio.BatchCameraQueueStore
 import com.oasismall.oasisai.domain.visio.CameraBatchStore
 import com.oasismall.oasisai.domain.visio.ProductImagesExporter
+import com.oasismall.oasisai.domain.visiopro.VisioProExporter
+import com.oasismall.oasisai.domain.visiopro.VisioProAilRenderer
+import com.oasismall.oasisai.domain.visiopro.VisioProPhotoStore
+import com.oasismall.oasisai.domain.visiopro.VisioProPriceResolver
+import com.oasismall.oasisai.domain.visiopro.VisioProRenderFacade
+import com.oasismall.oasisai.domain.visiopro.VisioProCatalogConfigStore
+import com.oasismall.oasisai.domain.visiopro.designer.VisioProDesignStore
+import com.oasismall.oasisai.domain.visiopro.VisioProCatalogService
+import com.oasismall.oasisai.domain.visiopro.VisioProStore
+import com.oasismall.oasisai.domain.visiopro.VisioProTemplateAssets
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -41,15 +52,19 @@ class OasisApp : Application() {
                 MIGRATION_12_13,
                 MIGRATION_13_14,
                 MIGRATION_14_15,
+                MIGRATION_15_16,
+                MIGRATION_16_17,
+                MIGRATION_17_18,
             )
             .fallbackToDestructiveMigration(true)
             .build()
     }
 
-    val repository: OasisRepository by lazy { OasisRepository(database) }
+    val importantRayonsStore: ImportantRayonsStore by lazy { ImportantRayonsStore(this) }
+    val repository: OasisRepository by lazy { OasisRepository(database, importantRayonsStore) }
     val imageMatcher: ImageMatcher by lazy { ImageMatcher(this, repository) }
     val readyPngLoader: ReadyPngLoader by lazy { ReadyPngLoader(imageMatcher) }
-    val importService: ImportService by lazy { ImportService(repository, imageMatcher) }
+    val importService: ImportService by lazy { ImportService(repository, imageMatcher, visioProCatalogService) }
     val printGenerator: PrintGenerator by lazy { PrintGenerator(this, repository) }
     val promoService: PromoService by lazy { PromoService(repository) }
     val backgroundRemovalService: BackgroundRemovalService by lazy { BackgroundRemovalService(this) }
@@ -67,6 +82,24 @@ class OasisApp : Application() {
     }
     val productImagesExporter: ProductImagesExporter by lazy {
         ProductImagesExporter(this, imageMatcher)
+    }
+    val visioProStore: VisioProStore by lazy { VisioProStore(this) }
+    val visioProCatalogConfigStore: VisioProCatalogConfigStore by lazy { VisioProCatalogConfigStore(this) }
+    val visioProDesignStore: VisioProDesignStore by lazy {
+        VisioProDesignStore(this, visioProTemplateAssets)
+    }
+    val visioProCatalogService: VisioProCatalogService by lazy {
+        VisioProCatalogService(repository, visioProCatalogConfigStore)
+    }
+    val visioProPhotoStore: VisioProPhotoStore by lazy { VisioProPhotoStore(this) }
+    val visioProExporter: VisioProExporter by lazy { VisioProExporter(this) }
+    val visioProTemplateAssets: VisioProTemplateAssets by lazy { VisioProTemplateAssets(this) }
+    val visioProAilRenderer: VisioProAilRenderer by lazy { VisioProAilRenderer(visioProTemplateAssets) }
+    val visioProRenderFacade: VisioProRenderFacade by lazy {
+        VisioProRenderFacade(visioProAilRenderer, visioProTemplateAssets)
+    }
+    val visioProPriceResolver: VisioProPriceResolver by lazy {
+        VisioProPriceResolver(repository, visioProStore)
     }
 
     override fun onCreate() {
@@ -240,5 +273,64 @@ private val MIGRATION_14_15 = object : Migration(14, 15) {
             ON preselection_items(articleId, cartType, variantBarcode)
             """.trimIndent(),
         )
+    }
+}
+
+private val MIGRATION_15_16 = object : Migration(15, 16) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "ALTER TABLE preselection_items ADD COLUMN isPromoTicket INTEGER NOT NULL DEFAULT 0",
+        )
+        db.execSQL("ALTER TABLE preselection_items ADD COLUMN promoPrice REAL")
+        db.execSQL("ALTER TABLE preselection_items ADD COLUMN promoOriginalPrice REAL")
+    }
+}
+
+private val MIGRATION_16_17 = object : Migration(16, 17) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE articles ADD COLUMN rayon TEXT")
+        db.execSQL("ALTER TABLE articles ADD COLUMN famille TEXT")
+        db.query("SELECT id, rawData FROM articles WHERE rawData IS NOT NULL AND trim(rawData) != ''").use { cursor ->
+            while (cursor.moveToNext()) {
+                val id = cursor.getLong(0)
+                val raw = cursor.getString(1) ?: continue
+                var rayon: String? = null
+                var famille: String? = null
+                var category: String? = null
+                raw.lineSequence().forEach { line ->
+                    when {
+                        line.startsWith("Rayon:") ->
+                            rayon = line.removePrefix("Rayon:").trim().takeIf { it.isNotBlank() }
+                        line.startsWith("Famille:") ->
+                            famille = line.removePrefix("Famille:").trim().takeIf { it.isNotBlank() }
+                        line.startsWith("Catégorie:") || line.startsWith("Categorie:") ->
+                            category = line.removePrefix("Catégorie:")
+                                .removePrefix("Categorie:")
+                                .trim()
+                                .takeIf { it.isNotBlank() }
+                    }
+                }
+                if (rayon != null) {
+                    db.execSQL("UPDATE articles SET rayon = ? WHERE id = ?", arrayOf(rayon, id))
+                }
+                if (famille != null) {
+                    db.execSQL("UPDATE articles SET famille = ? WHERE id = ?", arrayOf(famille, id))
+                }
+                if (category != null) {
+                    db.execSQL("UPDATE articles SET category = ? WHERE id = ?", arrayOf(category, id))
+                }
+            }
+        }
+    }
+}
+
+private val MIGRATION_17_18 = object : Migration(17, 18) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE print_batches ADD COLUMN pageIndex INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE print_batch_items ADD COLUMN copyCountSnapshot INTEGER NOT NULL DEFAULT 1")
+        db.execSQL("ALTER TABLE print_batch_items ADD COLUMN isPromoSnapshot INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE print_batch_items ADD COLUMN promoPriceSnapshot REAL")
+        db.execSQL("ALTER TABLE print_batch_items ADD COLUMN promoOriginalSnapshot REAL")
+        db.execSQL("ALTER TABLE print_batch_items ADD COLUMN variantBarcodeSnapshot TEXT NOT NULL DEFAULT ''")
     }
 }

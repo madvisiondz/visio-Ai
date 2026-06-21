@@ -61,7 +61,7 @@ fun AgentNavIcon(
         Color(0xFFE2E5EA),
     )
 
-    Canvas(modifier = modifier.size(46.8.dp)) {
+    Canvas(modifier = modifier.then(Modifier.size(32.dp))) {
         val c = center
         val base = size.minDimension * 0.44f * pulse
 

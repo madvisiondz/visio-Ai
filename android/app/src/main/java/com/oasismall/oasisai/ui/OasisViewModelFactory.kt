@@ -26,7 +26,16 @@ import com.oasismall.oasisai.ui.screens.parayhome.ParayHomeViewModel
 import com.oasismall.oasisai.ui.screens.parayimport.ParayImportViewModel
 import com.oasismall.oasisai.ui.screens.phonesync.PhoneSyncViewModel
 import com.oasismall.oasisai.ui.screens.scanner.ScannerViewModel
+import com.oasismall.oasisai.ui.screens.settings.ImportantRayonsViewModel
 import com.oasismall.oasisai.ui.screens.settings.SettingsViewModel
+import com.oasismall.oasisai.ui.screens.visiopro.VisioProHomeViewModel
+import com.oasismall.oasisai.ui.screens.visiopro.VisioProViewModel
+import com.oasismall.oasisai.domain.visiopro.designer.VisioProPresetDesignKey
+import com.oasismall.oasisai.domain.visiopro.VisioProCategory
+import com.oasismall.oasisai.ui.screens.visiopro.designer.VisioProDesignerHubViewModel
+import com.oasismall.oasisai.ui.screens.visiopro.designer.VisioProDesignerViewModel
+import com.oasismall.oasisai.ui.screens.visiopro.settings.VisioProListEditorViewModel
+import com.oasismall.oasisai.ui.screens.visiopro.settings.VisioProSettingsViewModel
 
 class OasisViewModelFactory(
     private val app: OasisApp,
@@ -44,6 +53,8 @@ class OasisViewModelFactory(
                     app.readyPngLoader,
                     app.productImagesExporter,
                 ) as T
+            modelClass.isAssignableFrom(ImportantRayonsViewModel::class.java) ->
+                ImportantRayonsViewModel(app.repository) as T
             modelClass.isAssignableFrom(ParayImportViewModel::class.java) ->
                 ParayImportViewModel(app.parayImportManager) as T
             modelClass.isAssignableFrom(ParayHomeViewModel::class.java) ->
@@ -93,9 +104,46 @@ class OasisViewModelFactory(
                 PhoneSyncViewModel(app.repository, app.imageMatcher) as T
             modelClass.isAssignableFrom(DesignViewModel::class.java) ->
                 DesignViewModel(app.repository, app.paray) as T
+            modelClass.isAssignableFrom(VisioProViewModel::class.java) ->
+                VisioProViewModel(
+                    app.repository,
+                    app.visioProCatalogService,
+                    app.visioProDesignStore,
+                    app.visioProStore,
+                    app.visioProPhotoStore,
+                    app.visioProPriceResolver,
+                    app.visioProExporter,
+                    app.visioProRenderFacade,
+                ) as T
+            modelClass.isAssignableFrom(VisioProSettingsViewModel::class.java) ->
+                VisioProSettingsViewModel(app.visioProCatalogService) as T
+            modelClass.isAssignableFrom(VisioProHomeViewModel::class.java) ->
+                VisioProHomeViewModel(app.visioProCatalogService) as T
+            modelClass.isAssignableFrom(VisioProDesignerHubViewModel::class.java) ->
+                VisioProDesignerHubViewModel(app.visioProDesignStore) as T
             else -> throw IllegalArgumentException("Unknown ViewModel: ${modelClass.name}")
         }
     }
+
+    fun visioProDesignerFactory(presetKey: VisioProPresetDesignKey): ViewModelProvider.Factory =
+        object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                return VisioProDesignerViewModel(
+                    presetKey,
+                    app.visioProDesignStore,
+                    app.visioProRenderFacade,
+                ) as T
+            }
+        }
+
+    fun visioProListEditorFactory(category: VisioProCategory): ViewModelProvider.Factory =
+        object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                return VisioProListEditorViewModel(category, app.visioProCatalogService) as T
+            }
+        }
 
     fun cartViewModelFactory(cartType: CartType): ViewModelProvider.Factory =
         object : ViewModelProvider.Factory {

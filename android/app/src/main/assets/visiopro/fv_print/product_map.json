@@ -1,0 +1,461 @@
+[
+  {
+    "slug": "abricot_frais",
+    "designation": "ABRICOT FRAIS",
+    "barcodeSuffix": "032",
+    "psd": "abricot.psd",
+    "asset": "visiopro/fv_print/products/abricot_frais.png",
+    "score": 200.0,
+    "method": "manual"
+  },
+  {
+    "slug": "ail",
+    "designation": "AIL",
+    "barcodeSuffix": "092",
+    "psd": "aIl.psd",
+    "asset": "visiopro/fv_print/products/ail.png",
+    "score": 200.0,
+    "method": "manual"
+  },
+  {
+    "slug": "ananas_1pc",
+    "designation": "ANANAS 1PC",
+    "barcodeSuffix": "010",
+    "psd": "ananas.psd",
+    "asset": "visiopro/fv_print/products/ananas_1pc.png",
+    "score": 200.0,
+    "method": "manual"
+  },
+  {
+    "slug": "artichaut_vert",
+    "designation": "ARTICHAUT VERT",
+    "barcodeSuffix": "083",
+    "psd": "artichaud vert.psd",
+    "asset": "visiopro/fv_print/products/artichaut_vert.png",
+    "score": 200.0,
+    "method": "manual"
+  },
+  {
+    "slug": "aubergine",
+    "designation": "AUBERGINE",
+    "barcodeSuffix": "052",
+    "psd": "aubergines.psd",
+    "asset": "visiopro/fv_print/products/aubergine.png",
+    "score": 200.0,
+    "method": "manual"
+  },
+  {
+    "slug": "banane",
+    "designation": "BANANE",
+    "barcodeSuffix": "014",
+    "psd": "BANANE.psd",
+    "asset": "visiopro/fv_print/products/banane.png",
+    "score": 200.0,
+    "method": "manual"
+  },
+  {
+    "slug": "betterave",
+    "designation": "BETTERAVE",
+    "barcodeSuffix": "047",
+    "psd": "BETTERAVE.psd",
+    "asset": "visiopro/fv_print/products/betterave.png",
+    "score": 200.0,
+    "method": "manual"
+  },
+  {
+    "slug": "brocoli",
+    "designation": "BROCOLI",
+    "barcodeSuffix": "175",
+    "psd": "BROCOLI.psd",
+    "asset": "visiopro/fv_print/products/brocoli.png",
+    "score": 200.0,
+    "method": "manual"
+  },
+  {
+    "slug": "carotte",
+    "designation": "CAROTTE",
+    "barcodeSuffix": "039",
+    "psd": "carotte.psd",
+    "asset": "visiopro/fv_print/products/carotte.png",
+    "score": 200.0,
+    "method": "manual"
+  },
+  {
+    "slug": "cerise",
+    "designation": "CERISE",
+    "barcodeSuffix": "098",
+    "psd": "cerise.psd",
+    "asset": "visiopro/fv_print/products/cerise.png",
+    "score": 200.0,
+    "method": "manual"
+  },
+  {
+    "slug": "citron",
+    "designation": "CITRON",
+    "barcodeSuffix": "048",
+    "psd": "citron.psd",
+    "asset": "visiopro/fv_print/products/citron.png",
+    "score": 200.0,
+    "method": "manual"
+  },
+  {
+    "slug": "citrouille",
+    "designation": "CITROUILLE",
+    "barcodeSuffix": "061",
+    "psd": "CITROUILLE.psd",
+    "asset": "visiopro/fv_print/products/citrouille.png",
+    "score": 200.0,
+    "method": "manual"
+  },
+  {
+    "slug": "coing",
+    "designation": "COING",
+    "barcodeSuffix": "090",
+    "psd": "COING.psd",
+    "asset": "visiopro/fv_print/products/coing.png",
+    "score": 200.0,
+    "method": "manual"
+  },
+  {
+    "slug": "concombre",
+    "designation": "CONCOMBRE",
+    "barcodeSuffix": "057",
+    "psd": "CONCOMBRE.psd",
+    "asset": "visiopro/fv_print/products/concombre.png",
+    "score": 200.0,
+    "method": "manual"
+  },
+  {
+    "slug": "courgette",
+    "designation": "COURGETTE",
+    "barcodeSuffix": "049",
+    "psd": "COURGETTE.psd",
+    "asset": "visiopro/fv_print/products/courgette.png",
+    "score": 200.0,
+    "method": "manual"
+  },
+  {
+    "slug": "pitaya_fruit_du_dragon",
+    "designation": "PITAYA/ FRUIT DU DRAGON",
+    "barcodeSuffix": "018",
+    "psd": "DRAGON  copy.psd",
+    "asset": "visiopro/fv_print/products/pitaya_fruit_du_dragon.png",
+    "score": 200.0,
+    "method": "manual"
+  },
+  {
+    "slug": "fenouil",
+    "designation": "FENOUIL",
+    "barcodeSuffix": "038",
+    "psd": "FENOUIL.psd",
+    "asset": "visiopro/fv_print/products/fenouil.png",
+    "score": 200.0,
+    "method": "manual"
+  },
+  {
+    "slug": "figue_de_barbarie_fruit",
+    "designation": "FIGUE DE BARBARIE FRUIT",
+    "barcodeSuffix": "184",
+    "psd": "FIGUE DE BARBARIE FRUIT.psd",
+    "asset": "visiopro/fv_print/products/figue_de_barbarie_fruit.png",
+    "score": 200.0,
+    "method": "manual"
+  },
+  {
+    "slug": "figue",
+    "designation": "FIGUE",
+    "barcodeSuffix": "030",
+    "psd": "FIGUE DE.psd",
+    "asset": "visiopro/fv_print/products/figue.png",
+    "score": 200.0,
+    "method": "manual"
+  },
+  {
+    "slug": "fraise",
+    "designation": "FRAISE",
+    "barcodeSuffix": "077",
+    "psd": "fraise.psd",
+    "asset": "visiopro/fv_print/products/fraise.png",
+    "score": 200.0,
+    "method": "manual"
+  },
+  {
+    "slug": "grenade",
+    "designation": "GRENADE",
+    "barcodeSuffix": "075",
+    "psd": "GRENADE.psd",
+    "asset": "visiopro/fv_print/products/grenade.png",
+    "score": 200.0,
+    "method": "manual"
+  },
+  {
+    "slug": "haricot_rouge_legume",
+    "designation": "HARICOT ROUGE LEGUME",
+    "barcodeSuffix": "096",
+    "psd": "HARICOT ROUGE.psd",
+    "asset": "visiopro/fv_print/products/haricot_rouge_legume.png",
+    "score": 200.0,
+    "method": "manual"
+  },
+  {
+    "slug": "haricot_vert_legume",
+    "designation": "HARICOT VERT LEGUME",
+    "barcodeSuffix": "055",
+    "psd": "HARICOT VERT.psd",
+    "asset": "visiopro/fv_print/products/haricot_vert_legume.png",
+    "score": 200.0,
+    "method": "manual"
+  },
+  {
+    "slug": "kiwi",
+    "designation": "KIWI",
+    "barcodeSuffix": "019",
+    "psd": "KIWI.psd",
+    "asset": "visiopro/fv_print/products/kiwi.png",
+    "score": 200.0,
+    "method": "manual"
+  },
+  {
+    "slug": "celeri_krafs",
+    "designation": "CELERI (KRAFS)",
+    "barcodeSuffix": "180",
+    "psd": "KRAFS.psd",
+    "asset": "visiopro/fv_print/products/celeri_krafs.png",
+    "score": 200.0,
+    "method": "manual"
+  },
+  {
+    "slug": "mandarine",
+    "designation": "MANDARINE",
+    "barcodeSuffix": "087",
+    "psd": "mandarine CC.psd",
+    "asset": "visiopro/fv_print/products/mandarine.png",
+    "score": 200.0,
+    "method": "manual"
+  },
+  {
+    "slug": "mandarine_wilki",
+    "designation": "MANDARINE wilki",
+    "barcodeSuffix": "192",
+    "psd": "mandarine.psd",
+    "asset": "visiopro/fv_print/products/mandarine_wilki.png",
+    "score": 200.0,
+    "method": "manual"
+  },
+  {
+    "slug": "mangue_fruit",
+    "designation": "MANGUE FRUIT",
+    "barcodeSuffix": "178",
+    "psd": "MANGUE.psd",
+    "asset": "visiopro/fv_print/products/mangue_fruit.png",
+    "score": 200.0,
+    "method": "manual"
+  },
+  {
+    "slug": "melon",
+    "designation": "MELON",
+    "barcodeSuffix": "022",
+    "psd": "MELON AFF.psd",
+    "asset": "visiopro/fv_print/products/melon.png",
+    "score": 200.0,
+    "method": "manual"
+  },
+  {
+    "slug": "melon_cantaloup",
+    "designation": "MELON CANTALOUP",
+    "barcodeSuffix": "021",
+    "psd": "melon cantaloupe.psd",
+    "asset": "visiopro/fv_print/products/melon_cantaloup.png",
+    "score": 200.0,
+    "method": "manual"
+  },
+  {
+    "slug": "mandarine_2",
+    "designation": "MANDARINE",
+    "barcodeSuffix": "194",
+    "psd": "MMANDARINE.psd",
+    "asset": "visiopro/fv_print/products/mandarine_2.png",
+    "score": 200.0,
+    "method": "manual"
+  },
+  {
+    "slug": "nefle",
+    "designation": "NEFLE",
+    "barcodeSuffix": "079",
+    "psd": "NEFEL.psd",
+    "asset": "visiopro/fv_print/products/nefle.png",
+    "score": 200.0,
+    "method": "manual"
+  },
+  {
+    "slug": "oignon",
+    "designation": "OIGNON",
+    "barcodeSuffix": "058",
+    "psd": "OIGNON.psd",
+    "asset": "visiopro/fv_print/products/oignon.png",
+    "score": 200.0,
+    "method": "manual"
+  },
+  {
+    "slug": "orange_1er_choix",
+    "designation": "ORANGE 1ER CHOIX",
+    "barcodeSuffix": "011",
+    "psd": "orange.psd",
+    "asset": "visiopro/fv_print/products/orange_1er_choix.png",
+    "score": 200.0,
+    "method": "manual"
+  },
+  {
+    "slug": "pasteque",
+    "designation": "PASTEQUE",
+    "barcodeSuffix": "029",
+    "psd": "pasteque.psd",
+    "asset": "visiopro/fv_print/products/pasteque.png",
+    "score": 200.0,
+    "method": "manual"
+  },
+  {
+    "slug": "peche_plate",
+    "designation": "PECHE PLATE",
+    "barcodeSuffix": "095",
+    "psd": "PECH PLATE.psd",
+    "asset": "visiopro/fv_print/products/peche_plate.png",
+    "score": 200.0,
+    "method": "manual"
+  },
+  {
+    "slug": "peche",
+    "designation": "PECHE",
+    "barcodeSuffix": "035",
+    "psd": "peche.psd",
+    "asset": "visiopro/fv_print/products/peche.png",
+    "score": 200.0,
+    "method": "manual"
+  },
+  {
+    "slug": "piment_fort_2",
+    "designation": "PIMENT FORT",
+    "barcodeSuffix": "102",
+    "psd": "PIMENT FORT   ROUGE copy.psd",
+    "asset": "visiopro/fv_print/products/piment_fort_2.png",
+    "score": 200.0,
+    "method": "manual"
+  },
+  {
+    "slug": "piment_fort_starteur",
+    "designation": "PIMENT FORT STARTEUR",
+    "barcodeSuffix": "084",
+    "psd": "PIMENT FORT STARTEUR.psd",
+    "asset": "visiopro/fv_print/products/piment_fort_starteur.png",
+    "score": 200.0,
+    "method": "manual"
+  },
+  {
+    "slug": "piment_fort",
+    "designation": "PIMENT FORT",
+    "barcodeSuffix": "054",
+    "psd": "PIMENT FORT.psd",
+    "asset": "visiopro/fv_print/products/piment_fort.png",
+    "score": 200.0,
+    "method": "manual"
+  },
+  {
+    "slug": "poire",
+    "designation": "POIRE",
+    "barcodeSuffix": "023",
+    "psd": "poire copy2.psd",
+    "asset": "visiopro/fv_print/products/poire.png",
+    "score": 200.0,
+    "method": "manual"
+  },
+  {
+    "slug": "poire_2",
+    "designation": "POIRE 2",
+    "barcodeSuffix": "024",
+    "psd": "poire.psd",
+    "asset": "visiopro/fv_print/products/poire_2.png",
+    "score": 200.0,
+    "method": "manual"
+  },
+  {
+    "slug": "poivron_rouge",
+    "designation": "POIVRON ROUGE",
+    "barcodeSuffix": "069",
+    "psd": "POIVRON ROUGE.psd",
+    "asset": "visiopro/fv_print/products/poivron_rouge.png",
+    "score": 200.0,
+    "method": "manual"
+  },
+  {
+    "slug": "poivron",
+    "designation": "POIVRON",
+    "barcodeSuffix": "053",
+    "psd": "poivron.psd",
+    "asset": "visiopro/fv_print/products/poivron.png",
+    "score": 200.0,
+    "method": "manual"
+  },
+  {
+    "slug": "pomme_jaune",
+    "designation": "POMME JAUNE",
+    "barcodeSuffix": "012",
+    "psd": "POMME JAUNE.psd",
+    "asset": "visiopro/fv_print/products/pomme_jaune.png",
+    "score": 200.0,
+    "method": "manual"
+  },
+  {
+    "slug": "pomme",
+    "designation": "POMME",
+    "barcodeSuffix": "400",
+    "psd": "POMME LITE.psd",
+    "asset": "visiopro/fv_print/products/pomme.png",
+    "score": 200.0,
+    "method": "manual"
+  },
+  {
+    "slug": "pomme_rouge",
+    "designation": "POMME ROUGE",
+    "barcodeSuffix": "013",
+    "psd": "POMME ROUGE copy.psd",
+    "asset": "visiopro/fv_print/products/pomme_rouge.png",
+    "score": 200.0,
+    "method": "manual"
+  },
+  {
+    "slug": "raisin_rouge",
+    "designation": "RAISIN ROUGE",
+    "barcodeSuffix": "027",
+    "psd": "RAISIN ROUGE AFF.psd",
+    "asset": "visiopro/fv_print/products/raisin_rouge.png",
+    "score": 200.0,
+    "method": "manual"
+  },
+  {
+    "slug": "raisin_blanc",
+    "designation": "RAISIN BLANC",
+    "barcodeSuffix": "025",
+    "psd": "RAISON BLANC.psd",
+    "asset": "visiopro/fv_print/products/raisin_blanc.png",
+    "score": 200.0,
+    "method": "manual"
+  },
+  {
+    "slug": "raisin",
+    "designation": "RAISIN",
+    "barcodeSuffix": "026",
+    "psd": "RAISON NOIRE.psd",
+    "asset": "visiopro/fv_print/products/raisin.png",
+    "score": 200.0,
+    "method": "manual"
+  },
+  {
+    "slug": "tomate",
+    "designation": "TOMATE",
+    "barcodeSuffix": "041",
+    "psd": "TOMATE AFF.psd",
+    "asset": "visiopro/fv_print/products/tomate.png",
+    "score": 200.0,
+    "method": "manual"
+  }
+]

@@ -2,6 +2,130 @@
 
 > What has been built. Update at end of each work session.
 
+## 2026-06-14 — Visio Ai v2.12.2 Gestium CSV charset + full row import
+
+- [x] `parseWithFallback` picks encoding with the most valid rows (cp1252 for Gestium exports)
+- [x] Import keeps articles when matched by codeart or normalized designation (not only barcode)
+- [x] Unit test: PIEDS DE VEAU → `CA:13145`, rayon Boucherie
+- [x] APK **2.12.2** (code 270)
+
+---
+
+## 2026-06-14 — Visio Ai v2.12.1 VisioPRO full pool resync + codeart import
+
+- [x] CSV import accepts rows without Code-barres — synthetic key from **codeart** (`CA:…`) or designation
+- [x] After every CSV import, `syncRayonPoolsAfterCsvImport` reloads Boucherie / Poissonnerie / F&V pools; pending = pool − enabled
+- [x] List editor + Settings refresh on resume; rayon query matches all DB rayon spellings
+- [x] APK **2.12.1** (code 269)
+
+---
+
+## 2026-06-14 — Visio Ai v2.12.0 Rayons importants + VisioPRO CSV sync
+
+- [x] Settings → **Rayons importants** checklist (persisted JSON); filters stats, Articles, Catalog, CSV report
+- [x] After CSV import, new Boucherie / Poissonnerie / Fruits et Légumes articles → VisioPRO list **pending** (Nouveau CSV)
+- [x] APK **2.12.0** (code 268)
+
+---
+
+## 2026-06-14 — Visio Ai v2.11.1 To share status + CSV glow fix
+
+- [x] Fix To share cart mapping — pass real `changeStatus` / `needsTicketUpdate` to `ArticleCard`
+- [x] `ArticleCard` + Report import cards use `catalogChangeGlow` for CSV changes
+- [x] To share row footer: Printed / Design queue|done / Telegram sent (live from DB)
+- [x] Cart SQL: `lastPrintedAt`, `inDesignQueue`, `inDesignDone` subqueries
+- [x] APK **2.11.1** (code 267)
+
+---
+
+## 2026-06-14 — Visio Ai v2.11.0 Design print history
+
+- [x] Shelf JPEG exports under `exports/yyyy-MM-dd/shelf_HHmmss_pN.jpg`; auto-share on print
+- [x] Design tabs **À imprimer** / **Historique**; tap batch → detail with article list
+- [x] Batch detail: exclude rows, reprint selection, load queue, send row to Design or To share, share JPEG
+- [x] Room v18 — `print_batches.pageIndex`, batch item promo/copy snapshots; live catalog merge in `enrichDesignBatchItems`
+- [x] `catalogChangeGlow` + **Modifié CSV** badge on queue, Done, and history rows when catalog changed
+- [x] APK **2.11.0** (code 266)
+
+---
+
+## 2026-06-20 — Visio Ai v2.7.0 VisioPRO list settings
+
+- [x] Settings → **Listes VisioPRO** route (`visio_pro_settings`, `visio_pro_list/{category}`)
+- [x] Per card: checkbox articles from Gestium rayon (Fruits/Légumes → « Fruits et Légumes », Boucherie, POISSONNERIE)
+- [x] **Ordre d'affichage** bottom sheet — long-press drag + Terminé
+- [x] Config persisted offline (`visio_pro_catalog_config.json`); VisioPRO cards use saved order + live CSV prices
+- [x] APK **2.7.0** (code 260)
+
+---
+
+## 2026-06-20 — Visio Ai v2.6.9 Articles rayon filter fix
+
+- [x] **Root cause**: `CsvParser` mapped `category` from **Famille** (col 4) because header set included `famille`/`rayon` with wrong priority
+- [x] Separate columns: **Famille**, **Catégorie**, **Rayon** (Gestium col 17 — Boucherie, Boissons, Confiserie, …)
+- [x] DB v17: `articles.rayon`, `articles.famille`; migration backfills from rawData
+- [x] Articles filter chips + scoped search use `rayon` column
+- [x] APK **2.6.9** (code 259)
+
+---
+
+## 2026-06-19 — Visio Ai v2.6.3 Bottom nav fix + smoke tests
+
+- [x] **Root cause**: `NavigationBarItem` inside `Row(horizontalScroll)` → zero-width / off-screen tabs on device
+- [x] Custom scrollable bottom bar — fixed 76dp tabs, auto-scroll to selected route
+- [x] Settings header shows `Visio Ai {version} ({code})`
+- [x] JVM smoke tests: `BottomNavSelectionTest` (8 tabs, VisioPRO routes, bar visibility)
+- [x] APK **2.6.3** (code 253)
+
+---
+
+## 2026-06-19 — Visio Ai v2.6.0–2.6.2 VisioPRO in-app module
+
+- [x] **VisioPRO** first bottom-nav tab (not Settings)
+- [x] 7 preset families: fruits/legumes/boucherie social+print; poisson social only
+- [x] AIL PSD social cards; F&V print A4×4 batch + To share integration
+- [x] Gallery export `DCIM/VisioPRO/Social|Print`
+- [x] APK **2.6.2** (code 252)
+
+---
+
+## 2026-06-19 — Visio Ai v2.6.0 VisioPRO in-app module (initial)
+
+- [x] Settings → **VisioPRO** — separate dark/gold UI (later moved to bottom nav)
+- [x] 7 preset families: fruits/legumes/boucherie social+print; poisson social only (no price)
+- [x] Article chip row + full card preview; CSV price + manual override + cross-channel memory
+- [x] Gallery export `DCIM/VisioPRO/Social|Print`
+- [x] `VisioProPresetCatalog.kt` — agent-maintained article list + layout themes
+- [x] APK **2.6.0** (code 250)
+
+---
+
+## 2026-06-19 — PSD template inspection pipeline
+
+- [x] `tools/psd/inspect_psd.py` (psd-tools) — layer tree, bounds, text, role hints → JSON
+- [x] `tools/psd-node/inspect.mjs` (ag-psd) — cross-check reader
+- [x] `scripts/INSPECT-PSD.ps1` — Windows one-shot runner
+- [x] `templates/psd-inbox/` drop folder + `docs/PSD_TEMPLATES.md`
+
+---
+
+## 2026-06-19 — Visio Ai v2.5.1 Promo shelf ticket layout fix
+
+- [x] DB v16: `isPromoTicket`, `promoPrice`, `promoOriginalPrice` on design queue rows
+- [x] Design queue: **Standard / Promo** toggle + dual price fields
+- [x] Shelf A4 print: promo price large pink left; original prix-barrée top-right (diagonal strike)
+- [x] APK **2.5.0** (code 248)
+
+---
+
+## 2026-06-18 — Visio Ai v2.4.7 PhotoRoom manual PNG pick
+
+- [x] **Pick PNG** on each PhotoRoom import card (SAF file picker)
+- [x] `importFromManualPng` — same pipeline as auto import; gallery file renamed + metadata for article
+- [x] APK **2.4.7** (code 247)
+
+---
+
 ## 2026-06-17 — Visio Ai v2.4.6 Manual barcode entry on all scanners
 
 - [x] Shared `ManualBarcodeEntrySection` + `ManualBarcodeEntryDialog`

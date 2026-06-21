@@ -7,6 +7,7 @@ OasisAI-debug.apk
 android/app/build/
 android/build/
 android/.gradle/
+android/.kotlin/
 android/local.properties
 android/.idea/
 android/*.iml
@@ -38,3 +39,9 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+tools/psd-node/node_modules/
+
+# PSD templates (large sources — keep JSON specs in git)
+templates/psd-inbox/**/*.psd
+templates/psd-inbox/*.psd
+templates/psd-previews/

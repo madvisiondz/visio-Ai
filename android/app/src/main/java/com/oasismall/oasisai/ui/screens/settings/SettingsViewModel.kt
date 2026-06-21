@@ -39,6 +39,8 @@ data class DatabaseOverview(
     val pngFilesOnDevice: Int = 0,
     val withGalleryImage: Int = 0,
     val oasisModelPngs: Int = 0,
+    val importantRayonsFiltered: Boolean = false,
+    val importantRayonsCount: Int = 0,
 )
 
 class SettingsViewModel(
@@ -57,9 +59,10 @@ class SettingsViewModel(
     val overview: StateFlow<DatabaseOverview> = combine(
         repository.observeDashboardStats(),
         repository.observeMissingImageCount(),
+        repository.importantRayonsConfig,
         _pngFileCount,
         _oasisModelCount,
-    ) { stats: DashboardStats?, missing: Int, pngCount: Int, oasisModel: Int ->
+    ) { stats: DashboardStats?, missing: Int, rayonConfig, pngCount: Int, oasisModel: Int ->
         val total = stats?.totalArticles ?: 0
         DatabaseOverview(
             totalArticles = total,
@@ -67,6 +70,8 @@ class SettingsViewModel(
             pngFilesOnDevice = pngCount,
             withGalleryImage = (total - missing).coerceAtLeast(0),
             oasisModelPngs = oasisModel,
+            importantRayonsFiltered = rayonConfig.configured && rayonConfig.selectedRayons.isNotEmpty(),
+            importantRayonsCount = rayonConfig.selectedRayons.size,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DatabaseOverview())
 

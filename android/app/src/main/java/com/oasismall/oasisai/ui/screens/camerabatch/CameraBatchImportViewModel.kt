@@ -2,6 +2,7 @@ package com.oasismall.oasisai.ui.screens.camerabatch
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import android.net.Uri
 import com.oasismall.oasisai.data.db.entity.CameraBatchItemEntity
 import com.oasismall.oasisai.domain.visio.CameraBatchStore
 import com.oasismall.oasisai.domain.visio.PhotoroomStorage
@@ -72,6 +73,20 @@ class CameraBatchImportViewModel(
                     refreshPhotoroomList()
                 },
                 onFailure = { e -> _message.value = e.message ?: "Import failed" },
+            )
+            _busy.value = false
+        }
+    }
+
+    fun importManual(itemId: Long, uri: Uri) {
+        viewModelScope.launch {
+            _busy.value = true
+            store.importFromManualPng(itemId, uri).fold(
+                onSuccess = { msg ->
+                    _message.value = msg
+                    refreshPhotoroomList()
+                },
+                onFailure = { e -> _message.value = e.message ?: "Manual import failed" },
             )
             _busy.value = false
         }

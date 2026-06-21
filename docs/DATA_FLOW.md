@@ -4,9 +4,10 @@
 
 ```
 CSV file (content URI or assets sample)
-    ??? CsvParser (flexible French/English headers)
+    ??? CsvParser (flexible French/English headers; **Rayon** / **Catégorie** / **Famille** mapped separately)
     ??? ImportService
         ??? compare by barcode vs existing articles
+        ??? persist designation, price, **rayon**, famille, catégorie, rawData
         ??? detect NEW / PRICE_CHANGED / RENAMED / REMOVED
         ??? write articles + import_changes + article_price_history
     ??? ImageMatcher.syncImagesForArticles()
@@ -32,6 +33,7 @@ Scan sub-barcode (AGENT SUB-BC or Article → Add sub-barcode & batch shoot)
         → Camera batch → JPEG → PhotoRoom PNG → importFromPhotoroom
         → registerSubBarcodeImage → article_alternate_barcodes.imagePath
     → importFromPhotoroom adds **sub-barcode flavor row** to To share (`variantBarcode` on preselection_items)
+    → **Pick PNG** on import screen when PhotoRoom export failed — user selects file; app renames to gallery PNG
     → Legacy sub-barcodes without imagePath: unchanged (fallback to main article image)
     → Tap sub-barcode chip → unlinkAlternateBarcode
 ```
@@ -105,15 +107,27 @@ To share cart (checked articles with PNG)
     → preselection_items cart_type = DESIGN
 Design screen (To print queue, cart_type = DESIGN)
     → **− / +** copy stepper (1–99); DesignCartExpand repeats article on A4
+    → **Standard / Promo** per row — promo uses promoPrice + promoOriginalPrice (prix-barrée on print)
     → **PARAY** active (visual learning + layout fit + GPU probe)
     → tap Shelf labels card → 2×6 grid (12 labels)
     → LayoutFitAgent: alpha bbox → contain-fit in white slot
-    → Generate landscape A4 JPEG (ShelfA4Renderer)
+    → Generate landscape A4 JPEG (ShelfA4Renderer) → `exports/yyyy-MM-dd/shelf_HHmmss_pN.jpg`
+    → Auto-share file on create; record `print_batches` + item snapshots (Room v18)
     → Ready to print preview + Share as file → articles on page move to Done
+    → **Historique** tab lists Design shelf prints (newest first) → batch detail:
+         live catalog merged with snapshot; exclude rows; reprint selection; load queue;
+         per-row **Design** / **To share**; share original JPEG
+    → CSV import / price edit refreshes open batch + glows changed articles (`changeStatus`, `needsTicketUpdate`, price vs print snapshot)
     → **Send info** (text share) → all To print items move to Done (cart_type = DESIGN_DONE)
     → Done capped at **50** articles — oldest dropped when over limit
     → **Pull up** on Done row → back to DESIGN queue
-    → **Import prices** matches barcodes in both To print and Done
+    → **Share all as files** marks `product_images.lastSentAt` → To share row shows **Telegram: sent …**
+    → Add to Design → row shows **Design: in print queue**; after print/Done → **Design: printed / done**
+    → Shelf print batch → row shows **Printed: dd/MM/yyyy HH:mm**
+    → CSV import price change → `changeStatus` + glow on ArticleCard / Design queue / Report cards
+    → **Every CSV import** reloads VisioPRO rayon pools from DB; articles not yet enabled → pending in Settings (**Nouveau CSV**)
+    → Gestium CSV (cp1252): rows without Code-barres import via Gestium **Code** (`CA:13145`) — e.g. PIEDS DE VEAU
+    → **Settings → Rayons importants** — user checklist; scopes Articles rayon chips, dashboard stats, Catalog filters, CSV report (ignored rayons hidden)
 ```
 
 ## 5c. To share → Telegram/file share
@@ -299,3 +313,19 @@ Settings -> Load IMAGE ASSETS folder
     -> if target file already exists and non-empty: skip (no copy)
     -> run image re-index after load
 ```
+
+## 14. VisioPRO (v2.6.0)
+
+```
+Settings → VisioPRO
+    → VisioProHome (categories: Fruits, Légumes, Boucherie, Poisson)
+    → VisioProCategory
+        → Social tab: manual price first, else CSV by designation keywords
+        → Print tab: CSV first, else manual price from social memory (shared slug)
+        → VisioProCardRenderer (1080² social / 1200×1697 print)
+        → product PNG from catalog when keyword match has image
+        → export → DCIM/VisioPRO/Social or Print
+        → VisioProStore (visio_pro_memory.json): manualPrice, lastSocialExportAt, lastPrintExportAt
+```
+
+Preset definitions: `VisioProPresetCatalog.kt` (agent-maintained; 7 layout families). Fish = social only, no price on card.

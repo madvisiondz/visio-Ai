@@ -41,6 +41,8 @@ data class ReportUiState(
     val previousImport: ImportEntity? = null,
     val csvChanges: List<ReportCsvChangeRow> = emptyList(),
     val designPrints: List<ReportDesignPrintRow> = emptyList(),
+    val importantRayonsFiltered: Boolean = false,
+    val importantRayonsCount: Int = 0,
 ) {
     val csvChangesByType: Map<String, List<ReportCsvChangeRow>> =
         csvChanges.groupBy { it.change.changeType }
@@ -71,12 +73,16 @@ class ReportViewModel(
             }
         },
         repository.observeDesignShelfPrints(),
-    ) { imports, enrichedChanges, designBatches ->
+        repository.importantRayonsConfig,
+    ) { imports, enrichedChanges, designBatches, rayonConfig ->
         val importById = imports.associateBy { it.id }
+        val filteredChanges = enrichedChanges.filter { (_, article) ->
+            repository.matchesImportantRayon(article?.rayon, rayonConfig)
+        }
         ReportUiState(
             latestImport = imports.firstOrNull(),
             previousImport = imports.getOrNull(1),
-            csvChanges = enrichedChanges.map { (change, article) ->
+            csvChanges = filteredChanges.map { (change, article) ->
                 val imp = importById[change.importId]
                 ReportCsvChangeRow(
                     change = change,
@@ -91,6 +97,8 @@ class ReportViewModel(
                     items = emptyList(),
                 )
             },
+            importantRayonsFiltered = rayonConfig.configured && rayonConfig.selectedRayons.isNotEmpty(),
+            importantRayonsCount = rayonConfig.selectedRayons.size,
         )
     }.flowOn(Dispatchers.IO)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ReportUiState())

@@ -1,5 +1,7 @@
 package com.oasismall.oasisai.ui.screens.camerabatch
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,6 +27,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
@@ -50,6 +55,17 @@ fun CameraBatchImportScreen(
     val message by viewModel.message.collectAsStateWithLifecycle()
     val busy by viewModel.busy.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
+    var pickPngForItemId by remember { mutableStateOf<Long?>(null) }
+
+    val pickPngLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        val itemId = pickPngForItemId
+        pickPngForItemId = null
+        if (uri != null && itemId != null) {
+            viewModel.importManual(itemId, uri)
+        }
+    }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -80,7 +96,8 @@ fun CameraBatchImportScreen(
         ) {
             item {
                 Text(
-                    "All pending shots (To shoot, Articles, AGENT, Batch). Rescan after PhotoRoom saves PNGs.",
+                    "All pending shots (To shoot, Articles, AGENT, Batch). Rescan after PhotoRoom saves PNGs, " +
+                        "or use Pick PNG when PhotoRoom failed (long names, etc.).",
                     style = MaterialTheme.typography.bodySmall,
                 )
                 Text(
@@ -126,6 +143,10 @@ fun CameraBatchImportScreen(
                     row = row,
                     busy = busy,
                     onImport = { viewModel.importOne(row.item.id) },
+                    onPickPng = {
+                        pickPngForItemId = row.item.id
+                        pickPngLauncher.launch(arrayOf("image/png"))
+                    },
                     onRemove = { viewModel.removePending(row.item.id) },
                 )
             }
@@ -138,6 +159,7 @@ private fun PendingImportCard(
     row: PendingBatchRow,
     busy: Boolean,
     onImport: () -> Unit,
+    onPickPng: () -> Unit,
     onRemove: () -> Unit,
 ) {
     val found = row.photoroomPng != null
@@ -164,7 +186,7 @@ private fun PendingImportCard(
                     Text(PriceFormatter.format(it), color = MaterialTheme.colorScheme.primary)
                 }
                 Text(
-                    if (found) "PhotoRoom PNG found" else "Waiting for PhotoRoom PNG",
+                    if (found) "PhotoRoom PNG found" else "Waiting for PhotoRoom PNG — or pick file manually",
                     color = if (found) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.labelMedium,
                 )
@@ -172,6 +194,9 @@ private fun PendingImportCard(
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Button(onClick = onImport, enabled = found && !busy) {
                     Text("Import")
+                }
+                OutlinedButton(onClick = onPickPng, enabled = !busy) {
+                    Text("Pick PNG")
                 }
                 OutlinedButton(onClick = onRemove, enabled = !busy) {
                     Text("Remove")

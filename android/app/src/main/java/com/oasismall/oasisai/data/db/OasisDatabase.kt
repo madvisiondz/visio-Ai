@@ -50,7 +50,7 @@ import com.oasismall.oasisai.data.db.entity.WorkflowHistoryEntity
         CameraBatchItemEntity::class,
         BatchCameraQueueEntity::class,
     ],
-    version = 15,
+    version = 18,
     exportSchema = false,
 )
 abstract class OasisDatabase : RoomDatabase() {

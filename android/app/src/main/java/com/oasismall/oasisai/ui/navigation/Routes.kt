@@ -7,6 +7,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.ListAlt
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.ui.graphics.vector.ImageVector
 
 sealed class OasisRoute(val route: String) {
@@ -75,6 +76,19 @@ sealed class OasisRoute(val route: String) {
     data object Design : OasisRoute("design")
     data object ParayImport : OasisRoute("paray_import")
     data object ParayHome : OasisRoute("paray_home")
+    data object VisioProHome : OasisRoute("visio_pro_home")
+    data object VisioProCategory : OasisRoute("visio_pro/{category}") {
+        fun create(category: String) = "visio_pro/$category"
+    }
+    data object ImportantRayons : OasisRoute("important_rayons")
+    data object VisioProSettings : OasisRoute("visio_pro_settings")
+    data object VisioProListEditor : OasisRoute("visio_pro_list/{category}") {
+        fun create(category: String) = "visio_pro_list/$category"
+    }
+    data object VisioProDesignerHub : OasisRoute("visio_pro_designer")
+    data object VisioProDesignerCanvas : OasisRoute("visio_pro_designer/{presetKey}") {
+        fun create(presetKey: String) = "visio_pro_designer/$presetKey"
+    }
 }
 
 data class BottomNavItem(
@@ -85,6 +99,7 @@ data class BottomNavItem(
 )
 
 val bottomNavItems = listOf(
+    BottomNavItem(OasisRoute.VisioProHome.route, "VisioPRO", Icons.Default.Storefront),
     BottomNavItem(OasisRoute.Home.route, "Articles", Icons.Default.Home),
     BottomNavItem(OasisRoute.PhotoshootCart.route, "To shoot", Icons.Default.CameraAlt),
     BottomNavItem(OasisRoute.CheckShoot.route, "AGENT", Icons.Default.Home, useAgentIcon = true),

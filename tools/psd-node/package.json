@@ -1,0 +1,12 @@
+{
+  "name": "visioai-psd-inspect",
+  "private": true,
+  "type": "module",
+  "description": "Secondary PSD reader (ag-psd) — cross-check psd-tools output",
+  "scripts": {
+    "inspect": "node inspect.mjs"
+  },
+  "dependencies": {
+    "ag-psd": "^28.0.0"
+  }
+}

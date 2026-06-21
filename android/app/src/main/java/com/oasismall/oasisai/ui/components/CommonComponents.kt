@@ -41,7 +41,9 @@ fun ArticleCard(
     border: BorderStroke? = null,
 ) {
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .catalogChangeGlow(article.hasCatalogChange()),
         onClick = onClick,
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         border = border,
@@ -72,6 +74,9 @@ fun ArticleCard(
                 Text(PriceFormatter.format(article.price), color = MaterialTheme.colorScheme.primary)
                 Text(article.barcode, style = MaterialTheme.typography.bodySmall)
                 StatusChip(article.changeStatus, article.needsTicketUpdate)
+                if (article.hasCatalogChange()) {
+                    CatalogChangeBadge(active = true)
+                }
             }
             trailing?.invoke()
         }
@@ -81,10 +86,11 @@ fun ArticleCard(
 @Composable
 fun StatusChip(changeStatus: String, needsTicket: Boolean) {
     val label = when {
-        needsTicket && changeStatus == ArticleChangeStatus.PRICE_CHANGED.name -> "Needs ticket"
+        changeStatus == ArticleChangeStatus.PRICE_CHANGED.name -> "Price changed"
         changeStatus == ArticleChangeStatus.NEW.name -> "New"
         changeStatus == ArticleChangeStatus.REMOVED.name -> "Removed"
         changeStatus == ArticleChangeStatus.RENAMED.name -> "Renamed"
+        needsTicket -> "Needs ticket"
         else -> null
     }
     if (label != null) {
@@ -222,7 +228,13 @@ fun ImportChangeCard(
     val canRoute = articleId != null && change.changeType != ImportChangeType.REMOVED.name
 
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .catalogChangeGlow(
+                change.changeType == ImportChangeType.PRICE_CHANGED.name ||
+                    change.changeType == ImportChangeType.NEW.name ||
+                    change.changeType == ImportChangeType.RENAMED.name,
+            ),
         onClick = {
             if (onArticleClick != null && articleId != null) {
                 onArticleClick(articleId)

@@ -51,6 +51,28 @@ OASIS MALL operates at scale with fragmented workflows:
 
 | Area | Choice |
 |------|--------|
+| 2026-06-19 | **VisioPRO**: in-app preset cards (agent-maintained catalog); CSV/manual prices; social + print export |
+| 2026-06-19 | **PSD pipeline**: `tools/psd` (psd-tools) + `tools/psd-node` (ag-psd) — inspect layers/bounds → JSON for template cloning |
+| 2026-06-19 | **PSD template pipeline**: Python psd-tools + Node ag-psd inspectors → `templates/psd-specs/*.json` for Design cloning |
+| 2026-06-14 | **Visio Ai v2.12.2**: Fix Gestium CSV charset (cp1252 wins over UTF-8); import all barcode-less rows via Code; removal by designation/codeart |
+| 2026-06-14 | **Visio Ai v2.12.1**: VisioPRO rayon pools **full resync on every CSV import**; import barcode-less Gestium rows via **codeart** (e.g. PIEDS DE VEAU); list editor reloads live pool |
+| 2026-06-14 | **Visio Ai v2.12.0**: VisioPRO lists auto-sync new CSV articles (pending in Settings); **Rayons importants** checklist filters stats + CSV report |
+| 2026-06-14 | **Visio Ai v2.11.1**: Fix CSV price-change glow (ArticleCard + cart mapping); To share footer — Printed / Design / Telegram status |
+| 2026-06-14 | **Visio Ai v2.11.0**: Design **Historique** tab — print batches by date/time folder; batch detail with reprint, load queue, send to Design/To share; CSV-changed articles glow |
+| 2026-06-20 | **Visio Ai v2.10.0**: Studio preset pro+ — pinch zoom, resize handles, snap guides, align tools, tab Calques/Réglages |
+| 2026-06-20 | **Visio Ai v2.9.0**: Studio preset pro — hub cards, undo/redo, debounced preview, dirty guard, inspecteur enrichi |
+| 2026-06-20 | **Visio Ai v2.8.1**: Designer price slider wired to render; print tab **Charger l'image**; désignation + code noir (impression) |
+| 2026-06-20 | **Visio Ai v2.7.1**: Fix VisioPRO order sheet — drag on ⋮⋮ handle works; ↑↓ fallback |
+| 2026-06-20 | **Visio Ai v2.7.0**: VisioPRO Settings — edit article lists per card (rayon pools) + drag reorder popup |
+| 2026-06-20 | **Visio Ai v2.6.9**: Fix Articles rayon filter — CSV **Rayon** column (not Famille); DB `rayon` + migration backfill |
+| 2026-06-19 | **Visio Ai v2.6.8**: Articles screen — rayon filter chips (all rayons from CSV); search scoped to selected rayon |
+| 2026-06-19 | **Visio Ai v2.6.5**: F&V print preset from `abricot example.psd` — Arabic designation, red price, `code : XX`, catalog photo |
+| 2026-06-19 | **Visio Ai v2.6.3**: Fix bottom nav — custom scrollable tab row (8 tabs visible + swipe); version in Settings; nav smoke tests |
+| 2026-06-19 | **Visio Ai v2.6.2**: VisioPRO first in bottom nav; swipeable bar; F&V A4×4 print queue + To share; exit without losing data |
+| 2026-06-19 | **Visio Ai v2.6.1**: AIL PSD template for F&L social (985×1311); 72 CSV articles; daily photo + layered render |
+| 2026-06-19 | **Visio Ai v2.6.0**: **VisioPRO** in-app module — fruits/légumes/boucherie/poisson presets (7 families); social + print; CSV/manual prices; gallery export |
+| 2026-06-19 | **Visio Ai v2.5.1**: Promo shelf ticket — standard red, grouped prix-barrée |
+| 2026-06-18 | **Visio Ai v2.4.7**: PhotoRoom import **Pick PNG** — manual file picker when PhotoRoom export fails; renames to article gallery |
 | 2026-06-17 | **Visio Ai v2.4.6**: Manual barcode entry on every camera scanner (AGENT, Camera batch, Settings scanner) |
 | 2026-06-17 | **Visio Ai v2.4.5**: Cart rows keyed by **variant barcode** — parent + each sub-flavor coexist in To share & Design; PhotoRoom sub-bc import auto-adds that flavor to To share |
 | 2026-06-17 | **Visio Ai v2.4.4**: Shelf label export **300 DPI** + **JPEG 100%**; full-res product decode on tickets |
@@ -587,6 +609,17 @@ It:
 
 | Date | Change |
 |------|--------|
+| 2026-06-14 | **Visio Ai v2.12.0**: Settings **Rayons importants** — checklist scopes Articles chips, Settings stats, Catalog filters, CSV report; VisioPRO list editors show **Nouveau CSV** pending after import |
+| 2026-06-14 | **Visio Ai v2.11.1**: `ArticleCard` glow + **Price changed** chip from live `changeStatus`; To share row footer (printed / Design queue / Telegram sent) |
+| 2026-06-14 | **Visio Ai v2.11.0**: Design **Historique** — dated export folders (`exports/yyyy-MM-dd/shelf_HHmmss_pN.jpg`); batch detail with exclude/reprint/load queue/send to Design or To share; **catalogChangeGlow** on CSV-changed rows (Room v18 batch snapshots) |
+| 2026-06-20 | **Visio Ai v2.6.9**: Articles rayon filter fixed — import maps Gestium **Rayon** column (col 17), not **Famille**; `articles.rayon` column + v17 migration backfill from rawData |
+| 2026-06-19 | **Visio Ai v2.6.8**: Articles — rayon filter chips (tous les rayons + distinct CSV rayons); browse/search scoped to filter |
+| 2026-06-19 | **Visio Ai v2.6.3**: Bottom nav layout fix — `NavigationBarItem` inside horizontal `Row` hid all tabs; replaced with fixed-width scroll tabs; Settings shows version; unit smoke tests |
+| 2026-06-19 | **Visio Ai v2.6.2**: VisioPRO first tab; swipeable bottom bar; A4×4 print batch; removed Settings entry |
+| 2026-06-19 | **Visio Ai v2.6.1**: AIL PSD F&L social cards; 72 CSV articles; photo store + layered renderer |
+| 2026-06-19 | **Visio Ai v2.6.0**: **VisioPRO** — Settings entry; separate UI; 7 preset families; article chips + full card; CSV price + manual memory; DCIM/VisioPRO export |
+| 2026-06-19 | **Visio Ai v2.5.0**: DB v16 design promo tickets — `isPromoTicket`, `promoPrice`, `promoOriginalPrice`; shelf print prix-barrée layout |
+| 2026-06-18 | **Visio Ai v2.4.7**: PhotoRoom import screen — **Pick PNG** per pending card; manual PNG → gallery rename + To share |
 | 2026-06-17 | **Visio Ai v2.4.6**: Shared `ManualBarcodeEntry` — type digits when label won't scan (AGENT dialog, Camera batch inline, Scanner) |
 | 2026-06-17 | **Visio Ai v2.4.5**: DB v15 `preselection_items.variantBarcode`; cart unique `(articleId, cartType, variantBarcode)`; sub-bc image in cart queries; PhotoRoom sub-bc → To share as flavor row |
 | 2026-06-17 | **Visio Ai v2.4.4**: Design shelf preset — 300 DPI page, JPEG quality 100, sharper product PNG decode |

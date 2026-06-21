@@ -35,6 +35,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -59,8 +60,17 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import com.oasismall.oasisai.data.db.dao.PreselectionWithArticle
+import com.oasismall.oasisai.data.db.entity.PrintBatchEntity
+import com.oasismall.oasisai.domain.design.DesignBatchItemUi
+import com.oasismall.oasisai.ui.components.CatalogChangeBadge
+import com.oasismall.oasisai.ui.components.catalogChangeGlow
+import com.oasismall.oasisai.ui.components.hasCatalogChange
 import com.oasismall.oasisai.domain.design.DesignCartExpand
+import com.oasismall.oasisai.domain.design.shelfDisplayPrice
+import com.oasismall.oasisai.domain.design.shelfOriginalPrice
 import com.oasismall.oasisai.util.ExportShareHelper
 import com.oasismall.oasisai.util.PriceFormatter
 import java.io.File
@@ -75,7 +85,7 @@ fun DesignScreen(viewModel: DesignViewModel) {
     when (step) {
         DesignStep.HOME -> DesignHomeScreen(viewModel)
         DesignStep.READY_PRINT -> ReadyPrintScreen(viewModel)
-        DesignStep.SHELF_LAYOUT -> DesignHomeScreen(viewModel)
+        DesignStep.BATCH_DETAIL -> DesignBatchDetailScreen(viewModel)
     }
 }
 
@@ -85,10 +95,13 @@ private fun DesignHomeScreen(viewModel: DesignViewModel) {
     val context = LocalContext.current
     val items by viewModel.items.collectAsStateWithLifecycle()
     val doneItems by viewModel.doneItems.collectAsStateWithLifecycle()
+    val printHistory by viewModel.printHistory.collectAsStateWithLifecycle()
+    val homeTab by viewModel.homeTab.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     val isRendering by viewModel.isRendering.collectAsStateWithLifecycle()
     val shareable = viewModel.shareableItems()
     val labelCount = DesignCartExpand.labelCount(shareable)
+    val learned by viewModel.parayLearnedCount.collectAsStateWithLifecycle()
     var detailItem by remember { mutableStateOf<PreselectionWithArticle?>(null) }
     var showImportDialog by remember { mutableStateOf(false) }
     var importPasteText by remember { mutableStateOf("") }
@@ -140,7 +153,21 @@ private fun DesignHomeScreen(viewModel: DesignViewModel) {
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
-                val learned by viewModel.parayLearnedCount.collectAsStateWithLifecycle()
+                TabRow(selectedTabIndex = homeTab.ordinal) {
+                    Tab(
+                        selected = homeTab == DesignHomeTab.QUEUE,
+                        onClick = { viewModel.setHomeTab(DesignHomeTab.QUEUE) },
+                        text = { Text("À imprimer") },
+                    )
+                    Tab(
+                        selected = homeTab == DesignHomeTab.HISTORY,
+                        onClick = { viewModel.setHomeTab(DesignHomeTab.HISTORY) },
+                        text = { Text("Historique (${printHistory.size})") },
+                    )
+                }
+            }
+            if (homeTab == DesignHomeTab.QUEUE) {
+            item {
                 Text(
                     "Shelf labels on phone — pick a template to generate a print-ready A4 JPEG.",
                     style = MaterialTheme.typography.bodyMedium,
@@ -176,7 +203,7 @@ private fun DesignHomeScreen(viewModel: DesignViewModel) {
                             Text("Shelf labels", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                         }
                         Text(
-                            "12 per landscape A4 (2×6) · yellow 9.2×3.5 cm · no row gaps",
+                            "12 per landscape A4 (2×6) · standard or promo tickets (prix-barrée)",
                             style = MaterialTheme.typography.bodyMedium,
                         )
                         Text(
@@ -211,6 +238,10 @@ private fun DesignHomeScreen(viewModel: DesignViewModel) {
                         onImageClick = { detailItem = item },
                         onRemove = { viewModel.remove(item.preselectionId) },
                         onPriceCommit = { text -> viewModel.updatePrice(item.articleId, text) },
+                        onPromoToggle = { enabled -> viewModel.setPromoTicket(item.preselectionId, enabled) },
+                        onPromoPricesCommit = { promo, original ->
+                            viewModel.updatePromoPrices(item.preselectionId, promo, original)
+                        },
                         onIncrementCopy = { viewModel.incrementCopy(item.preselectionId) },
                         onDecrementCopy = { viewModel.decrementCopy(item.preselectionId) },
                     )
@@ -241,6 +272,33 @@ private fun DesignHomeScreen(viewModel: DesignViewModel) {
                         onPullUp = { viewModel.pullUpFromDone(item.preselectionId) },
                         onRemove = { viewModel.removeFromDone(item.preselectionId) },
                     )
+                }
+            }
+            } else {
+                item {
+                    Text(
+                        "Fichiers générés à chaque impression — date et heure dans le dossier d'export.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+                message?.let { msg ->
+                    item { Text(msg, color = MaterialTheme.colorScheme.primary) }
+                }
+                if (printHistory.isEmpty()) {
+                    item {
+                        Text(
+                            "Aucune impression enregistrée. Imprimez depuis « À imprimer ».",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                } else {
+                    items(printHistory, key = { "hist_${it.id}" }) { batch ->
+                        DesignHistoryBatchRow(
+                            batch = batch,
+                            onClick = { viewModel.openBatchDetail(batch.id) },
+                        )
+                    }
                 }
             }
         }
@@ -318,13 +376,219 @@ private fun DetailLine(label: String, value: String) {
 }
 
 @Composable
+private fun DesignHistoryBatchRow(
+    batch: PrintBatchEntity,
+    onClick: () -> Unit,
+) {
+    val exportFile = File(batch.exportPath)
+    val folderLabel = exportFile.parentFile?.name ?: "exports"
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+    ) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                formatDoneTimestamp(batch.createdAt),
+                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.titleSmall,
+            )
+            Text(
+                "${batch.itemCount} article(s) · page ${batch.pageIndex + 1}",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Text(
+                "$folderLabel/${exportFile.name}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                batch.status,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DesignBatchDetailScreen(viewModel: DesignViewModel) {
+    val context = LocalContext.current
+    val detail by viewModel.batchDetail.collectAsStateWithLifecycle()
+    val message by viewModel.message.collectAsStateWithLifecycle()
+    val isRendering by viewModel.isRendering.collectAsStateWithLifecycle()
+    val batch = detail.batch
+    val activeCount = detail.items.count { !it.excludedFromReprint }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(batch?.let { formatDoneTimestamp(it.createdAt) } ?: "Impression") },
+                navigationIcon = {
+                    IconButton(onClick = viewModel::closeBatchDetail) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(padding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            batch?.let { b ->
+                item {
+                    Text(
+                        "${b.itemCount} article(s) · ${File(b.exportPath).name}",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Text(
+                        File(b.exportPath).parentFile?.absolutePath ?: b.exportPath,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            message?.let { msg ->
+                item { Text(msg, color = MaterialTheme.colorScheme.primary) }
+            }
+            item {
+                Text(
+                    "$activeCount / ${detail.items.size} sélectionné(s) pour réimpression",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    "Articles modifiés par import CSV sont surlignés. Décochez pour exclure.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            items(detail.items, key = { it.batchItemId }) { item ->
+                DesignBatchItemRow(
+                    item = item,
+                    onToggleExclude = { viewModel.toggleExcludeBatchItem(item.batchItemId) },
+                    onSendToDesign = { viewModel.sendBatchItemToDesign(item.batchItemId) },
+                    onSendToShare = { viewModel.sendBatchItemToShare(item.batchItemId) },
+                )
+            }
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = { viewModel.reprintFromBatchDetail(context) },
+                        enabled = activeCount > 0 && !isRendering,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        if (isRendering) {
+                            CircularProgressIndicator(
+                                strokeWidth = 2.dp,
+                                modifier = Modifier.height(20.dp).padding(end = 8.dp),
+                            )
+                        }
+                        Text("Réimprimer la sélection")
+                    }
+                    OutlinedButton(
+                        onClick = viewModel::loadBatchToDesignQueue,
+                        enabled = activeCount > 0,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text("Charger dans Design") }
+                    OutlinedButton(
+                        onClick = { viewModel.shareBatchExportFile(context) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text("Partager le fichier JPEG") }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DesignBatchItemRow(
+    item: DesignBatchItemUi,
+    onToggleExclude: () -> Unit,
+    onSendToDesign: () -> Unit,
+    onSendToShare: () -> Unit,
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .catalogChangeGlow(item.hasCatalogChange),
+        colors = CardDefaults.cardColors(
+            containerColor = if (item.excludedFromReprint) {
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+            } else {
+                MaterialTheme.colorScheme.surface
+            },
+        ),
+    ) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (!item.imagePath.isNullOrBlank() && File(item.imagePath).exists()) {
+                    AsyncImage(
+                        model = File(item.imagePath),
+                        contentDescription = item.designation,
+                        modifier = Modifier
+                            .height(56.dp)
+                            .aspectRatio(1f)
+                            .clip(RoundedCornerShape(6.dp)),
+                        contentScale = ContentScale.Fit,
+                    )
+                }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(item.designation, fontWeight = FontWeight.Medium, maxLines = 2)
+                    Text(
+                        if (item.isPromoTicket) {
+                            val orig = item.promoOriginalPrice
+                            if (orig != null) {
+                                "${PriceFormatter.formatNumber(item.promoPrice ?: item.price)} DA promo · ${PriceFormatter.formatNumber(orig)} barré · ×${item.copyCount}"
+                            } else {
+                                "${PriceFormatter.formatNumber(item.promoPrice ?: item.price)} DA promo · ×${item.copyCount}"
+                            }
+                        } else {
+                            "${PriceFormatter.formatNumber(item.price)} DA · ×${item.copyCount}"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    if (item.hasCatalogChange) {
+                        CatalogChangeBadge(active = true)
+                        if (kotlin.math.abs(item.price - item.priceAtPrint) > 0.009) {
+                            Text(
+                                "Imprimé à ${PriceFormatter.formatNumber(item.priceAtPrint)} DA",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    }
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = !item.excludedFromReprint,
+                    onClick = onToggleExclude,
+                    label = { Text(if (item.excludedFromReprint) "Exclu" else "Inclus") },
+                )
+                OutlinedButton(onClick = onSendToDesign) { Text("Design") }
+                OutlinedButton(onClick = onSendToShare) { Text("To share") }
+            }
+        }
+    }
+}
+
+@Composable
 private fun DesignDoneRow(
     item: PreselectionWithArticle,
     onPullUp: () -> Unit,
     onRemove: () -> Unit,
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .catalogChangeGlow(item.hasCatalogChange()),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
     ) {
         Row(
@@ -333,9 +597,25 @@ private fun DesignDoneRow(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(item.designation, fontWeight = FontWeight.Medium, maxLines = 2)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(item.designation, fontWeight = FontWeight.Medium, maxLines = 2)
+                    CatalogChangeBadge(active = item.hasCatalogChange())
+                }
                 Text(
-                    "${PriceFormatter.formatNumber(item.price)} DA · ×${item.copyCount.coerceAtLeast(1)}",
+                    if (item.isPromoTicket) {
+                        val promo = item.promoPrice ?: item.shelfDisplayPrice()
+                        val orig = item.promoOriginalPrice ?: item.shelfOriginalPrice()
+                        if (orig != null) {
+                            "${PriceFormatter.formatNumber(promo)} DA promo · ${PriceFormatter.formatNumber(orig)} barré · ×${item.copyCount.coerceAtLeast(1)}"
+                        } else {
+                            "${PriceFormatter.formatNumber(promo)} DA promo · ×${item.copyCount.coerceAtLeast(1)}"
+                        }
+                    } else {
+                        "${PriceFormatter.formatNumber(item.price)} DA · ×${item.copyCount.coerceAtLeast(1)}"
+                    },
                     style = MaterialTheme.typography.bodySmall,
                 )
                 Text(
@@ -367,75 +647,164 @@ private fun DesignQueueRow(
     onImageClick: () -> Unit,
     onRemove: () -> Unit,
     onPriceCommit: (String) -> Unit,
+    onPromoToggle: (Boolean) -> Unit,
+    onPromoPricesCommit: (promo: String, original: String) -> Unit,
     onIncrementCopy: () -> Unit,
     onDecrementCopy: () -> Unit,
 ) {
     val copies = item.copyCount.coerceIn(1, 99)
-    var priceText by remember(item.preselectionId) { mutableStateOf(PriceFormatter.formatNumber(item.price)) }
-    var hadFocus by remember(item.preselectionId) { mutableStateOf(false) }
-    LaunchedEffect(item.price) {
-        if (!hadFocus) priceText = PriceFormatter.formatNumber(item.price)
+    var priceText by remember(item.preselectionId, item.isPromoTicket) {
+        mutableStateOf(PriceFormatter.formatNumber(item.price))
+    }
+    var promoText by remember(item.preselectionId, item.promoPrice, item.isPromoTicket) {
+        mutableStateOf(PriceFormatter.formatNumber(item.promoPrice ?: item.shelfDisplayPrice()))
+    }
+    var originalText by remember(item.preselectionId, item.promoOriginalPrice, item.isPromoTicket) {
+        mutableStateOf(
+            PriceFormatter.formatNumber(
+                item.promoOriginalPrice ?: item.shelfOriginalPrice() ?: item.price,
+            ),
+        )
+    }
+    var hadPriceFocus by remember(item.preselectionId) { mutableStateOf(false) }
+    var hadPromoFocus by remember(item.preselectionId) { mutableStateOf(false) }
+    LaunchedEffect(item.price, item.isPromoTicket) {
+        if (!hadPriceFocus && !item.isPromoTicket) priceText = PriceFormatter.formatNumber(item.price)
+    }
+    LaunchedEffect(item.promoPrice, item.promoOriginalPrice, item.isPromoTicket) {
+        if (!hadPromoFocus && item.isPromoTicket) {
+            promoText = PriceFormatter.formatNumber(item.promoPrice ?: item.shelfDisplayPrice())
+            originalText = PriceFormatter.formatNumber(
+                item.promoOriginalPrice ?: item.shelfOriginalPrice() ?: item.price,
+            )
+        }
     }
 
-    Card(Modifier.fillMaxWidth()) {
-        Row(
-            Modifier.padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (!item.imagePath.isNullOrBlank()) {
-                AsyncImage(
-                    model = File(item.imagePath),
-                    contentDescription = item.designation,
-                    modifier = Modifier
-                        .height(56.dp)
-                        .aspectRatio(1f)
-                        .clip(RoundedCornerShape(6.dp))
-                        .clickable(onClick = onImageClick),
-                    contentScale = ContentScale.Fit,
-                )
-            } else {
-                Box(
-                    Modifier
-                        .height(56.dp)
-                        .aspectRatio(1f)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .clickable(onClick = onImageClick),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text("No PNG", style = MaterialTheme.typography.labelSmall)
-                }
-            }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(item.designation, fontWeight = FontWeight.Medium, maxLines = 2, modifier = Modifier.weight(1f))
-                    Row(
-                        modifier = Modifier.padding(start = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .catalogChangeGlow(item.hasCatalogChange()),
+    ) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (!item.imagePath.isNullOrBlank()) {
+                    AsyncImage(
+                        model = File(item.imagePath),
+                        contentDescription = item.designation,
+                        modifier = Modifier
+                            .height(56.dp)
+                            .aspectRatio(1f)
+                            .clip(RoundedCornerShape(6.dp))
+                            .clickable(onClick = onImageClick),
+                        contentScale = ContentScale.Fit,
+                    )
+                } else {
+                    Box(
+                        Modifier
+                            .height(56.dp)
+                            .aspectRatio(1f)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .clickable(onClick = onImageClick),
+                        contentAlignment = Alignment.Center,
                     ) {
-                        IconButton(
-                            onClick = onDecrementCopy,
-                            enabled = copies > 1,
-                            modifier = Modifier.height(36.dp),
-                        ) {
-                            Icon(Icons.Default.Remove, contentDescription = "Fewer copies")
-                        }
-                        Text("×$copies", style = MaterialTheme.typography.labelLarge)
-                        IconButton(
-                            onClick = onIncrementCopy,
-                            enabled = copies < 99,
-                            modifier = Modifier.height(36.dp),
-                        ) {
-                            Icon(Icons.Default.Add, contentDescription = "More copies")
-                        }
+                        Text("No PNG", style = MaterialTheme.typography.labelSmall)
                     }
                 }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(item.designation, fontWeight = FontWeight.Medium, maxLines = 2, modifier = Modifier.weight(1f))
+                        CatalogChangeBadge(active = item.hasCatalogChange())
+                        Row(
+                            modifier = Modifier.padding(start = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(2.dp),
+                        ) {
+                            IconButton(
+                                onClick = onDecrementCopy,
+                                enabled = copies > 1,
+                                modifier = Modifier.height(36.dp),
+                            ) {
+                                Icon(Icons.Default.Remove, contentDescription = "Fewer copies")
+                            }
+                            Text("×$copies", style = MaterialTheme.typography.labelLarge)
+                            IconButton(
+                                onClick = onIncrementCopy,
+                                enabled = copies < 99,
+                                modifier = Modifier.height(36.dp),
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = "More copies")
+                            }
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(
+                            selected = !item.isPromoTicket,
+                            onClick = { if (item.isPromoTicket) onPromoToggle(false) },
+                            label = { Text("Standard") },
+                        )
+                        FilterChip(
+                            selected = item.isPromoTicket,
+                            onClick = { if (!item.isPromoTicket) onPromoToggle(true) },
+                            label = { Text("Promo") },
+                        )
+                    }
+                }
+                IconButton(onClick = onRemove) {
+                    Icon(Icons.Default.Delete, contentDescription = "Remove")
+                }
+            }
+            if (item.isPromoTicket) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = promoText,
+                        onValueChange = { promoText = it.filter { ch -> ch.isDigit() || ch == '.' } },
+                        label = { Text("Promo price") },
+                        suffix = { Text("DA") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                        modifier = Modifier
+                            .weight(1f)
+                            .onFocusChanged { state ->
+                                if (hadPromoFocus && !state.isFocused) {
+                                    onPromoPricesCommit(promoText, originalText)
+                                }
+                                hadPromoFocus = state.isFocused
+                            },
+                    )
+                    OutlinedTextField(
+                        value = originalText,
+                        onValueChange = { originalText = it.filter { ch -> ch.isDigit() || ch == '.' } },
+                        label = { Text("Original") },
+                        suffix = { Text("DA") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(
+                            onDone = { onPromoPricesCommit(promoText, originalText) },
+                        ),
+                        modifier = Modifier
+                            .weight(1f)
+                            .onFocusChanged { state ->
+                                if (hadPromoFocus && !state.isFocused) {
+                                    onPromoPricesCommit(promoText, originalText)
+                                }
+                                hadPromoFocus = state.isFocused
+                            },
+                    )
+                }
+                Text(
+                    "Promo ticket: same red as standard; original prix-barrée sits beside promo price.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
                 OutlinedTextField(
                     value = priceText,
                     onValueChange = { priceText = it.filter { ch -> ch.isDigit() || ch == '.' } },
@@ -447,13 +816,10 @@ private fun DesignQueueRow(
                     modifier = Modifier
                         .fillMaxWidth()
                         .onFocusChanged { state ->
-                            if (hadFocus && !state.isFocused) onPriceCommit(priceText)
-                            hadFocus = state.isFocused
+                            if (hadPriceFocus && !state.isFocused) onPriceCommit(priceText)
+                            hadPriceFocus = state.isFocused
                         },
                 )
-            }
-            IconButton(onClick = onRemove) {
-                Icon(Icons.Default.Delete, contentDescription = "Remove")
             }
         }
     }

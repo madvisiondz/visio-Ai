@@ -25,6 +25,7 @@ object CartSourceTags {
     const val HOME = "SRC_HOME"
     const val ARTICLE = "SRC_ARTICLE"
     const val IMPORT_CHANGE = "SRC_IMPORT_CHANGE"
+    const val VISIO_PRO = "SRC_VISIO_PRO"
 }
 
 data class CartSourceStyle(
@@ -40,6 +41,7 @@ fun cartSourceStyle(note: String?): CartSourceStyle = when (note) {
     CartSourceTags.HOME -> CartSourceStyle("Articles search", Color(0xFFF57C00))
     CartSourceTags.BATCH_CAMERA -> CartSourceStyle("Camera batch", Color(0xFF5E35B1))
     CartSourceTags.IMPORT_CHANGE -> CartSourceStyle("CSV import", Color(0xFF00695C))
+    CartSourceTags.VISIO_PRO -> CartSourceStyle("VisioPRO", Color(0xFFD4AF37))
     else -> CartSourceStyle("Manual", Color(0xFF757575))
 }
 
@@ -63,6 +65,7 @@ fun CartSourceLegend(modifier: Modifier = Modifier) {
                     CartSourceTags.ARTICLE,
                     CartSourceTags.BATCH_CAMERA,
                     CartSourceTags.IMPORT_CHANGE,
+                    CartSourceTags.VISIO_PRO,
                     CartSourceTags.MANUAL,
                 ).forEach { key ->
                     val style = cartSourceStyle(key)

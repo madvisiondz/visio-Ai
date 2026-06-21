@@ -1,0 +1,52 @@
+{
+  "templateId": "ail_social",
+  "sourcePsd": "AIL(example).psd",
+  "generated": "2026-06-19",
+  "width": 985,
+  "height": 1311,
+  "photo": {
+    "left": 0,
+    "top": 0,
+    "right": 985,
+    "bottom": 1311,
+    "fit": "cover"
+  },
+  "designAsset": "design_overlay.png",
+  "text": {
+    "price": {
+      "left": 683,
+      "top": 1182,
+      "right": 867,
+      "bottom": 1251,
+      "sample": "550",
+      "color": "#000000",
+      "fontSizeRatio": 0.085,
+      "align": "center",
+      "autoFit": true
+    },
+    "designation": {
+      "left": 734,
+      "top": 1083,
+      "right": 824,
+      "bottom": 1143,
+      "locale": "ar",
+      "color": "#FFFFFF",
+      "strokeColor": "#000000",
+      "strokeWidthRatio": 0.004,
+      "fontSizeRatio": 0.042,
+      "align": "center"
+    }
+  },
+  "code": {
+    "_note": "Print labels only — not drawn on social AIL cards",
+    "left": 683,
+    "top": 1095,
+    "right": 728,
+    "bottom": 1143,
+    "color": "#FFFFFF",
+    "strokeColor": "#000000",
+    "strokeWidthRatio": 0.003,
+    "fontSizeRatio": 0.035,
+    "align": "center"
+  }
+}

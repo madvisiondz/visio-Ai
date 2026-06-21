@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
@@ -36,14 +37,22 @@ class HomeViewModel(
     private val _query = MutableStateFlow("")
     val query: StateFlow<String> = _query.asStateFlow()
 
+    /** `null` = all rayons (global). */
+    private val _selectedRayon = MutableStateFlow<String?>(null)
+    val selectedRayon: StateFlow<String?> = _selectedRayon.asStateFlow()
+
+    val rayons: StateFlow<List<String>> = repository.observeDistinctRayons()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     @OptIn(ExperimentalCoroutinesApi::class)
-    val searchResult: StateFlow<HomeSearchResult> = _query
-        .map { it.trim() }
-        .flatMapLatest { q ->
-            if (q.isBlank()) {
+    val searchResult: StateFlow<HomeSearchResult> = combine(_query, _selectedRayon) { q, rayon ->
+        q.trim() to rayon
+    }
+        .flatMapLatest { (q, rayon) ->
+            if (q.isBlank() && rayon == null) {
                 flowOf(HomeSearchResult())
             } else {
-                repository.observeArticles(q).map { articles ->
+                repository.observeArticles(q, rayon).map { articles ->
                     val (withImage, withoutImage) = articles.partition { it.hasAppGalleryImage() }
                     HomeSearchResult(withImage = withImage, withoutImage = withoutImage)
                 }
@@ -69,6 +78,10 @@ class HomeViewModel(
 
     fun setQuery(value: String) {
         _query.value = value
+    }
+
+    fun setSelectedRayon(rayon: String?) {
+        _selectedRayon.value = rayon
     }
 
     fun addToShareCart(articleId: Long, variantBarcode: String? = null) {

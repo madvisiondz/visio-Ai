@@ -1,17 +1,33 @@
 package com.oasismall.oasisai.domain
 
+import com.oasismall.oasisai.util.NameNormalizer
+
 data class ParsedArticleRow(
     val barcode: String,
     val designation: String,
     val price: Double,
     val codeart: String? = null,
     val reference: String? = null,
+    /** Gestium Catégorie column (not Famille, not Rayon). */
     val category: String? = null,
+    /** Gestium Rayon column — used for Articles screen filter. */
+    val rayon: String? = null,
+    val famille: String? = null,
     val brand: String? = null,
     val stock: Double? = null,
     val unit: String? = null,
     val rawData: String? = null,
-)
+) {
+    /** Gestium rows often omit Code-barres; codeart or normalized designation becomes the DB lookup key. */
+    fun resolveImportBarcode(): ParsedArticleRow {
+        if (barcode.isNotBlank()) return this
+        val code = codeart?.trim().orEmpty()
+        if (code.isNotBlank()) return copy(barcode = "CA:$code")
+        val normalized = NameNormalizer.normalize(designation)
+        if (normalized.isNotBlank()) return copy(barcode = "DN:$normalized")
+        return this
+    }
+}
 
 data class CsvParseResult(
     val rows: List<ParsedArticleRow>,

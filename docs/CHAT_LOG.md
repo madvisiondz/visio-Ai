@@ -717,3 +717,147 @@
 **User:** Manual barcode entry on every camera scanner — some product barcodes won't scan.
 
 **Assistant:** **Visio Ai v2.4.6**: Shared `ManualBarcodeEntry` component; AGENT “Type barcode” dialog; Camera batch inline entry; Settings scanner refactored; manual bypasses AGENT scan debounce.
+
+---
+
+## Session 84 — 2026-06-18
+
+**User:** PhotoRoom fails on some images (long designation?) — need manual PNG import on PhotoRoom import screen; system renames to corresponding article.
+
+**Assistant:** **Visio Ai v2.4.7**: **Pick PNG** per pending card on PhotoRoom import; `importFromManualPng` uses same gallery rename/metadata pipeline as auto import → To share.
+
+---
+
+## Session 85 — 2026-06-19
+
+**User:** Promo/discount shelf tickets in Design — dual price (original + promo), prix-barrée like reference photo, same layout otherwise.
+
+**Assistant:** **Visio Ai v2.5.0**: Design **Promo** toggle per queue row; promo + original price fields; shelf renderer pink promo price left + diagonal prix-barrée on original top-right.
+
+---
+
+## Session 86 — 2026-06-19
+
+**User:** Promo print result — price not same red as standard; promo and barré too far apart.
+
+**Assistant:** **Visio Ai v2.5.1**: Promo price uses standard `#E60000` red; promo + prix-barrée laid out as one cluster (~2.5 mm gap) slightly left of center.
+
+---
+
+## Session 87 — 2026-06-19
+
+**User:** Set up Photoshop reading tools to clone PSD templates from layer configuration and position (many templates coming).
+
+**Assistant:** PSD pipeline — `tools/psd` (psd-tools), `tools/psd-node` (ag-psd), `scripts/INSPECT-PSD.ps1`, inbox at `templates/psd-inbox/`, docs `PSD_TEMPLATES.md`.
+
+---
+
+## Session 88 — 2026-06-19
+
+**User:** VisioPRO lives inside VisioAI (not separate AI inspector app). Agent creates presets; app shows cards, edits prices (CSV + manual), exports social/print. Seven families: fruits/veg/butcher social+print; fish social only. Article buttons top, one card per screen.
+
+**Assistant:** **Visio Ai v2.6.0**: VisioPRO module — Settings entry, own UI; `VisioProPresetCatalog` (7 themes, 46 articles); Social/Print tabs; price memory; gallery export; fish without prices.
+
+---
+
+## Session 89 — 2026-06-19
+
+**User:** Map articles from Gestium CSV (`19-06-26 10h MATIN.csv`) by Rayon — Fruits et Légumes, Boucherie, POISSONNERIE; code = last 3 barcode digits; save as .md for VisioPRO mapping memory.
+
+**Assistant:** Extracted **278 articles** → `docs/VISIOPRO_CSV_ARTICLES.md` (Fruits 43, Légumes 29, à classer 37, Boucherie 67, Poisson 102). Re-run: `scripts/extract_visiopro_csv_articles.py`.
+
+---
+
+## Session 90 — 2026-06-19
+
+**User:** Apply `AIL(example).psd` to all fruits & légumes VisioPRO presets; social = photo (daily shoot or latest) + design + designation/code/price; print = no photoshoot (static images later).
+
+**Assistant:** **Visio Ai v2.6.1** — PSD inspected; assets in `visiopro/ail_social/`; 72 CSV articles in `VisioProCsvArticles.kt`; AIL layered renderer + per-article photo store + camera button on social F&L. See `docs/VISIOPRO_AIL_TEMPLATE.md`.
+
+---
+
+## Session 91 — 2026-06-19
+
+**User:** Nothing changed in the app; can't find VisioPRO.
+
+**Assistant:** Code existed but no APK was installed — built **VisioAI-debug.apk v2.6.2** for manual install.
+
+---
+
+## Session 92 — 2026-06-19
+
+**User:** Bottom nav empty / tabs off-screen; request smoke/stability evaluation.
+
+**Assistant:** **v2.6.3** — fixed broken layout (`NavigationBarItem` inside scrolling `Row`); custom 76dp scroll tabs; Settings shows version; `BottomNavSelectionTest` smoke tests; fresh APK built.
+
+---
+
+## Session 93 — 2026-06-19
+
+**User:** Use `abricot example.psd` as print template; presets ready for fruits and vegetables.
+
+**Assistant:** **v2.6.5** — exported `fv_print` assets from abricot PSD (3508×2480); fruits + légumes print presets use PSD renderer (catalog photo, Arabic designation, red auto-fit price, `code : XX`); A4×4 batch unchanged. Script: `scripts/build_visiopro_print_assets.py`.
+
+---
+
+## Session 94 — 2026-06-19
+
+**User:** Map `D:\Oasis Data\affichage fruits` PSDs to CSV articles; export product images; assign to VisioPRO print presets without mismatches.
+
+**Assistant:** **v2.6.6** — `scripts/map_visiopro_affichage_psd.py`: code-in-PSD + filename + JPG histogram verification; 51 PSDs → 63 product PNGs (aliases for promos/variants); `docs/VISIOPRO_AFFICHAGE_MAP.md` audit trail; print renderer uses bundled product before catalog fallback.
+
+---
+
+## Session 95 — 2026-06-20
+
+**User:** Rayon filter shows Famille codes (4000, 001) — wanted Gestium **Rayon** list (Boucherie, Boissons, Confiserie, …).
+
+**Assistant:** **v2.6.9** — fixed `CsvParser` column mapping (Rayon / Catégorie / Famille separate); added `articles.rayon` + migration v17 backfill from rawData; Articles filter queries use `rayon` column. Re-import CSV for full fix on all rows.
+
+---
+
+## Session 96 — 2026-06-20
+
+**User:** VisioPRO lists are great; want Settings route to pick which rayon articles show in each of the 4 cards + drag reorder popup.
+
+**Assistant:** **v2.7.0** — Settings → **Listes VisioPRO**; per-card editor from Gestium rayon pool; save selection + **Ordre d'affichage** sheet (drag handles); VisioPRO home/category lists read saved config with live prices.
+
+---
+
+## Session 97 — 2026-06-14
+
+**User:** Design print should save under date/time; Historique tab with batch list; open batch to modify/reprint; CSV updates refresh lists; changed articles glow.
+
+**Assistant:** **v2.11.0** — `exports/yyyy-MM-dd/shelf_HHmmss_pN.jpg`; Design **Historique** tab + batch detail (exclude, reprint, load queue, → Design/To share); Room v18 batch snapshots; `catalogChangeGlow` on changed rows; APK build OK.
+
+---
+
+## Session 98 — 2026-06-14
+
+**User:** CSV price-changed articles must glow; To share list should show printed / sent to Design / Telegram sent at bottom — existing status didn't work.
+
+**Assistant:** **v2.11.1** — fixed cart `toArticleWithImage()` hardcoding UNCHANGED; `ArticleCard` + Report import cards glow; To share **ShareCartStatusFooter** (Printed / Design / Telegram); cart SQL adds `lastPrintedAt`, `inDesignQueue`, `inDesignDone`.
+
+---
+
+## Session 99 — 2026-06-14
+
+**User:** VisioPRO lists should stay linked to CSV rayons (new butcher/fish/F&V articles appear in Settings); important rayons checklist to filter CSV report and all stats.
+
+**Assistant:** **v2.12.0** — post-import `syncNewArticlesAfterImport` → pending in VisioPRO config; Settings **Rayons importants** screen; filtered dashboard stats, Articles chips, Catalog, CSV report.
+
+---
+
+## Session 100 — 2026-06-14
+
+**User:** VisioPRO lists still missing articles (e.g. PIEDS DE VEAU in Boucherie); lists must reload on every CSV import.
+
+**Assistant:** **v2.12.1** — import barcode-less rows via codeart; `syncRayonPoolsAfterCsvImport` full rayon resync; live pool in list editor; multi-spelling rayon query; Settings resume refresh.
+
+---
+
+## Session 101 — 2026-06-14
+
+**User:** Still cannot find PIEDS DE VEAU in Articles or VisioPRO — CSV loader may be ignoring rows.
+
+**Assistant:** **v2.12.2** — root cause: UTF-8 mis-read Gestium cp1252 CSV (0 rows vs 28k); `parseWithFallback` now picks charset with most valid rows; removal detection uses codeart + designation; unit test for PIEDS DE VEAU row.

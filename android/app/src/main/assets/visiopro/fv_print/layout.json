@@ -1,0 +1,49 @@
+{
+  "templateId": "fv_print",
+  "sourcePsd": "abricot example.psd",
+  "generated": "2026-06-19",
+  "width": 3508,
+  "height": 2480,
+  "photo": {
+    "left": 1046,
+    "top": 0,
+    "right": 2843,
+    "bottom": 1594,
+    "fit": "cover"
+  },
+  "designAsset": "design_overlay.png",
+  "text": {
+    "designation": {
+      "left": 48,
+      "top": 1742,
+      "right": 1417,
+      "bottom": 2288,
+      "color": "#000000",
+      "fontSizeRatio": 0.055,
+      "align": "center",
+      "autoFit": true,
+      "locale": "ar"
+    },
+    "price": {
+      "left": 1484,
+      "top": 1741,
+      "right": 2885,
+      "bottom": 2404,
+      "color": "#E53935",
+      "fontSizeRatio": 0.09,
+      "align": "center",
+      "autoFit": true
+    }
+  },
+  "code": {
+    "left": 2540,
+    "top": 1443,
+    "right": 3383,
+    "bottom": 1595,
+    "color": "#000000",
+    "fontSizeRatio": 0.028,
+    "align": "center",
+    "autoFit": false,
+    "format": "code : {value}"
+  }
+}

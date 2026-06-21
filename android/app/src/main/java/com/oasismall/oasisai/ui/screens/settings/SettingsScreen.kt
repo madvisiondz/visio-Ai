@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,9 +22,11 @@ import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.AutoFixHigh
+import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.Sync
@@ -47,6 +50,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.oasismall.oasisai.OasisApp
+import com.oasismall.oasisai.BuildConfig
 import com.oasismall.oasisai.domain.visio.PhotoroomStorage
 import com.oasismall.oasisai.domain.paray.ParayImportStatus
 import androidx.compose.ui.Modifier
@@ -69,6 +73,8 @@ fun SettingsScreen(
     onNavigateReport: () -> Unit = {},
     onNavigateParayImport: () -> Unit = {},
     onNavigateParayHome: () -> Unit = {},
+    onNavigateVisioProSettings: () -> Unit = {},
+    onNavigateImportantRayons: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val app = context.applicationContext as OasisApp
@@ -119,7 +125,20 @@ fun SettingsScreen(
 
     val busy = uiState.isLoadingImages || uiState.isReindexing || uiState.isLoadingSample || uiState.isExportingPngs
 
-    Scaffold(topBar = { TopAppBar(title = { Text("Settings") }) }) { padding ->
+    Scaffold(topBar = {
+        TopAppBar(
+            title = {
+                Column {
+                    Text("Settings")
+                    Text(
+                        "Visio Ai ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            },
+        )
+    }) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -164,6 +183,13 @@ fun SettingsScreen(
                         Text("Articles in app: ${overview.totalArticles}")
                         Text("With Oasis gallery image: ${overview.withGalleryImage}")
                         Text("Missing image: ${overview.missingImages}")
+                        if (overview.importantRayonsFiltered) {
+                            Text(
+                                "Stats scoped to ${overview.importantRayonsCount} important rayon(s)",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
                         Text("PNG files on device: ${overview.pngFilesOnDevice}")
                         Text("Oasis IMAGE ASSETS model PNGs: ${overview.oasisModelPngs}")
                         Text(
@@ -173,6 +199,26 @@ fun SettingsScreen(
                         )
                     }
                 }
+            }
+
+            item { SectionTitle("Catalogue") }
+            item {
+                SettingsRow(
+                    title = "Rayons importants",
+                    subtitle = "Filtrer rapport CSV, statistiques et filtres Articles",
+                    icon = Icons.Default.Assessment,
+                    onClick = onNavigateImportantRayons,
+                )
+            }
+
+            item { SectionTitle("VisioPRO") }
+            item {
+                SettingsRow(
+                    title = "Listes VisioPRO",
+                    subtitle = "Articles par carte · Fruits / Légumes depuis « Fruits et Légumes », ordre d'affichage",
+                    icon = Icons.Default.Storefront,
+                    onClick = onNavigateVisioProSettings,
+                )
             }
 
             item { SectionTitle("Data uploads") }

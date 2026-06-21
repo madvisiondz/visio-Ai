@@ -1,6 +1,8 @@
 package com.oasismall.oasisai.domain.visio
 
 import android.content.Context
+import android.net.Uri
+import android.provider.OpenableColumns
 import com.oasismall.oasisai.data.db.dao.CameraBatchDao
 import com.oasismall.oasisai.data.db.entity.CameraBatchItemEntity
 import com.oasismall.oasisai.data.model.CameraBatchStatus
@@ -120,49 +122,83 @@ class CameraBatchStore(
             val pngRef = findPhotoroomPng(item.barcode, item.designation)
                 ?: error("No PNG in ${photoroomDisplayPath()}/ for ${item.barcode} (${item.designation})")
             val png = pngRef.asLocalFile(context)
-            if (item.pendingSubBarcodeLink && item.linkParentArticleId != null) {
-                val parent = repository.getArticleById(item.linkParentArticleId)
-                    ?: error("Parent article not found")
-                val imagePath = imageMatcher.registerSubBarcodeImage(item.barcode, parent, png)
-                repository.linkSubBarcodeToMainArticle(
-                    articleId = item.linkParentArticleId,
-                    mainBarcode = parent.barcode,
-                    subBarcode = item.barcode,
-                    imagePath = imagePath,
-                )
-                if (!repository.isInCart(item.linkParentArticleId, CartType.SHARE, item.barcode)) {
-                    repository.addToCart(
-                        item.linkParentArticleId,
-                        CartType.SHARE,
-                        CartSourceTags.BATCH_CAMERA,
-                        variantBarcode = item.barcode,
-                    )
-                }
-                dao.updateStatus(item.id, CameraBatchStatus.IMPORTED.name, pngRef.pathLabel)
-                return@runCatching "Sub-barcode ${item.barcode} linked with image → To share"
-            }
-            val articleEntity = item.articleId?.let { repository.getArticleById(it) }
-                ?: repository.resolveScannedBarcode(item.barcode)?.article?.id
-                    ?.let { repository.getArticleById(it) }
-                ?: repository.getArticleWithImageByDesignation(item.designation)?.let {
-                    repository.getArticleById(it.id)
-                }
-            val articleId: Long = if (articleEntity != null) {
-                imageMatcher.registerCapturedImage(articleEntity, png)
-                repository.removeFromCart(articleEntity.id, CartType.PHOTOSHOOT)
-                articleEntity.id
-            } else {
-                val saved = imageMatcher.registerCapturedImageByBarcode(item.barcode, png)
-                repository.removeFromCart(saved.articleId, CartType.PHOTOSHOOT)
-                saved.articleId
-            }
-            if (!repository.isInCart(articleId, CartType.SHARE)) {
-                repository.addToCart(articleId, CartType.SHARE, CartSourceTags.BATCH_CAMERA)
-            }
-            dao.updateStatus(item.id, CameraBatchStatus.IMPORTED.name, pngRef.pathLabel)
-            "Imported ${item.designation} → gallery & To share"
+            importPngForItem(item, png, pngRef.pathLabel)
         }
     }
+
+    /** User picks a PNG when PhotoRoom export failed or used a random filename. */
+    suspend fun importFromManualPng(itemId: Long, sourceUri: Uri): Result<String> = withContext(Dispatchers.IO) {
+        runCatching {
+            val item = dao.getById(itemId) ?: error("Batch item not found")
+            val displayName = queryDisplayName(sourceUri).ifBlank { "picked.png" }
+            val cache = File(context.cacheDir, "manual_photoroom_import/${itemId}_$displayName")
+            cache.parentFile?.mkdirs()
+            context.contentResolver.openInputStream(sourceUri)?.use { input ->
+                cache.outputStream().use { output -> input.copyTo(output) }
+            } ?: error("Cannot read selected PNG")
+            importPngForItem(item, cache, "Manual: $displayName")
+        }
+    }
+
+    private suspend fun importPngForItem(
+        item: CameraBatchItemEntity,
+        png: File,
+        pathLabel: String,
+    ): String {
+        if (item.pendingSubBarcodeLink && item.linkParentArticleId != null) {
+            val parent = repository.getArticleById(item.linkParentArticleId)
+                ?: error("Parent article not found")
+            val imagePath = imageMatcher.registerSubBarcodeImage(item.barcode, parent, png)
+            repository.linkSubBarcodeToMainArticle(
+                articleId = item.linkParentArticleId,
+                mainBarcode = parent.barcode,
+                subBarcode = item.barcode,
+                imagePath = imagePath,
+            )
+            if (!repository.isInCart(item.linkParentArticleId, CartType.SHARE, item.barcode)) {
+                repository.addToCart(
+                    item.linkParentArticleId,
+                    CartType.SHARE,
+                    CartSourceTags.BATCH_CAMERA,
+                    variantBarcode = item.barcode,
+                )
+            }
+            dao.updateStatus(item.id, CameraBatchStatus.IMPORTED.name, pathLabel)
+            return "Sub-barcode ${item.barcode} linked with image → To share"
+        }
+        val articleEntity = item.articleId?.let { repository.getArticleById(it) }
+            ?: repository.resolveScannedBarcode(item.barcode)?.article?.id
+                ?.let { repository.getArticleById(it) }
+            ?: repository.getArticleWithImageByDesignation(item.designation)?.let {
+                repository.getArticleById(it.id)
+            }
+        val articleId: Long = if (articleEntity != null) {
+            imageMatcher.registerCapturedImage(articleEntity, png)
+            repository.removeFromCart(articleEntity.id, CartType.PHOTOSHOOT)
+            articleEntity.id
+        } else {
+            val saved = imageMatcher.registerCapturedImageByBarcode(item.barcode, png)
+            repository.removeFromCart(saved.articleId, CartType.PHOTOSHOOT)
+            saved.articleId
+        }
+        if (!repository.isInCart(articleId, CartType.SHARE)) {
+            repository.addToCart(articleId, CartType.SHARE, CartSourceTags.BATCH_CAMERA)
+        }
+        dao.updateStatus(item.id, CameraBatchStatus.IMPORTED.name, pathLabel)
+        return "Imported ${item.designation} → gallery & To share"
+    }
+
+    private fun queryDisplayName(uri: Uri): String =
+        runCatching {
+            context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val idx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    if (idx >= 0) cursor.getString(idx) else null
+                } else {
+                    null
+                }
+            }
+        }.getOrNull()?.trim().orEmpty()
 
     suspend fun importAllPending(): ImportAllResult = withContext(Dispatchers.IO) {
         refreshPhotoroomIndex()

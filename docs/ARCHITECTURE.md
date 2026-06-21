@@ -7,7 +7,7 @@
 | UI | Jetpack Compose + Material 3 (Oasis orange `#FF5E13`, dark surfaces) |
 | Navigation | Navigation Compose |
 | State | ViewModel + StateFlow |
-| Database | Room (SQLite) — **v15** (`preselection_items.variantBarcode`; v14: `article_alternate_barcodes.imagePath`, `camera_batch_items.pendingSubBarcodeLink`) |
+| Database | Room (SQLite) — **v16** (design promo tickets on `preselection_items`; v15: `variantBarcode`) |
 | Images | Coil lazy previews + local `files/product_images/` + FileProvider sharing |
 | Barcode | ML Kit (dependency) + manual entry |
 | Print export | Android `PdfDocument` |
@@ -81,7 +81,11 @@ Seeded on first launch in `OasisApp`.
 
 ## Print export (on phone)
 
-Shelf labels: **Design** screen → `ShelfA4Renderer` → landscape A4 JPEG (12-up). Design uses two carts: `DESIGN` (To print) and `DESIGN_DONE`; `copyCount` expands repeats per article. Legacy PDF templates remain in Settings print flow.
+Shelf labels: **Design** screen → `ShelfA4Renderer` → landscape A4 JPEG (12-up) under `exports/yyyy-MM-dd/`. Design uses `DESIGN` (To print), `DESIGN_DONE`, and **Historique** (`print_batches` with templateName `Design — Shelf A4 12-up`); batch detail supports reprint with live catalog merge. `copyCount` expands repeats per article. Legacy PDF templates remain in Settings print flow.
+
+**PSD cloning (in progress):** drop `.psd` in `templates/psd-inbox/` → `scripts/INSPECT-PSD.ps1` → JSON specs in `templates/psd-specs/` → map to Kotlin renderers. See [`docs/PSD_TEMPLATES.md`](PSD_TEMPLATES.md).
+
+**VisioPRO (v2.6.x):** in-app module at `domain/visiopro/` + `ui/screens/visiopro/` — preset catalog, card renderer, JSON price memory; **first bottom-nav tab** (`SwipeableBottomNavBar` — custom fixed-width scroll row, not Material3 `NavigationBarItem` in a `Row`). **v2.12.1:** `VisioProCatalogService.syncRayonPoolsAfterCsvImport()` reloads full Gestium rayon pools after every CSV import; list editors read live pool minus enabled selection.
 
 Phone-to-phone PNG sync: **Phone sync** (hotspot LAN, port 8776) — see `docs/PHONE_SYNC.md`.
 

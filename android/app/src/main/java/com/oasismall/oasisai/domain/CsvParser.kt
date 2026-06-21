@@ -15,7 +15,10 @@ object CsvParser {
     )
     private val priceHeaders = setOf("price", "prix", "prix_vente", "prix vente", "pv", "prix de vente")
     private val referenceHeaders = setOf("reference", "référence", "ref")
-    private val categoryHeaders = setOf("category", "categorie", "catégorie", "rayon", "famille")
+    /** Gestium « Catégorie » — not Famille, not Rayon. */
+    private val categoryHeaders = setOf("category", "categorie", "catégorie")
+    private val rayonHeaders = setOf("rayon")
+    private val familleHeaders = setOf("famille")
     private val brandHeaders = setOf("brand", "marque")
     private val stockHeaders = setOf("stock", "stock reel", "stock réel", "qte", "quantite", "quantité")
     private val unitHeaders = setOf("unit", "unite", "unité", "uom", "unite de mesure (vente)")
@@ -28,22 +31,27 @@ object CsvParser {
 
     fun parseWithFallback(input: InputStream): CsvParseResult {
         val bytes = input.readBytes()
-        var lastResult = CsvParseResult(emptyList(), emptyList(), ',', 0)
-        for (charset in fallbackCharsets) {
+        val attempts = fallbackCharsets.map { charset ->
             val result = parse(ByteArrayInputStream(bytes), charset)
-            lastResult = result
-            val validation = validate(result.headers)
-            if (validation.isValid && result.rows.isNotEmpty()) return result
+            result to validate(result.headers)
         }
-        return lastResult
+        val bestValid = attempts
+            .filter { (_, validation) -> validation.isValid }
+            .maxByOrNull { (result, _) -> result.rows.size }
+            ?.first
+        if (bestValid != null && bestValid.rows.isNotEmpty()) return bestValid
+        return attempts.maxByOrNull { (result, _) -> result.rows.size }?.first
+            ?: CsvParseResult(emptyList(), emptyList(), ',', 0)
     }
 
     fun validate(headers: List<String>): CsvValidation {
         val columnMap = buildColumnMap(headers)
         val missing = buildList {
-            if (!columnMap.containsKey("barcode")) add("barcode (Code-barres)")
             if (!columnMap.containsKey("designation")) add("designation (Désignation)")
             if (!columnMap.containsKey("price")) add("price (Prix de vente TTC)")
+            if (!columnMap.containsKey("barcode") && !columnMap.containsKey("codeart")) {
+                add("barcode (Code-barres) or code (Gestium Code)")
+            }
         }
         return CsvValidation(missing.isEmpty(), missing, headers)
     }
@@ -67,14 +75,14 @@ object CsvParser {
                 skipped++
                 null
             } else {
-                parseRow(cells, columnMap, rawHeaders)?.also {
+                parseRow(cells, columnMap, rawHeaders)?.resolveImportBarcode()?.also {
                     if (it.barcode.isBlank() || it.designation.isBlank()) skipped++
                 } ?: run {
                     skipped++
                     null
                 }
             }
-        }.filter { it.barcode.isNotBlank() && it.designation.isBlank().not() }
+        }.filter { it.barcode.isNotBlank() && it.designation.isNotBlank() }
 
         return CsvParseResult(rows, headers, delimiter, skipped)
     }
@@ -118,7 +126,16 @@ object CsvParser {
     private fun buildColumnMap(headers: List<String>): Map<String, Int> {
         fun findIndex(candidates: Set<String>): Int? {
             headers.forEachIndexed { index, header ->
-                if (candidates.any { candidate -> header.contains(candidate) }) return index
+                if (candidates.any { candidate -> header == candidate || header.contains(candidate) }) {
+                    return index
+                }
+            }
+            return null
+        }
+
+        fun findExactIndex(vararg names: String): Int? {
+            headers.forEachIndexed { index, header ->
+                if (names.any { header == it }) return index
             }
             return null
         }
@@ -129,6 +146,10 @@ object CsvParser {
             findPriceIndex(headers)?.let { put("price", it) }
             findCodeartIndex(headers)?.let { put("codeart", it) }
             findIndex(referenceHeaders)?.let { put("reference", it) }
+            findExactIndex("rayon")?.let { put("rayon", it) }
+                ?: findIndex(rayonHeaders)?.let { put("rayon", it) }
+            findExactIndex("famille")?.let { put("famille", it) }
+                ?: findIndex(familleHeaders)?.let { put("famille", it) }
             findIndex(categoryHeaders)?.let { put("category", it) }
             findIndex(brandHeaders)?.let { put("brand", it) }
             findIndex(stockHeaders)?.let { put("stock", it) }
@@ -138,7 +159,14 @@ object CsvParser {
 
     private fun findCodeartIndex(headers: List<String>): Int? {
         headers.forEachIndexed { index, header ->
-            if (header == "code") return index
+            if (
+                header == "code" ||
+                header == "codeart" ||
+                header.contains("code art") ||
+                header == "code article"
+            ) {
+                return index
+            }
         }
         return null
     }
@@ -172,21 +200,28 @@ object CsvParser {
         columnMap: Map<String, Int>,
         headers: List<String>,
     ): ParsedArticleRow? {
-        val barcodeIdx = columnMap["barcode"] ?: return null
         val designationIdx = columnMap["designation"] ?: return null
         val priceIdx = columnMap["price"] ?: return null
 
-        val barcode = cells.getOrNull(barcodeIdx)?.trim()?.replace("\"", "") ?: return null
+        val barcode = columnMap["barcode"]
+            ?.let { cells.getOrNull(it)?.trim()?.replace("\"", "") }
+            .orEmpty()
         val designation = cells.getOrNull(designationIdx)?.trim()?.replace("\"", "") ?: return null
+        if (designation.isBlank()) return null
         val price = parseFrenchNumber(cells.getOrNull(priceIdx)) ?: return null
+
+        val codeart = columnMap["codeart"]?.let { cells.getOrNull(it)?.trim()?.replace("\"", "") }
+        if (barcode.isBlank() && codeart.isNullOrBlank()) return null
 
         return ParsedArticleRow(
             barcode = barcode,
             designation = designation,
             price = price,
-            codeart = columnMap["codeart"]?.let { cells.getOrNull(it)?.trim()?.replace("\"", "") },
+            codeart = codeart,
             reference = columnMap["reference"]?.let { cells.getOrNull(it)?.trim()?.replace("\"", "") },
-            category = columnMap["category"]?.let { cells.getOrNull(it)?.trim()?.replace("\"", "") },
+            category = columnMap["category"]?.let { cells.getOrNull(it)?.trim()?.replace("\"", "")?.takeIf { it.isNotBlank() } },
+            rayon = columnMap["rayon"]?.let { cells.getOrNull(it)?.trim()?.replace("\"", "")?.takeIf { it.isNotBlank() } },
+            famille = columnMap["famille"]?.let { cells.getOrNull(it)?.trim()?.replace("\"", "")?.takeIf { it.isNotBlank() } },
             brand = columnMap["brand"]?.let { cells.getOrNull(it)?.trim()?.replace("\"", "") },
             stock = columnMap["stock"]?.let { parseFrenchNumber(cells.getOrNull(it)) },
             unit = columnMap["unit"]?.let { cells.getOrNull(it)?.trim()?.replace("\"", "") },

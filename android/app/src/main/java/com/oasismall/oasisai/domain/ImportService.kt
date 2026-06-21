@@ -9,6 +9,7 @@ import com.oasismall.oasisai.data.model.ArticleChangeStatus
 import com.oasismall.oasisai.data.model.ImportChangeType
 import com.oasismall.oasisai.data.model.ImportStatus
 import com.oasismall.oasisai.data.repository.OasisRepository
+import com.oasismall.oasisai.domain.visiopro.VisioProCatalogService
 import com.oasismall.oasisai.util.NameNormalizer
 import com.oasismall.oasisai.util.TaskProgress
 import java.io.InputStream
@@ -16,6 +17,7 @@ import java.io.InputStream
 class ImportService(
     private val repository: OasisRepository,
     private val imageMatcher: ImageMatcher,
+    private val visioProCatalogService: VisioProCatalogService? = null,
 ) {
     suspend fun importFromStream(
         inputStream: InputStream,
@@ -54,7 +56,21 @@ class ImportService(
             )
 
             val existingByBarcode = repository.getAllArticles().associateBy { it.barcode }
+            val existingByCodeart = repository.getAllArticles()
+                .mapNotNull { article ->
+                    article.codeart?.trim()?.takeIf { it.isNotEmpty() }?.let { it to article }
+                }
+                .associate { it.first to it.second }
+            val existingByNormalizedName = repository.getAllArticles()
+                .groupBy { it.normalizedName }
+                .mapValues { (_, articles) -> articles.maxByOrNull { it.lastSeenAt }!! }
             val incomingBarcodes = parseResult.rows.map { it.barcode }.toSet()
+            val incomingCodearts = parseResult.rows
+                .mapNotNull { it.codeart?.trim()?.takeIf { it.isNotEmpty() } }
+                .toSet()
+            val incomingNormalizedNames = parseResult.rows
+                .map { NameNormalizer.normalize(it.designation) }
+                .toSet()
 
             var newCount = 0
             var priceChangedCount = 0
@@ -68,6 +84,8 @@ class ImportService(
             parseResult.rows.forEachIndexed { index, row ->
                 val normalized = NameNormalizer.normalize(row.designation)
                 val existing = existingByBarcode[row.barcode]
+                    ?: row.codeart?.trim()?.takeIf { it.isNotEmpty() }?.let { existingByCodeart[it] }
+                    ?: existingByNormalizedName[normalized]
 
                 if (existing == null) {
                     newCount++
@@ -107,6 +125,8 @@ class ImportService(
                         codeart = row.codeart ?: existing.codeart,
                         reference = row.reference ?: existing.reference,
                         category = row.category ?: existing.category,
+                        rayon = row.rayon ?: existing.rayon,
+                        famille = row.famille ?: existing.famille,
                         brand = row.brand ?: existing.brand,
                         stock = row.stock ?: existing.stock,
                         unit = row.unit ?: existing.unit,
@@ -166,7 +186,14 @@ class ImportService(
             }
 
             onProgress?.invoke(TaskProgress("Detecting removed articles", 62))
-            val removed = existingByBarcode.values.filter { it.barcode !in incomingBarcodes && it.isActive }
+            val removed = existingByBarcode.values.filter { article ->
+                if (!article.isActive) return@filter false
+                if (article.barcode in incomingBarcodes) return@filter false
+                val codeart = article.codeart?.trim().orEmpty()
+                if (codeart.isNotEmpty() && codeart in incomingCodearts) return@filter false
+                if (article.normalizedName in incomingNormalizedNames) return@filter false
+                true
+            }
             val removedCount = removed.size
             removed.forEach { article ->
                 articlesToSave.add(
@@ -205,6 +232,8 @@ class ImportService(
                     renamedCount = renamedCount,
                 ),
             )
+
+            visioProCatalogService?.syncRayonPoolsAfterCsvImport()
 
             onProgress?.invoke(TaskProgress("Re-indexing product images", 90))
             imageMatcher.syncImagesForArticles(repository.getAllArticles()) { progress ->
@@ -249,6 +278,8 @@ class ImportService(
         codeart = codeart,
         reference = reference,
         category = category,
+        rayon = rayon,
+        famille = famille,
         brand = brand,
         stock = stock,
         unit = unit,

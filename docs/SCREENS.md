@@ -4,10 +4,14 @@
 
 | Screen | Route | Status | Notes |
 |--------|-------|--------|-------|
-| Home / Articles | `home` | Done | **Smart search**; split has image / needs photo; **Add to To shoot**; **Open camera batch** on each result |
+| VisioPRO home | `visio_pro_home` | Done | **Simple list** — 4 categories (counts from user catalog config) |
+| VisioPRO designer hub | `visio_pro_designer` → `visio_pro_designer/{presetKey}` | Done | **Studio pro+** — pinch · resize · snap · align · onglets Calques/Réglages |
+| VisioPRO list settings | `visio_pro_settings` → `visio_pro_list/{category}` | Done | Full rayon pool after each CSV import · pending badge · resume refresh |
+| VisioPRO category | `visio_pro/{category}` | Done | **Full article list** + search · tap → **bottom sheet** (prix, photo, To share, export) |
+| Home / Articles | `home` | Done | **Rayon filter** (Gestium **Rayon** column — Boucherie, Boissons, Confiserie, …) · search scoped to filter · smart search |
 | PARAY home | `paray_home` | Done | PARAY's own UI + `paray_home/` folder; office links to Design / AGENT / import |
 | PARAY neural load | `paray_import` | Done | Fingerprint import progress, neural profile, memory growth; foreground service (background-safe) |
-| Settings | `settings` | Done | IMAGE ASSETS load, **PhotoRoom folder** picker, Export PNG database, re-index, Report |
+| Settings | `settings` | Done | Shows **app version**; **Rayons importants**; **Listes VisioPRO**; IMAGE ASSETS load, **PhotoRoom folder** picker, Export PNG database, re-index, Report |
 | Gallery link (placeholder) | `gallery_link` | Planned | Pick PNGs → scan → rename workflow |
 | Import Center | `import` | Done | From Settings; CSV picker, preview, Confirm/Cancel in scroll (all screen sizes); history |
 | Import Detail | `import/{importId}` | Done | Per-import change log; thumbnail + **Add to To share** / **To shoot** |
@@ -20,8 +24,8 @@
 | PhotoRoom import | `camera_batch_import` | Done | Pending list; Import / **Remove** per card; import all matched |
 | To shoot cart | `photoshoot_cart` | Done | **Bottom nav**; **Open camera batch** per article; Open AGENT; origin colors |
 | AGENT | `check_shoot` | Done | SUB-BC: confirm → shoot? → batch camera; tap sub-barcode chip to remove |
-| To share cart | `share_cart` | Done | **Add all/selected to Design** + **Share all as files**; **parent + sub-barcode flavors** as separate rows (v2.4.5); origin color legend |
-| Design | `design` | Done | **Bottom nav** (brush); **To print** + **Done**; each cart flavor row independent (remove/copy by preselectionId) |
+| To share cart | `share_cart` | Done | Per-row footer: **Printed**, **Design** queue/done, **Telegram** sent; CSV price-change glow; Add all/selected to Design + Share as files |
+| Design | `design` | Done | **Bottom nav** (brush); tabs **À imprimer** / **Historique**; print exports under `exports/yyyy-MM-dd/`; batch detail reprint + glow on CSV changes |
 | Report | `report` | Done | **Settings → Report**; CSV changes with image + cart actions + Design shelf prints |
 | Work History | `history` | Done | **Settings → Work history**; records searched/scanned/cart/linked/sent actions |
 | Pre-selection | `preselection` | Legacy | Older print cart workflow |
@@ -33,8 +37,14 @@
 
 ## Bottom navigation
 
-Articles · **AGENT** · Batch txt · To share · **Design** · Settings
+**VisioPRO** · Articles · To shoot · **AGENT** · Batch txt · To share · **Design** · Settings
+
+**Swipe** the bottom bar horizontally to reach all tabs (each tab is 76dp wide — **VisioPRO** is leftmost).
+
+Fixed in **v2.6.3**: tabs no longer render off-screen (Material3 `NavigationBarItem` cannot live inside a scrolling `Row`).
 
 ## From Settings
 
 Work history · Report · Import CSV · Load IMAGE ASSETS · Re-index · **Import PARAY fingerprints** · Phone sync · Scanner
+
+(VisioPRO moved to bottom navigation — no longer under Settings.)

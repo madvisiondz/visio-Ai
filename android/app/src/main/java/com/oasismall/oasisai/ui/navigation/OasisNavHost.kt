@@ -1,15 +1,11 @@
 package com.oasismall.oasisai.ui.navigation
 
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -44,7 +40,8 @@ import com.oasismall.oasisai.ui.screens.history.WorkHistoryScreen
 import com.oasismall.oasisai.ui.screens.history.WorkHistoryViewModel
 import com.oasismall.oasisai.ui.screens.report.ReportScreen
 import com.oasismall.oasisai.ui.screens.report.ReportViewModel
-import com.oasismall.oasisai.ui.components.AgentNavIcon
+import com.oasismall.oasisai.ui.navigation.SwipeableBottomNavBar
+import com.oasismall.oasisai.ui.navigation.showMainBottomBar
 import com.oasismall.oasisai.ui.screens.cart.CartRoute
 import com.oasismall.oasisai.ui.screens.home.HomeScreen
 import com.oasismall.oasisai.ui.screens.home.HomeViewModel
@@ -73,55 +70,37 @@ import com.oasismall.oasisai.ui.screens.phonesync.PhoneSyncScreen
 import com.oasismall.oasisai.ui.screens.phonesync.PhoneSyncViewModel
 import com.oasismall.oasisai.ui.screens.scanner.ScannerScreen
 import com.oasismall.oasisai.ui.screens.scanner.ScannerViewModel
+import com.oasismall.oasisai.domain.visiopro.VisioProCategory
+import com.oasismall.oasisai.ui.screens.visiopro.VisioProCategoryScreen
+import com.oasismall.oasisai.ui.screens.visiopro.VisioProHomeScreen
+import com.oasismall.oasisai.ui.screens.visiopro.VisioProHomeViewModel
+import com.oasismall.oasisai.ui.screens.visiopro.VisioProViewModel
+import com.oasismall.oasisai.ui.screens.visiopro.designer.VisioProDesignerCanvasScreen
+import com.oasismall.oasisai.ui.screens.visiopro.designer.VisioProDesignerHubScreen
+import com.oasismall.oasisai.ui.screens.visiopro.designer.VisioProDesignerHubViewModel
+import com.oasismall.oasisai.ui.screens.visiopro.designer.VisioProDesignerViewModel
+import com.oasismall.oasisai.ui.screens.visiopro.settings.VisioProListEditorScreen
+import com.oasismall.oasisai.ui.screens.visiopro.settings.VisioProListEditorViewModel
+import com.oasismall.oasisai.ui.screens.settings.ImportantRayonsScreen
+import com.oasismall.oasisai.ui.screens.settings.ImportantRayonsViewModel
+import com.oasismall.oasisai.ui.screens.visiopro.settings.VisioProSettingsScreen
+import com.oasismall.oasisai.ui.screens.visiopro.settings.VisioProSettingsViewModel
 
 @Composable
 fun OasisNavHost(factory: OasisViewModelFactory) {
     val navController = rememberNavController()
     val backStack by navController.currentBackStackEntryAsState()
     val currentRoute = backStack?.destination?.route
-    val showBottomBar = bottomNavItems.any { item ->
-        currentRoute == item.route || currentRoute?.startsWith("${item.route}?") == true
-    }
+    val showBottomBar = showMainBottomBar(currentRoute)
 
     Scaffold(
         bottomBar = {
             if (showBottomBar) {
-                NavigationBar {
-                    bottomNavItems.forEach { item ->
-                        val selected = currentRoute == item.route ||
-                            (item.route == OasisRoute.CheckShoot.route &&
-                                currentRoute?.startsWith(OasisRoute.CheckShoot.route) == true)
-                        NavigationBarItem(
-                            selected = selected,
-                            onClick = {
-                                val dest = if (item.route == OasisRoute.CheckShoot.route) {
-                                    OasisRoute.CheckShoot.create()
-                                } else {
-                                    item.route
-                                }
-                                navController.navigate(dest) {
-                                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
-                            },
-                            icon = {
-                                if (item.useAgentIcon) {
-                                    AgentNavIcon(selected = selected)
-                                } else {
-                                    Icon(item.icon, contentDescription = item.label)
-                                }
-                            },
-                            label = { Text(item.label, maxLines = 1) },
-                            alwaysShowLabel = true,
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = MaterialTheme.colorScheme.primary,
-                                selectedTextColor = MaterialTheme.colorScheme.primary,
-                                indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
-                            ),
-                        )
-                    }
-                }
+                SwipeableBottomNavBar(
+                    items = bottomNavItems,
+                    currentRoute = currentRoute,
+                    navController = navController,
+                )
             }
         },
     ) { padding ->
@@ -156,6 +135,93 @@ fun OasisNavHost(factory: OasisViewModelFactory) {
                     onNavigateReport = { navController.navigate(OasisRoute.Report.route) },
                     onNavigateParayImport = { navController.navigate(OasisRoute.ParayImport.route) },
                     onNavigateParayHome = { navController.navigate(OasisRoute.ParayHome.route) },
+                    onNavigateVisioProSettings = { navController.navigate(OasisRoute.VisioProSettings.route) },
+                    onNavigateImportantRayons = { navController.navigate(OasisRoute.ImportantRayons.route) },
+                )
+            }
+            composable(OasisRoute.ImportantRayons.route) {
+                val vm: ImportantRayonsViewModel = viewModel(factory = factory)
+                ImportantRayonsScreen(
+                    viewModel = vm,
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable(OasisRoute.VisioProSettings.route) {
+                val vm: VisioProSettingsViewModel = viewModel(factory = factory)
+                VisioProSettingsScreen(
+                    viewModel = vm,
+                    onBack = { navController.popBackStack() },
+                    onOpenCategory = { category ->
+                        navController.navigate(OasisRoute.VisioProListEditor.create(category.name))
+                    },
+                )
+            }
+            composable(
+                OasisRoute.VisioProListEditor.route,
+                arguments = listOf(navArgument("category") { type = NavType.StringType }),
+            ) { entry ->
+                val categoryName = entry.arguments?.getString("category") ?: return@composable
+                val category = runCatching { VisioProCategory.valueOf(categoryName) }.getOrNull()
+                    ?: return@composable
+                val vm: VisioProListEditorViewModel = viewModel(
+                    factory = factory.visioProListEditorFactory(category),
+                )
+                VisioProListEditorScreen(
+                    viewModel = vm,
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable(OasisRoute.VisioProHome.route) {
+                val vm: VisioProHomeViewModel = viewModel(factory = factory)
+                val counts by vm.counts.collectAsStateWithLifecycle()
+                VisioProHomeScreen(
+                    categoryCounts = counts,
+                    onOpenCategory = { category ->
+                        navController.navigate(OasisRoute.VisioProCategory.create(category.name))
+                    },
+                    onOpenDesigner = {
+                        navController.navigate(OasisRoute.VisioProDesignerHub.route)
+                    },
+                )
+            }
+            composable(OasisRoute.VisioProDesignerHub.route) {
+                val hubVm: VisioProDesignerHubViewModel = viewModel(factory = factory)
+                VisioProDesignerHubScreen(
+                    viewModel = hubVm,
+                    onBack = { navController.popBackStack() },
+                    onOpenPreset = { key ->
+                        navController.navigate(OasisRoute.VisioProDesignerCanvas.create(key.name))
+                    },
+                )
+            }
+            composable(
+                OasisRoute.VisioProDesignerCanvas.route,
+                arguments = listOf(navArgument("presetKey") { type = NavType.StringType }),
+            ) { entry ->
+                val presetKeyName = entry.arguments?.getString("presetKey") ?: return@composable
+                val presetKey = runCatching {
+                    com.oasismall.oasisai.domain.visiopro.designer.VisioProPresetDesignKey.valueOf(presetKeyName)
+                }.getOrNull() ?: return@composable
+                val vm: com.oasismall.oasisai.ui.screens.visiopro.designer.VisioProDesignerViewModel = viewModel(
+                    factory = factory.visioProDesignerFactory(presetKey),
+                )
+                VisioProDesignerCanvasScreen(
+                    viewModel = vm,
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable(
+                OasisRoute.VisioProCategory.route,
+                arguments = listOf(navArgument("category") { type = NavType.StringType }),
+            ) { entry ->
+                val categoryName = entry.arguments?.getString("category") ?: return@composable
+                val category = runCatching { VisioProCategory.valueOf(categoryName) }.getOrNull()
+                    ?: return@composable
+                val vm: VisioProViewModel = viewModel(factory = factory)
+                VisioProCategoryScreen(
+                    category = category,
+                    viewModel = vm,
+                    onBack = { navController.popBackStack() },
                 )
             }
             composable(OasisRoute.ParayHome.route) {

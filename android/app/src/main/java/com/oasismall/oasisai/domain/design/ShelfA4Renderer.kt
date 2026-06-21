@@ -12,6 +12,9 @@ import com.oasismall.oasisai.domain.paray.ParayAgent
 import com.oasismall.oasisai.util.PriceFormatter
 import java.io.File
 import java.io.FileOutputStream
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlin.math.min
 
 /**
@@ -74,13 +77,24 @@ object ShelfA4Renderer {
             drawShelfTicket(canvas, col, row, item, paray)
         }
 
-        val name = "shelf_a4_p${pageIndex + 1}_${System.currentTimeMillis()}.jpg"
-        val out = File(exportsDir, name)
+        val name = buildExportFileName(pageIndex)
+        val dayDir = datedExportDir(exportsDir)
+        val out = File(dayDir, name)
         FileOutputStream(out).use { stream ->
             bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, stream)
         }
         bitmap.recycle()
         return out
+    }
+
+    fun datedExportDir(exportsRoot: File): File {
+        val dayFmt = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        return File(exportsRoot, dayFmt.format(Date())).also { it.mkdirs() }
+    }
+
+    fun buildExportFileName(pageIndex: Int, at: Date = Date()): String {
+        val timeFmt = SimpleDateFormat("HHmmss", Locale.US)
+        return "shelf_${timeFmt.format(at)}_p${pageIndex + 1}.jpg"
     }
 
     fun pageCount(itemCount: Int): Int =
@@ -107,7 +121,11 @@ object ShelfA4Renderer {
         canvas.drawRect(yellowRect, Paint().apply { color = YELLOW })
 
         drawDesignation(canvas, item.designation, yellowRect)
-        drawPriceBlock(canvas, item.price, yellowRect)
+        if (item.isPromoShelfTicket()) {
+            drawPromoPriceBlock(canvas, item, yellowRect)
+        } else {
+            drawRegularPriceBlock(canvas, item.shelfDisplayPrice(), yellowRect)
+        }
     }
 
     private fun drawDesignation(canvas: Canvas, designation: String, yellowRect: RectF) {
@@ -155,7 +173,7 @@ object ShelfA4Renderer {
         paint.textAlign = Paint.Align.LEFT
     }
 
-    private fun drawPriceBlock(canvas: Canvas, price: Double, yellowRect: RectF) {
+    private fun drawRegularPriceBlock(canvas: Canvas, price: Double, yellowRect: RectF) {
         val numberText = PriceFormatter.formatNumber(price)
         val daText = "DA"
 
@@ -185,6 +203,95 @@ object ShelfA4Renderer {
 
         canvas.drawText(numberText, startX, baselineY, pricePaint)
         canvas.drawText(daText, startX + pricePaint.measureText(numberText) + gap, baselineY, daPaint)
+    }
+
+    private fun drawPromoPriceBlock(canvas: Canvas, item: PreselectionWithArticle, yellowRect: RectF) {
+        val promoPrice = item.shelfDisplayPrice()
+        val originalPrice = item.shelfOriginalPrice() ?: run {
+            drawRegularPriceBlock(canvas, promoPrice, yellowRect)
+            return
+        }
+
+        val numberText = PriceFormatter.formatNumber(promoPrice)
+        val daText = "DA"
+        val origNumber = PriceFormatter.formatNumber(originalPrice)
+        val origDa = "da"
+
+        var priceSize = yellowRect.height() * 0.52f
+        val promoPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = PRICE_RED
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        }
+        val promoDaPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = PRICE_RED
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        }
+
+        var origSize = priceSize * 0.38f
+        val origPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.BLACK
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        }
+        val origDaPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.BLACK
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        }
+
+        repeat(40) {
+            promoPaint.textSize = priceSize
+            promoDaPaint.textSize = priceSize * 0.42f
+            origSize = priceSize * 0.38f
+            origPaint.textSize = origSize
+            origDaPaint.textSize = origSize * 0.85f
+            val promoGap = priceSize * 0.08f
+            val promoW = promoPaint.measureText(numberText) + promoGap + promoDaPaint.measureText(daText)
+            val origGap = origSize * 0.06f
+            val origW = origPaint.measureText(origNumber) + origGap + origDaPaint.measureText(origDa)
+            val combined = promoW + mmToPx(2.5f) + origW
+            if (combined <= yellowRect.width() - mmToPx(3f)) return@repeat
+            priceSize -= 2f
+        }
+
+        val promoGap = priceSize * 0.08f
+        val promoW = promoPaint.measureText(numberText) + promoGap + promoDaPaint.measureText(daText)
+        val origGap = origSize * 0.06f
+        val origW = origPaint.measureText(origNumber) + origGap + origDaPaint.measureText(origDa)
+        val betweenPrices = mmToPx(2.5f)
+        val combinedW = promoW + betweenPrices + origW
+
+        // Slightly left of center — promo + barré read as one price cluster.
+        val blockStartX = yellowRect.left + (yellowRect.width() - combinedW) / 2f - mmToPx(4f)
+        val promoBaselineY = yellowRect.top + yellowRect.height() * 0.8f
+        val origBaselineY = yellowRect.top + yellowRect.height() * 0.56f
+
+        canvas.drawText(numberText, blockStartX, promoBaselineY, promoPaint)
+        canvas.drawText(
+            daText,
+            blockStartX + promoPaint.measureText(numberText) + promoGap,
+            promoBaselineY,
+            promoDaPaint,
+        )
+
+        val origStartX = blockStartX + promoW + betweenPrices
+        canvas.drawText(origNumber, origStartX, origBaselineY, origPaint)
+        canvas.drawText(
+            origDa,
+            origStartX + origPaint.measureText(origNumber) + origGap,
+            origBaselineY,
+            origDaPaint,
+        )
+
+        val strikePad = origSize * 0.12f
+        val strikeLeft = origStartX - strikePad
+        val strikeRight = origStartX + origW + strikePad
+        val strikeTop = origBaselineY - origSize * 1.05f
+        val strikeBottom = origBaselineY + origSize * 0.12f
+        val strikePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = PRICE_RED
+            strokeWidth = (origSize * 0.14f).coerceAtLeast(mmToPx(0.35f))
+            strokeCap = Paint.Cap.ROUND
+        }
+        canvas.drawLine(strikeLeft, strikeBottom, strikeRight, strikeTop, strikePaint)
     }
 
     private fun drawProductImage(

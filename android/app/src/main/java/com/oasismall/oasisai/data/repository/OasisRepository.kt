@@ -25,6 +25,9 @@ import com.oasismall.oasisai.data.model.ArticleChangeStatus
 import com.oasismall.oasisai.data.model.CartType
 import com.oasismall.oasisai.data.model.PrintBatchStatus
 import com.oasismall.oasisai.data.model.TemplateType
+import com.oasismall.oasisai.domain.design.DesignCartExpand
+import com.oasismall.oasisai.domain.settings.ImportantRayonsConfig
+import com.oasismall.oasisai.domain.settings.ImportantRayonsStore
 import com.oasismall.oasisai.util.BarcodeSuffixMatcher
 import com.oasismall.oasisai.util.NameNormalizer
 import com.oasismall.oasisai.util.SearchQuery
@@ -42,46 +45,117 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import java.io.File
 
-class OasisRepository(private val db: OasisDatabase) {
+class OasisRepository(
+    private val db: OasisDatabase,
+    private val importantRayonsStore: ImportantRayonsStore,
+) {
 
-    fun observeDashboardStats(): Flow<DashboardStats> {
-        val core = combine(
-            db.articleDao().observeActiveCount(),
-            db.articleDao().observeNeedsTicketCount(),
-            db.productImageDao().observeMissingCount(),
-        ) { activeCount, needsTicket, missingImages ->
-            Triple(activeCount, needsTicket, missingImages)
-        }
-        return combine(
-            core,
-            db.preselectionDao().observeCount(CartType.PHOTOSHOOT.name),
-            db.preselectionDao().observeCount(CartType.SHARE.name),
-            observePrintBatches(),
-        ) { triple, photoshootCount, shareCount, batches ->
-            val (activeCount, needsTicket, missingImages) = triple
-            val now = System.currentTimeMillis()
-            DashboardStats(
-                totalArticles = activeCount,
-                activeArticles = activeCount,
-                needsTicket = needsTicket,
-                missingImages = missingImages,
-                preselectionCount = photoshootCount + shareCount,
-                activePromos = batches.count { it.isPromo && (it.promoEnd ?: 0) >= now },
-                expiredPromos = batches.count { it.isPromo && (it.promoEnd ?: Long.MAX_VALUE) < now },
-            )
-        }
+    val importantRayonsConfig: Flow<ImportantRayonsConfig> = importantRayonsStore.config
+
+    fun matchesImportantRayon(rayon: String?, config: ImportantRayonsConfig = importantRayonsStore.config.value): Boolean {
+        val filter = importantRayonFilter(config) ?: return true
+        if (rayon.isNullOrBlank()) return false
+        val normalized = NameNormalizer.normalize(rayon)
+        return filter.any { NameNormalizer.normalize(it) == normalized }
     }
 
+    private fun importantRayonFilter(config: ImportantRayonsConfig): Set<String>? =
+        if (config.configured && config.selectedRayons.isNotEmpty()) config.selectedRayons else null
+
+    private fun <T> Flow<List<T>>.filterByImportantRayon(selector: (T) -> String?): Flow<List<T>> =
+        importantRayonsStore.config.flatMapLatest { config ->
+            map { items ->
+                val filter = importantRayonFilter(config) ?: return@map items
+                items.filter { matchesImportantRayon(selector(it), config) }
+            }
+        }
+
     @OptIn(ExperimentalCoroutinesApi::class)
-    fun observeArticles(query: String): Flow<List<ArticleWithImage>> {
-        val search = SearchQuery.prepare(query) ?: return flowOf(emptyList())
-        return db.articleDao().searchWithImages(search.sqlPattern).flatMapLatest { articles ->
+    fun observeDashboardStats(): Flow<DashboardStats> =
+        importantRayonsStore.config.flatMapLatest { config ->
+            val rayons = importantRayonFilter(config)?.toList()
+            val core: Flow<Triple<Int, Int, Int>> = if (rayons == null) {
+                combine(
+                    db.articleDao().observeActiveCount(),
+                    db.articleDao().observeNeedsTicketCount(),
+                    db.productImageDao().observeMissingCount(),
+                ) { activeCount: Int, needsTicket: Int, missingImages: Int ->
+                    Triple(activeCount, needsTicket, missingImages)
+                }
+            } else {
+                combine(
+                    db.articleDao().observeActiveCountInRayons(rayons),
+                    db.articleDao().observeNeedsTicketCountInRayons(rayons),
+                    db.articleDao().observeMissingCountInRayons(rayons),
+                ) { activeCount: Int, needsTicket: Int, missingImages: Int ->
+                    Triple(activeCount, needsTicket, missingImages)
+                }
+            }
+            combine(
+                core,
+                db.preselectionDao().observeCount(CartType.PHOTOSHOOT.name),
+                db.preselectionDao().observeCount(CartType.SHARE.name),
+                observePrintBatches(),
+            ) { triple, photoshootCount, shareCount, batches ->
+                val (activeCount, needsTicket, missingImages) = triple
+                val now = System.currentTimeMillis()
+                DashboardStats(
+                    totalArticles = activeCount,
+                    activeArticles = activeCount,
+                    needsTicket = needsTicket,
+                    missingImages = missingImages,
+                    preselectionCount = photoshootCount + shareCount,
+                    activePromos = batches.count { it.isPromo && (it.promoEnd ?: 0) >= now },
+                    expiredPromos = batches.count { it.isPromo && (it.promoEnd ?: Long.MAX_VALUE) < now },
+                )
+            }
+        }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun observeDistinctRayons(): Flow<List<String>> =
+        combine(
+            db.articleDao().observeDistinctRayons(),
+            importantRayonsStore.config,
+        ) { all, config ->
+            val filter = importantRayonFilter(config) ?: return@combine all
+            all.filter { rayon -> filter.any { NameNormalizer.normalize(it) == NameNormalizer.normalize(rayon) } }
+        }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun observeAllDistinctRayons(): Flow<List<String>> =
+        db.articleDao().observeDistinctRayons()
+
+    suspend fun saveImportantRayons(selectedRayons: Set<String>) {
+        importantRayonsStore.save(selectedRayons)
+    }
+
+    suspend fun getImportantRayonsConfig(): ImportantRayonsConfig =
+        importantRayonsStore.getConfig()
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun observeArticles(query: String, rayon: String? = null): Flow<List<ArticleWithImage>> {
+        val trimmed = query.trim()
+        if (trimmed.isBlank()) {
+            if (rayon.isNullOrBlank()) return flowOf(emptyList())
+            return db.articleDao().listWithImagesByRayon(rayon).flatMapLatest { articles ->
+                flow {
+                    emit(articles.sortedBy { it.designation })
+                }.flowOn(Dispatchers.IO)
+            }
+        }
+        val search = SearchQuery.prepare(trimmed) ?: return flowOf(emptyList())
+        val source = if (rayon.isNullOrBlank()) {
+            db.articleDao().searchWithImages(search.sqlPattern)
+        } else {
+            db.articleDao().searchWithImagesInRayon(search.sqlPattern, rayon)
+        }
+        return source.flatMapLatest { articles ->
             flow {
                 val results = runCatching { buildSearchResults(articles, search) }
                     .getOrElse { fallbackSearchResults(articles, search) }
                 emit(results)
             }.flowOn(Dispatchers.IO)
-        }
+        }.filterByImportantRayon { it.rayon }
     }
 
     private suspend fun buildSearchResults(
@@ -149,18 +223,124 @@ class OasisRepository(private val db: OasisDatabase) {
             .take(limit)
     }
 
-    fun observeNeedsTicket(): Flow<List<ArticleWithImage>> = db.articleDao().observeNeedsTicket()
-    fun observeMissingImages(): Flow<List<ArticleWithImage>> = db.articleDao().observeMissingImages()
+    /** VisioPRO — CSV price by barcode suffix (3 digits), exact designation, then keyword search. */
+    suspend fun findPriceForVisioProArticle(
+        csvDesignation: String,
+        barcodeSuffix: String?,
+        keywords: List<String>,
+    ): Double? {
+        barcodeSuffix?.takeIf { it.length == 3 }?.let { suffix ->
+            db.articleDao().findByBarcodePartial(suffix, "").firstOrNull { article ->
+                article.barcode.filter { it.isDigit() }.takeLast(3) == suffix
+            }?.price?.let { return it }
+        }
+        getArticleWithImageByDesignation(csvDesignation)?.price?.let { return it }
+        return findPriceByDesignationKeywords(keywords)
+    }
+
+    suspend fun findArticleIdForVisioPro(
+        csvDesignation: String,
+        barcodeSuffix: String?,
+        keywords: List<String>,
+    ): Long? {
+        barcodeSuffix?.takeIf { it.length == 3 }?.let { suffix ->
+            db.articleDao().findByBarcodePartial(suffix, "").firstOrNull { article ->
+                article.barcode.filter { it.isDigit() }.takeLast(3) == suffix
+            }?.id?.let { return it }
+        }
+        getArticleWithImageByDesignation(csvDesignation)?.id?.let { return it }
+        for (keyword in keywords) {
+            val normalized = NameNormalizer.normalize(keyword)
+            if (normalized.isNotBlank()) {
+                db.articleDao().getByNormalizedName(normalized).firstOrNull()?.id?.let { return it }
+            }
+            searchArticlesForPicker(keyword, limit = 5).firstOrNull()?.id?.let { return it }
+        }
+        return null
+    }
+
+    suspend fun resolveRayonLabel(targetRayon: String): String = withContext(Dispatchers.IO) {
+        val normalizedTarget = NameNormalizer.normalize(targetRayon)
+        db.articleDao().getDistinctRayonsSync()
+            .firstOrNull { NameNormalizer.normalize(it) == normalizedTarget }
+            ?: targetRayon
+    }
+
+    suspend fun listArticlesInRayon(rayonLabel: String): List<ArticleWithImage> = withContext(Dispatchers.IO) {
+        val normalizedTarget = NameNormalizer.normalize(rayonLabel)
+        val matchingRayons = db.articleDao().getDistinctRayonsSync()
+            .filter { NameNormalizer.normalize(it) == normalizedTarget }
+        val rayons = when {
+            matchingRayons.isNotEmpty() -> matchingRayons
+            else -> listOf(resolveRayonLabel(rayonLabel))
+        }.distinct()
+        if (rayons.isEmpty()) return@withContext emptyList()
+        db.articleDao().listAllWithImagesByRayons(rayons)
+            .distinctBy { it.id }
+            .sortedBy { it.designation.lowercase() }
+    }
+
+    suspend fun getArticlesWithImagesByIds(ids: List<Long>): List<ArticleWithImage> {
+        if (ids.isEmpty()) return emptyList()
+        return withContext(Dispatchers.IO) {
+            db.articleDao().getWithImagesByIds(ids)
+        }
+    }
+
+    /** VisioPRO — first CSV price match from designation keywords (exact normalized name, then search). */
+    suspend fun findPriceByDesignationKeywords(keywords: List<String>): Double? {
+        for (keyword in keywords) {
+            val normalized = NameNormalizer.normalize(keyword)
+            if (normalized.isNotBlank()) {
+                db.articleDao().getByNormalizedName(normalized).firstOrNull()?.price?.let { return it }
+            }
+            val picked = searchArticlesForPicker(keyword, limit = 5).firstOrNull()
+            if (picked != null) return picked.price
+        }
+        return null
+    }
+
+    suspend fun findArticleImageForKeywords(keywords: List<String>): ArticleWithImage? {
+        for (keyword in keywords) {
+            val normalized = NameNormalizer.normalize(keyword)
+            if (normalized.isNotBlank()) {
+                db.articleDao().getByNormalizedName(normalized).firstOrNull()?.id?.let { id ->
+                    db.articleDao().getWithImageById(id)?.let { return it }
+                }
+            }
+            searchArticlesForPicker(keyword, limit = 3).firstOrNull { it.imagePath != null }?.let { return it }
+        }
+        return null
+    }
+
+    fun observeNeedsTicket(): Flow<List<ArticleWithImage>> =
+        db.articleDao().observeNeedsTicket().filterByImportantRayon { it.rayon }
+
+    fun observeMissingImages(): Flow<List<ArticleWithImage>> =
+        db.articleDao().observeMissingImages().filterByImportantRayon { it.rayon }
 
     fun observeMissingImagesLimited(): Flow<List<ArticleWithImage>> =
-        db.articleDao().observeMissingImagesLimited()
+        db.articleDao().observeMissingImagesLimited().filterByImportantRayon { it.rayon }
 
     fun searchMissingImages(query: String): Flow<List<ArticleWithImage>> =
         db.articleDao().searchMissingImages(SearchQuery.escapeLikePattern(query))
+            .filterByImportantRayon { it.rayon }
 
-    fun observeMissingImageCount(): Flow<Int> = db.productImageDao().observeMissingCount()
-    fun observeNewArticles(): Flow<List<ArticleWithImage>> = db.articleDao().observeNewArticles()
-    fun observePriceChanged(): Flow<List<ArticleWithImage>> = db.articleDao().observePriceChanged()
+    fun observeMissingImageCount(): Flow<Int> =
+        importantRayonsStore.config.flatMapLatest { config ->
+            val rayons = importantRayonFilter(config)?.toList()
+            if (rayons == null) {
+                db.productImageDao().observeMissingCount()
+            } else {
+                db.articleDao().observeMissingCountInRayons(rayons)
+            }
+        }
+
+    fun observeNewArticles(): Flow<List<ArticleWithImage>> =
+        db.articleDao().observeNewArticles().filterByImportantRayon { it.rayon }
+
+    fun observePriceChanged(): Flow<List<ArticleWithImage>> =
+        db.articleDao().observePriceChanged().filterByImportantRayon { it.rayon }
     fun observeImports(): Flow<List<ImportEntity>> = db.importDao().observeAll()
     fun observeImportChanges(importId: Long): Flow<List<ImportChangeEntity>> =
         db.importChangeDao().observeByImport(importId)
@@ -575,6 +755,29 @@ class OasisRepository(private val db: OasisDatabase) {
         db.preselectionDao().updateCopyCountById(preselectionId, next)
     }
 
+    suspend fun setDesignPromoTicket(preselectionId: Long, enabled: Boolean) {
+        val item = db.preselectionDao().getById(preselectionId) ?: return
+        if (!enabled) {
+            db.preselectionDao().updatePromoTicket(preselectionId, false, null, null)
+            return
+        }
+        val article = db.articleDao().getById(item.articleId)
+        val original = item.promoOriginalPrice ?: article?.price
+        val promo = item.promoPrice ?: article?.previousPrice ?: article?.price
+        db.preselectionDao().updatePromoTicket(preselectionId, true, promo, original)
+    }
+
+    suspend fun updateDesignPromoPrices(
+        preselectionId: Long,
+        promoPrice: Double,
+        originalPrice: Double,
+    ) {
+        if (promoPrice < 0 || originalPrice < 0) return
+        val item = db.preselectionDao().getById(preselectionId) ?: return
+        db.preselectionDao().updatePromoTicket(preselectionId, true, promoPrice, originalPrice)
+        updateArticlePrice(item.articleId, promoPrice)
+    }
+
     suspend fun moveDesignItemsToDone(preselectionIds: List<Long>) {
         if (preselectionIds.isEmpty()) return
         val idSet = preselectionIds.toSet()
@@ -697,27 +900,82 @@ class OasisRepository(private val db: OasisDatabase) {
         items: List<PreselectionWithArticle>,
     ): Long {
         if (items.isEmpty()) return -1L
+        val labelCount = DesignCartExpand.labelCount(items)
         return createPrintBatch(
             batch = PrintBatchEntity(
                 templateId = null,
-                templateName = "Design — Shelf A4 12-up (page ${pageIndex + 1})",
+                templateName = "Design — Shelf A4 12-up",
                 exportPath = exportPath,
                 previewPath = exportPath,
                 status = PrintBatchStatus.GENERATED.name,
-                itemCount = items.size,
+                itemCount = labelCount,
+                pageIndex = pageIndex,
             ),
             items = items.mapIndexed { index, item ->
                 PrintBatchItemEntity(
                     batchId = 0,
                     articleId = item.articleId,
                     designationSnapshot = item.designation,
-                    priceSnapshot = item.price,
+                    priceSnapshot = if (item.isPromoTicket) {
+                        item.promoPrice ?: item.price
+                    } else {
+                        item.price
+                    },
                     barcodeSnapshot = item.barcode,
                     imageSnapshotPath = item.imagePath,
                     sortOrder = index,
+                    copyCountSnapshot = item.copyCount.coerceIn(1, 99),
+                    isPromoSnapshot = item.isPromoTicket,
+                    promoPriceSnapshot = item.promoPrice,
+                    promoOriginalSnapshot = item.promoOriginalPrice,
+                    variantBarcodeSnapshot = item.variantBarcode,
                 )
             },
         )
+    }
+
+    suspend fun enrichDesignBatchItems(items: List<PrintBatchItemEntity>): List<com.oasismall.oasisai.domain.design.DesignBatchItemUi> =
+        items.map { snap ->
+            val live = snap.articleId?.let { getArticleWithImageById(it) }
+            com.oasismall.oasisai.domain.design.DesignBatchItemUi(
+                batchItemId = snap.id,
+                articleId = snap.articleId,
+                designation = live?.designation ?: snap.designationSnapshot,
+                barcode = live?.barcode ?: snap.barcodeSnapshot,
+                variantBarcode = snap.variantBarcodeSnapshot,
+                price = live?.price ?: snap.priceSnapshot,
+                previousPrice = live?.previousPrice,
+                priceAtPrint = snap.priceSnapshot,
+                copyCount = snap.copyCountSnapshot.coerceIn(1, 99),
+                isPromoTicket = snap.isPromoSnapshot,
+                promoPrice = snap.promoPriceSnapshot ?: live?.price,
+                promoOriginalPrice = snap.promoOriginalSnapshot,
+                imagePath = live?.imagePath ?: snap.imageSnapshotPath,
+                changeStatus = live?.changeStatus ?: ArticleChangeStatus.UNCHANGED.name,
+                needsTicketUpdate = live?.needsTicketUpdate ?: false,
+            )
+        }
+
+    suspend fun restoreBatchItemToDesign(item: com.oasismall.oasisai.domain.design.DesignBatchItemUi) {
+        val articleId = item.articleId ?: return
+        addToCart(articleId, CartType.DESIGN, item.variantBarcode)
+        val pre = db.preselectionDao().getItem(articleId, CartType.DESIGN.name, item.variantBarcode)
+        pre?.let { row ->
+            db.preselectionDao().updateCopyCountById(row.id, item.copyCount.coerceIn(1, 99))
+            if (item.isPromoTicket) {
+                db.preselectionDao().updatePromoTicket(
+                    row.id,
+                    isPromo = true,
+                    promoPrice = item.promoPrice,
+                    originalPrice = item.promoOriginalPrice,
+                )
+            }
+        }
+    }
+
+    suspend fun restoreBatchItemToShare(item: com.oasismall.oasisai.domain.design.DesignBatchItemUi) {
+        val articleId = item.articleId ?: return
+        addToCart(articleId, CartType.SHARE, item.variantBarcode)
     }
 
     suspend fun updatePrintBatchStatus(batchId: Long, status: String) {

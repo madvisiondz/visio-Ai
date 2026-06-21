@@ -35,6 +35,9 @@ data class ArticleEntity(
     val codeart: String? = null,
     val reference: String? = null,
     val category: String? = null,
+    /** Gestium Rayon (department) — Articles filter. */
+    val rayon: String? = null,
+    val famille: String? = null,
     val brand: String? = null,
     val stock: Double? = null,
     val unit: String? = null,
@@ -188,6 +191,10 @@ data class PreselectionItemEntity(
     val intendedTemplateType: String? = null,
     /** Shelf labels to print per article (Design queue only). */
     val copyCount: Int = 1,
+    /** Promo/discount shelf ticket — shows promo + prix-barrée original. */
+    val isPromoTicket: Boolean = false,
+    val promoPrice: Double? = null,
+    val promoOriginalPrice: Double? = null,
 )
 
 @Entity(tableName = "print_templates")
@@ -225,6 +232,7 @@ data class PrintBatchEntity(
     val campaignName: String? = null,
     val status: String,
     val itemCount: Int = 0,
+    val pageIndex: Int = 0,
 )
 
 @Entity(
@@ -254,6 +262,11 @@ data class PrintBatchItemEntity(
     val barcodeSnapshot: String,
     val imageSnapshotPath: String? = null,
     val sortOrder: Int = 0,
+    val copyCountSnapshot: Int = 1,
+    val isPromoSnapshot: Boolean = false,
+    val promoPriceSnapshot: Double? = null,
+    val promoOriginalSnapshot: Double? = null,
+    val variantBarcodeSnapshot: String = "",
 )
 
 /** Extra barcodes for one article (same product suffix, different store prefix). */

@@ -33,6 +33,7 @@ data class ArticleWithImage(
     val previousPrice: Double?,
     val reference: String?,
     val category: String?,
+    val rayon: String? = null,
     val brand: String?,
     val stock: Double?,
     val unit: String?,
@@ -64,6 +65,14 @@ data class PreselectionWithArticle(
     val imageCreatedAt: Long?,
     val imageLastSentAt: Long?,
     val copyCount: Int = 1,
+    val isPromoTicket: Boolean = false,
+    val promoPrice: Double? = null,
+    val promoOriginalPrice: Double? = null,
+    val changeStatus: String = "UNCHANGED",
+    val needsTicketUpdate: Boolean = false,
+    val lastPrintedAt: Long? = null,
+    val inDesignQueue: Boolean = false,
+    val inDesignDone: Boolean = false,
 )
 
 data class ImageHistoryItem(
@@ -130,7 +139,7 @@ interface ArticleDao {
     @Query(
         """
         SELECT a.id, a.barcode, a.designation, a.normalizedName, a.price, a.previousPrice,
-               a.reference, a.category, a.brand, a.stock, a.unit, a.changeStatus,
+               a.reference, a.category, a.rayon, a.brand, a.stock, a.unit, a.changeStatus,
                a.isActive, a.needsTicketUpdate, a.rawData,
                (SELECT p.imagePath FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imagePath,
                (SELECT p.imageStatus FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imageStatus,
@@ -152,7 +161,128 @@ interface ArticleDao {
     @Query(
         """
         SELECT a.id, a.barcode, a.designation, a.normalizedName, a.price, a.previousPrice,
-               a.reference, a.category, a.brand, a.stock, a.unit, a.changeStatus,
+               a.reference, a.category, a.rayon, a.brand, a.stock, a.unit, a.changeStatus,
+               a.isActive, a.needsTicketUpdate, a.rawData,
+               (SELECT p.imagePath FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imagePath,
+               (SELECT p.imageStatus FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imageStatus,
+               (SELECT p.createdAt FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imageCreatedAt,
+               (SELECT p.lastSentAt FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imageLastSentAt
+        FROM articles a
+        WHERE a.isActive = 1 AND (
+            a.designation LIKE '%' || :query || '%' ESCAPE '\'
+            OR a.normalizedName LIKE '%' || :query || '%' ESCAPE '\'
+            OR a.barcode LIKE '%' || :query || '%' ESCAPE '\'
+            OR a.codeart LIKE '%' || :query || '%' ESCAPE '\'
+        )
+        AND a.rayon = :rayon
+        ORDER BY a.designation ASC
+        LIMIT 200
+        """,
+    )
+    fun searchWithImagesInRayon(query: String, rayon: String): Flow<List<ArticleWithImage>>
+
+    @Query(
+        """
+        SELECT a.id, a.barcode, a.designation, a.normalizedName, a.price, a.previousPrice,
+               a.reference, a.category, a.rayon, a.brand, a.stock, a.unit, a.changeStatus,
+               a.isActive, a.needsTicketUpdate, a.rawData,
+               (SELECT p.imagePath FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imagePath,
+               (SELECT p.imageStatus FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imageStatus,
+               (SELECT p.createdAt FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imageCreatedAt,
+               (SELECT p.lastSentAt FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imageLastSentAt
+        FROM articles a
+        WHERE a.isActive = 1 AND a.rayon = :rayon
+        ORDER BY a.designation ASC
+        LIMIT 200
+        """,
+    )
+    fun listWithImagesByRayon(rayon: String): Flow<List<ArticleWithImage>>
+
+    @Query(
+        """
+        SELECT DISTINCT rayon FROM articles
+        WHERE isActive = 1 AND rayon IS NOT NULL AND trim(rayon) != ''
+        ORDER BY rayon COLLATE NOCASE ASC
+        """,
+    )
+    fun observeDistinctRayons(): Flow<List<String>>
+
+    @Query(
+        """
+        SELECT rayon FROM articles
+        WHERE isActive = 1 AND rayon IS NOT NULL AND trim(rayon) != ''
+        GROUP BY rayon
+        """,
+    )
+    suspend fun getDistinctRayonsSync(): List<String>
+
+    @Query(
+        """
+        SELECT a.id, a.barcode, a.designation, a.normalizedName, a.price, a.previousPrice,
+               a.reference, a.category, a.rayon, a.brand, a.stock, a.unit, a.changeStatus,
+               a.isActive, a.needsTicketUpdate, a.rawData,
+               (SELECT p.imagePath FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imagePath,
+               (SELECT p.imageStatus FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imageStatus,
+               (SELECT p.createdAt FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imageCreatedAt,
+               (SELECT p.lastSentAt FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imageLastSentAt
+        FROM articles a
+        WHERE a.isActive = 1 AND a.rayon = :rayon
+        ORDER BY a.designation COLLATE NOCASE ASC
+        """,
+    )
+    suspend fun listAllWithImagesByRayon(rayon: String): List<ArticleWithImage>
+
+    @Query(
+        """
+        SELECT a.id, a.barcode, a.designation, a.normalizedName, a.price, a.previousPrice,
+               a.reference, a.category, a.rayon, a.brand, a.stock, a.unit, a.changeStatus,
+               a.isActive, a.needsTicketUpdate, a.rawData,
+               (SELECT p.imagePath FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imagePath,
+               (SELECT p.imageStatus FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imageStatus,
+               (SELECT p.createdAt FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imageCreatedAt,
+               (SELECT p.lastSentAt FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imageLastSentAt
+        FROM articles a
+        WHERE a.isActive = 1 AND a.rayon IN (:rayons)
+        ORDER BY a.designation COLLATE NOCASE ASC
+        """,
+    )
+    suspend fun listAllWithImagesByRayons(rayons: List<String>): List<ArticleWithImage>
+
+    @Query(
+        """
+        SELECT a.id, a.barcode, a.designation, a.normalizedName, a.price, a.previousPrice,
+               a.reference, a.category, a.rayon, a.brand, a.stock, a.unit, a.changeStatus,
+               a.isActive, a.needsTicketUpdate, a.rawData,
+               (SELECT p.imagePath FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imagePath,
+               (SELECT p.imageStatus FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imageStatus,
+               (SELECT p.createdAt FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imageCreatedAt,
+               (SELECT p.lastSentAt FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imageLastSentAt
+        FROM articles a
+        WHERE a.isActive = 1 AND a.id IN (:ids)
+        """,
+    )
+    suspend fun getWithImagesByIds(ids: List<Long>): List<ArticleWithImage>
+
+    @Query(
+        """
+        SELECT a.id, a.barcode, a.designation, a.normalizedName, a.price, a.previousPrice,
+               a.reference, a.category, a.rayon, a.brand, a.stock, a.unit, a.changeStatus,
+               a.isActive, a.needsTicketUpdate, a.rawData,
+               (SELECT p.imagePath FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imagePath,
+               (SELECT p.imageStatus FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imageStatus,
+               (SELECT p.createdAt FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imageCreatedAt,
+               (SELECT p.lastSentAt FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imageLastSentAt
+        FROM articles a
+        WHERE a.isActive = 1 AND a.id = :id
+        LIMIT 1
+        """,
+    )
+    suspend fun getWithImageByIdSync(id: Long): ArticleWithImage?
+
+    @Query(
+        """
+        SELECT a.id, a.barcode, a.designation, a.normalizedName, a.price, a.previousPrice,
+               a.reference, a.category, a.rayon, a.brand, a.stock, a.unit, a.changeStatus,
                a.isActive, a.needsTicketUpdate, a.rawData,
                (SELECT p.imagePath FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imagePath,
                (SELECT p.imageStatus FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imageStatus,
@@ -168,7 +298,7 @@ interface ArticleDao {
     @Query(
         """
         SELECT a.id, a.barcode, a.designation, a.normalizedName, a.price, a.previousPrice,
-               a.reference, a.category, a.brand, a.stock, a.unit, a.changeStatus,
+               a.reference, a.category, a.rayon, a.brand, a.stock, a.unit, a.changeStatus,
                a.isActive, a.needsTicketUpdate, a.rawData,
                (SELECT p.imagePath FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imagePath,
                (SELECT p.imageStatus FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imageStatus,
@@ -189,7 +319,7 @@ interface ArticleDao {
     @Query(
         """
         SELECT a.id, a.barcode, a.designation, a.normalizedName, a.price, a.previousPrice,
-               a.reference, a.category, a.brand, a.stock, a.unit, a.changeStatus,
+               a.reference, a.category, a.rayon, a.brand, a.stock, a.unit, a.changeStatus,
                a.isActive, a.needsTicketUpdate, a.rawData,
                (SELECT p.imagePath FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imagePath,
                (SELECT p.imageStatus FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imageStatus,
@@ -211,7 +341,7 @@ interface ArticleDao {
     @Query(
         """
         SELECT a.id, a.barcode, a.designation, a.normalizedName, a.price, a.previousPrice,
-               a.reference, a.category, a.brand, a.stock, a.unit, a.changeStatus,
+               a.reference, a.category, a.rayon, a.brand, a.stock, a.unit, a.changeStatus,
                a.isActive, a.needsTicketUpdate, a.rawData,
                (SELECT p.imagePath FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imagePath,
                (SELECT p.imageStatus FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imageStatus,
@@ -232,7 +362,7 @@ interface ArticleDao {
     @Query(
         """
         SELECT a.id, a.barcode, a.designation, a.normalizedName, a.price, a.previousPrice,
-               a.reference, a.category, a.brand, a.stock, a.unit, a.changeStatus,
+               a.reference, a.category, a.rayon, a.brand, a.stock, a.unit, a.changeStatus,
                a.isActive, a.needsTicketUpdate, a.rawData,
                (SELECT p.imagePath FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imagePath,
                (SELECT p.imageStatus FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imageStatus,
@@ -289,7 +419,7 @@ interface ArticleDao {
     @Query(
         """
         SELECT a.id, a.barcode, a.designation, a.normalizedName, a.price, a.previousPrice,
-               a.reference, a.category, a.brand, a.stock, a.unit, a.changeStatus,
+               a.reference, a.category, a.rayon, a.brand, a.stock, a.unit, a.changeStatus,
                a.isActive, a.needsTicketUpdate, a.rawData,
                (SELECT p.imagePath FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imagePath,
                (SELECT p.imageStatus FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imageStatus,
@@ -305,7 +435,7 @@ interface ArticleDao {
     @Query(
         """
         SELECT a.id, a.barcode, a.designation, a.normalizedName, a.price, a.previousPrice,
-               a.reference, a.category, a.brand, a.stock, a.unit, a.changeStatus,
+               a.reference, a.category, a.rayon, a.brand, a.stock, a.unit, a.changeStatus,
                a.isActive, a.needsTicketUpdate, a.rawData,
                (SELECT p.imagePath FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imagePath,
                (SELECT p.imageStatus FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imageStatus,
@@ -321,7 +451,7 @@ interface ArticleDao {
     @Query(
         """
         SELECT a.id, a.barcode, a.designation, a.normalizedName, a.price, a.previousPrice,
-               a.reference, a.category, a.brand, a.stock, a.unit, a.changeStatus,
+               a.reference, a.category, a.rayon, a.brand, a.stock, a.unit, a.changeStatus,
                a.isActive, a.needsTicketUpdate, a.rawData,
                (SELECT p.imagePath FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imagePath,
                (SELECT p.imageStatus FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imageStatus,
@@ -337,7 +467,7 @@ interface ArticleDao {
     @Query(
         """
         SELECT a.id, a.barcode, a.designation, a.normalizedName, a.price, a.previousPrice,
-               a.reference, a.category, a.brand, a.stock, a.unit, a.changeStatus,
+               a.reference, a.category, a.rayon, a.brand, a.stock, a.unit, a.changeStatus,
                a.isActive, a.needsTicketUpdate, a.rawData,
                (SELECT p.imagePath FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imagePath,
                (SELECT p.imageStatus FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imageStatus,
@@ -357,7 +487,7 @@ interface ArticleDao {
     @Query(
         """
         SELECT a.id, a.barcode, a.designation, a.normalizedName, a.price, a.previousPrice,
-               a.reference, a.category, a.brand, a.stock, a.unit, a.changeStatus,
+               a.reference, a.category, a.rayon, a.brand, a.stock, a.unit, a.changeStatus,
                a.isActive, a.needsTicketUpdate, a.rawData,
                (SELECT p.imagePath FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imagePath,
                (SELECT p.imageStatus FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imageStatus,
@@ -379,7 +509,7 @@ interface ArticleDao {
     @Query(
         """
         SELECT a.id, a.barcode, a.designation, a.normalizedName, a.price, a.previousPrice,
-               a.reference, a.category, a.brand, a.stock, a.unit, a.changeStatus,
+               a.reference, a.category, a.rayon, a.brand, a.stock, a.unit, a.changeStatus,
                a.isActive, a.needsTicketUpdate, a.rawData,
                (SELECT p.imagePath FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imagePath,
                (SELECT p.imageStatus FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imageStatus,
@@ -432,6 +562,28 @@ interface ArticleDao {
     @Query("SELECT COUNT(*) FROM articles WHERE isActive = 1")
     fun observeActiveCount(): Flow<Int>
 
+    @Query("SELECT COUNT(*) FROM articles WHERE isActive = 1 AND rayon IN (:rayons)")
+    fun observeActiveCountInRayons(rayons: List<String>): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM articles WHERE needsTicketUpdate = 1 AND isActive = 1")
+    fun observeNeedsTicketCount(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM articles WHERE isActive = 1 AND needsTicketUpdate = 1 AND rayon IN (:rayons)")
+    fun observeNeedsTicketCountInRayons(rayons: List<String>): Flow<Int>
+
+    @Query(
+        """
+        SELECT COUNT(*) FROM articles a
+        WHERE a.isActive = 1 AND a.rayon IN (:rayons)
+          AND NOT EXISTS (
+                SELECT 1 FROM product_images p
+                WHERE p.articleId = a.id AND p.imageStatus = 'FOUND'
+                  AND p.imagePath IS NOT NULL AND p.imagePath != ''
+              )
+        """,
+    )
+    fun observeMissingCountInRayons(rayons: List<String>): Flow<Int>
+
     @Query("UPDATE articles SET isActive = 0, changeStatus = :status WHERE barcode NOT IN (:barcodes)")
     suspend fun markRemovedExcept(barcodes: List<String>, status: String)
 
@@ -440,9 +592,6 @@ interface ArticleDao {
 
     @Query("SELECT COUNT(*) FROM articles WHERE needsTicketUpdate = 1 AND isActive = 1")
     suspend fun countNeedsTicket(): Int
-
-    @Query("SELECT COUNT(*) FROM articles WHERE needsTicketUpdate = 1 AND isActive = 1")
-    fun observeNeedsTicketCount(): Flow<Int>
 }
 
 @Dao
@@ -608,17 +757,28 @@ interface PreselectionDao {
     @Query(
         """
         SELECT p.id AS preselectionId, p.articleId, p.sortOrder, p.addedAt, p.note, p.intendedTemplateType,
-               p.copyCount, p.variantBarcode,
+               p.copyCount, p.variantBarcode, p.isPromoTicket, p.promoPrice, p.promoOriginalPrice,
                a.designation,
                CASE WHEN p.variantBarcode != '' THEN p.variantBarcode ELSE a.barcode END AS barcode,
                a.price, a.previousPrice, a.codeart, a.category,
+               a.changeStatus, a.needsTicketUpdate,
                COALESCE(
                  (SELECT ab.imagePath FROM article_alternate_barcodes ab
                   WHERE ab.articleId = a.id AND ab.barcode = p.variantBarcode AND p.variantBarcode != ''),
                  (SELECT i.imagePath FROM product_images i WHERE i.articleId = a.id ORDER BY i.id DESC LIMIT 1)
                ) AS imagePath,
                (SELECT i.createdAt FROM product_images i WHERE i.articleId = a.id ORDER BY i.id DESC LIMIT 1) AS imageCreatedAt,
-               (SELECT i.lastSentAt FROM product_images i WHERE i.articleId = a.id ORDER BY i.id DESC LIMIT 1) AS imageLastSentAt
+               (SELECT i.lastSentAt FROM product_images i WHERE i.articleId = a.id ORDER BY i.id DESC LIMIT 1) AS imageLastSentAt,
+               (SELECT pb.createdAt FROM print_batch_items pbi
+                INNER JOIN print_batches pb ON pb.id = pbi.batchId
+                WHERE pbi.articleId = a.id
+                ORDER BY pb.createdAt DESC LIMIT 1) AS lastPrintedAt,
+               (SELECT COUNT(*) > 0 FROM preselection_items dq
+                WHERE dq.articleId = a.id AND dq.cartType = 'DESIGN'
+                  AND dq.variantBarcode = p.variantBarcode) AS inDesignQueue,
+               (SELECT COUNT(*) > 0 FROM preselection_items dd
+                WHERE dd.articleId = a.id AND dd.cartType = 'DESIGN_DONE'
+                  AND dd.variantBarcode = p.variantBarcode) AS inDesignDone
         FROM preselection_items p
         JOIN articles a ON a.id = p.articleId
         WHERE p.cartType = :cartType
@@ -630,17 +790,28 @@ interface PreselectionDao {
     @Query(
         """
         SELECT p.id AS preselectionId, p.articleId, p.sortOrder, p.addedAt, p.note, p.intendedTemplateType,
-               p.copyCount, p.variantBarcode,
+               p.copyCount, p.variantBarcode, p.isPromoTicket, p.promoPrice, p.promoOriginalPrice,
                a.designation,
                CASE WHEN p.variantBarcode != '' THEN p.variantBarcode ELSE a.barcode END AS barcode,
                a.price, a.previousPrice, a.codeart, a.category,
+               a.changeStatus, a.needsTicketUpdate,
                COALESCE(
                  (SELECT ab.imagePath FROM article_alternate_barcodes ab
                   WHERE ab.articleId = a.id AND ab.barcode = p.variantBarcode AND p.variantBarcode != ''),
                  (SELECT i.imagePath FROM product_images i WHERE i.articleId = a.id ORDER BY i.id DESC LIMIT 1)
                ) AS imagePath,
                (SELECT i.createdAt FROM product_images i WHERE i.articleId = a.id ORDER BY i.id DESC LIMIT 1) AS imageCreatedAt,
-               (SELECT i.lastSentAt FROM product_images i WHERE i.articleId = a.id ORDER BY i.id DESC LIMIT 1) AS imageLastSentAt
+               (SELECT i.lastSentAt FROM product_images i WHERE i.articleId = a.id ORDER BY i.id DESC LIMIT 1) AS imageLastSentAt,
+               (SELECT pb.createdAt FROM print_batch_items pbi
+                INNER JOIN print_batches pb ON pb.id = pbi.batchId
+                WHERE pbi.articleId = a.id
+                ORDER BY pb.createdAt DESC LIMIT 1) AS lastPrintedAt,
+               (SELECT COUNT(*) > 0 FROM preselection_items dq
+                WHERE dq.articleId = a.id AND dq.cartType = 'DESIGN'
+                  AND dq.variantBarcode = p.variantBarcode) AS inDesignQueue,
+               (SELECT COUNT(*) > 0 FROM preselection_items dd
+                WHERE dd.articleId = a.id AND dd.cartType = 'DESIGN_DONE'
+                  AND dd.variantBarcode = p.variantBarcode) AS inDesignDone
         FROM preselection_items p
         JOIN articles a ON a.id = p.articleId
         WHERE p.cartType = :cartType
@@ -681,6 +852,20 @@ interface PreselectionDao {
         "UPDATE preselection_items SET copyCount = :copyCount WHERE id = :preselectionId",
     )
     suspend fun updateCopyCountById(preselectionId: Long, copyCount: Int)
+
+    @Query(
+        """
+        UPDATE preselection_items
+        SET isPromoTicket = :isPromo, promoPrice = :promoPrice, promoOriginalPrice = :originalPrice
+        WHERE id = :preselectionId
+        """,
+    )
+    suspend fun updatePromoTicket(
+        preselectionId: Long,
+        isPromo: Boolean,
+        promoPrice: Double?,
+        originalPrice: Double?,
+    )
 
     @Query(
         """

@@ -27,6 +27,7 @@
 ## Phase 3 — Polish (in progress)
 
 - [x] **v2.4.0** Sub-barcode confirm + deferred PhotoRoom link + per-barcode images + removable chips (Room v14)
+- [x] v2.11.0 Design Historique tab + batch detail reprint; dated export paths; CSV-change glow (Room v18)
 - [x] v2.5.0 Design queue order preserved; AGENT Bulk mode + `bulk_captures` (Room v11)
 - [x] v2.4.0 Design Done sub-cart + per-article copy count (+ button); Room v10 `copyCount`
 - [x] v1.5.0 Design screen: in-app Oasis Print shelf labels; To share → Add to Design; A4 JPEG export; History → Settings
@@ -50,7 +51,8 @@
 - [x] Stamper gallery launch crash fix and zero-start event history
 - [x] Stamper last-card fix, larger scrollable cards, and enriched shared PNG metadata
 - [x] Replace repo image database from `G:\DATA BASE` and support barcode-only PNG filenames
-- [x] v2.4.5 Cart flavor rows — `variantBarcode` on preselection; parent + sub-barcodes coexist in To share & Design
+- [x] v2.5.0 Design promo shelf tickets (dual price + prix-barrée)
+- [x] PSD inspect pipeline — psd-tools + ag-psd → JSON specs for template cloning
 
 ---
 - [x] Batch txt screen routes designation lists to To share / To shoot / **Camera batch queue** automatically
@@ -74,6 +76,15 @@
 5. Pre-selection → Print → **Shelf A4** → Generate PDF
 6. Print History → verify batch
 7. Import a second CSV with changed prices (when ready)
+
+## Phase 4b — VisioPRO ✅ (v2.6.3)
+
+- [x] In-app VisioPRO module (**bottom nav 1st tab**, not Settings)
+- [x] Scrollable bottom bar fix (v2.6.3)
+- [x] Preset catalog: 7 families, ~46 article cards
+- [x] Social + print channels; fish social-only
+- [ ] PSD-based pixel-perfect layouts (when templates supplied — agent inspects → updates catalog)
+- [ ] Explicit designation/codeart mapping table (currently keyword match)
 
 ## Phase 5 — Oasis Print desktop (cancelled)
 

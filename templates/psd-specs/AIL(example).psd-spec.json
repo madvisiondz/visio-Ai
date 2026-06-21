@@ -1,0 +1,116 @@
+{
+  "source_file": "AIL(example).psd",
+  "engine": "psd-tools",
+  "document": {
+    "width": 985,
+    "height": 1311,
+    "channels": 3,
+    "color_mode": "3",
+    "dpi_x": null,
+    "dpi_y": null
+  },
+  "layers": [
+    {
+      "index": 0,
+      "name": "Ail (the latest is to be automaticaly loaded & a shoot button for photoshoot via camera)",
+      "path": "Ail (the latest is to be automaticaly loaded & a shoot button for photoshoot via camera)",
+      "depth": 0,
+      "kind": "smartobject",
+      "visible": true,
+      "opacity": 1.0,
+      "blend_mode": "BlendMode.NORMAL",
+      "bounds": {
+        "left": -9,
+        "top": -211,
+        "right": 1000,
+        "bottom": 1397,
+        "width": 1009,
+        "height": 1608
+      },
+      "text": null,
+      "role_hint": "product_image",
+      "children_count": 0
+    },
+    {
+      "index": 1,
+      "name": "Design",
+      "path": "Design",
+      "depth": 0,
+      "kind": "smartobject",
+      "visible": true,
+      "opacity": 1.0,
+      "blend_mode": "BlendMode.NORMAL",
+      "bounds": {
+        "left": -55,
+        "top": -29,
+        "right": 1057,
+        "bottom": 1386,
+        "width": 1112,
+        "height": 1415
+      },
+      "text": null,
+      "role_hint": null,
+      "children_count": 0
+    },
+    {
+      "index": 2,
+      "name": "price",
+      "path": "price",
+      "depth": 0,
+      "kind": "type",
+      "visible": true,
+      "opacity": 1.0,
+      "blend_mode": "BlendMode.NORMAL",
+      "bounds": {
+        "left": 683,
+        "top": 1182,
+        "right": 867,
+        "bottom": 1251,
+        "width": 184,
+        "height": 69
+      },
+      "text": {
+        "value": "550",
+        "font_name": null,
+        "font_size": null,
+        "color": null,
+        "alignment": null
+      },
+      "role_hint": null,
+      "children_count": 0
+    },
+    {
+      "index": 3,
+      "name": "ثوم( designition is to be in arabic )",
+      "path": "ثوم( designition is to be in arabic )",
+      "depth": 0,
+      "kind": "type",
+      "visible": true,
+      "opacity": 1.0,
+      "blend_mode": "BlendMode.NORMAL",
+      "bounds": {
+        "left": 734,
+        "top": 1083,
+        "right": 824,
+        "bottom": 1143,
+        "width": 90,
+        "height": 60
+      },
+      "text": {
+        "value": "ثوم",
+        "font_name": null,
+        "font_size": null,
+        "color": null,
+        "alignment": null
+      },
+      "role_hint": null,
+      "children_count": 0
+    }
+  ],
+  "role_summary": {
+    "product_image": [
+      "Ail (the latest is to be automaticaly loaded & a shoot button for photoshoot via camera)"
+    ]
+  },
+  "warnings": []
+}

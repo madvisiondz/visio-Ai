@@ -34,8 +34,10 @@ import com.oasismall.oasisai.data.model.CartType
 import com.oasismall.oasisai.ui.OasisViewModelFactory
 import com.oasismall.oasisai.ui.components.ArticleCard
 import com.oasismall.oasisai.ui.components.CartSourceLegend
+import com.oasismall.oasisai.ui.components.CatalogChangeBadge
 import com.oasismall.oasisai.ui.components.OpenCameraBatchButton
 import com.oasismall.oasisai.ui.components.cartSourceStyle
+import com.oasismall.oasisai.ui.components.hasCatalogChange
 import com.oasismall.oasisai.ui.components.sourceBorder
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -205,11 +207,15 @@ fun CartScreen(
                             }
                         },
                     )
-                    Text(
-                        imageTimingText(item),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    if (viewModel.cartType == CartType.SHARE) {
+                        ShareCartStatusFooter(item)
+                    } else {
+                        Text(
+                            imageTimingText(item),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                     if (viewModel.cartType == CartType.PHOTOSHOOT && onOpenCameraBatch != null) {
                         OpenCameraBatchButton(
                             onClick = onOpenCameraBatch,
@@ -254,14 +260,56 @@ private fun PreselectionWithArticle.toArticleWithImage() = ArticleWithImage(
     stock = null,
     unit = null,
     rawData = null,
-    changeStatus = "UNCHANGED",
+    changeStatus = changeStatus,
     isActive = true,
-    needsTicketUpdate = false,
+    needsTicketUpdate = needsTicketUpdate,
     imagePath = imagePath,
     imageStatus = null,
     imageCreatedAt = imageCreatedAt,
     imageLastSentAt = imageLastSentAt,
 )
+
+@Composable
+private fun ShareCartStatusFooter(item: PreselectionWithArticle) {
+    val fmt = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        if (item.hasCatalogChange()) {
+            CatalogChangeBadge(active = true)
+        }
+        Text(
+            item.lastPrintedAt?.let { "Printed: ${fmt.format(Date(it))}" } ?: "Printed: not yet",
+            style = MaterialTheme.typography.bodySmall,
+            color = if (item.lastPrintedAt != null) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+        )
+        Text(
+            when {
+                item.inDesignDone -> "Design: printed / done"
+                item.inDesignQueue -> "Design: in print queue"
+                else -> "Design: not added"
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = if (item.inDesignQueue || item.inDesignDone) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+        )
+        Text(
+            item.imageLastSentAt?.let { "Telegram: sent ${fmt.format(Date(it))}" }
+                ?: "Telegram: not sent",
+            style = MaterialTheme.typography.bodySmall,
+            color = if (item.imageLastSentAt != null) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+        )
+    }
+}
 
 private fun imageTimingText(item: PreselectionWithArticle): String {
     val fmt = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
