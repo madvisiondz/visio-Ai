@@ -134,8 +134,14 @@ fun ImportScreen(
                             Text("Import preview", style = MaterialTheme.typography.titleSmall)
                             Text("File: ${preview.fileName}")
                             Text("${preview.parseResult.rows.size} valid rows (delimiter '${preview.parseResult.delimiter}')")
+                            if (preview.parseResult.barcodeLessRows > 0) {
+                                Text(
+                                    "${preview.parseResult.barcodeLessRows} without Code-barres (imported via Gestium Code)",
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                            }
                             if (preview.parseResult.skippedRows > 0) {
-                                Text("${preview.parseResult.skippedRows} rows skipped")
+                                Text("${preview.parseResult.skippedRows} rows skipped (no designation, price, or identity)")
                             }
                             Text("Sample rows:", style = MaterialTheme.typography.labelMedium)
                             preview.sampleRows.take(8).forEach {

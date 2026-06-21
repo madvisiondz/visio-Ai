@@ -2,6 +2,15 @@
 
 > What has been built. Update at end of each work session.
 
+## 2026-06-14 — Visio Ai v2.12.3 Fix 1118 barcode-less CSV rows skipped
+
+- [x] Gestium rows with empty Code-barres but valid **Code** column no longer counted as skipped (e.g. PIEDS DE VEAU)
+- [x] `resolveImportBarcode()` applied inside `parseRow`; Windows-1252 tried first
+- [x] Import preview shows barcode-less count separately from true skips
+- [x] APK **2.12.3** (code 271)
+
+---
+
 ## 2026-06-14 — Visio Ai v2.12.2 Gestium CSV charset + full row import
 
 - [x] `parseWithFallback` picks encoding with the most valid rows (cp1252 for Gestium exports)

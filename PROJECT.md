@@ -54,7 +54,7 @@ OASIS MALL operates at scale with fragmented workflows:
 | 2026-06-19 | **VisioPRO**: in-app preset cards (agent-maintained catalog); CSV/manual prices; social + print export |
 | 2026-06-19 | **PSD pipeline**: `tools/psd` (psd-tools) + `tools/psd-node` (ag-psd) — inspect layers/bounds → JSON for template cloning |
 | 2026-06-19 | **PSD template pipeline**: Python psd-tools + Node ag-psd inspectors → `templates/psd-specs/*.json` for Design cloning |
-| 2026-06-14 | **Visio Ai v2.12.2**: Fix Gestium CSV charset (cp1252 wins over UTF-8); import all barcode-less rows via Code; removal by designation/codeart |
+| 2026-06-14 | **Visio Ai v2.12.3**: Fix 1118 Gestium rows skipped (empty Code-barres) — identity from Gestium Code inside parseRow; cp1252 first |
 | 2026-06-14 | **Visio Ai v2.12.1**: VisioPRO rayon pools **full resync on every CSV import**; import barcode-less Gestium rows via **codeart** (e.g. PIEDS DE VEAU); list editor reloads live pool |
 | 2026-06-14 | **Visio Ai v2.12.0**: VisioPRO lists auto-sync new CSV articles (pending in Settings); **Rayons importants** checklist filters stats + CSV report |
 | 2026-06-14 | **Visio Ai v2.11.1**: Fix CSV price-change glow (ArticleCard + cart mapping); To share footer — Printed / Design / Telegram status |

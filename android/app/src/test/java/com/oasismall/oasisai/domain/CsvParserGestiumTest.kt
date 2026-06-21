@@ -30,14 +30,22 @@ class CsvParserGestiumTest {
     }
 
     @Test
+    fun emptyBarcodeRow_isNotSkipped() {
+        val csv = "$gestiumHeader\n$piedsDeVeauRow"
+        val cp1252 = Charset.forName("Windows-1252")
+        val result = CsvParser.parse(csv.byteInputStream(cp1252), cp1252)
+        assertEquals(0, result.skippedRows)
+        assertEquals(1, result.barcodeLessRows)
+        assertEquals(1, result.rows.size)
+    }
+
+    @Test
     fun parseWithFallback_prefersCharsetWithMostRows() {
         val csv = "$gestiumHeader\n$piedsDeVeauRow"
         val bytes = csv.toByteArray(Charset.forName("Windows-1252"))
         val result = CsvParser.parseWithFallback(bytes.inputStream())
         assertTrue(result.rows.any { it.designation == "PIEDS DE VEAU" })
-        assertEquals(
-            "CA:13145",
-            result.rows.first { it.designation == "PIEDS DE VEAU" }.barcode,
-        )
+        assertEquals("CA:13145", result.rows.first { it.designation == "PIEDS DE VEAU" }.barcode)
+        assertEquals(0, result.skippedRows)
     }
 }

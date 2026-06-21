@@ -861,3 +861,11 @@
 **User:** Still cannot find PIEDS DE VEAU in Articles or VisioPRO — CSV loader may be ignoring rows.
 
 **Assistant:** **v2.12.2** — root cause: UTF-8 mis-read Gestium cp1252 CSV (0 rows vs 28k); `parseWithFallback` now picks charset with most valid rows; removal detection uses codeart + designation; unit test for PIEDS DE VEAU row.
+
+---
+
+## Session 102 — 2026-06-14
+
+**User:** Still 1117 rows skipped; PIEDS DE VEAU not in Articles.
+
+**Assistant:** **v2.12.3** — 1118 Gestium rows have empty Code-barres but valid Code (13145 for PIEDS DE VEAU); old filter counted them as skipped. Identity resolved inside `parseRow`; cp1252 first; preview shows barcode-less import count.
