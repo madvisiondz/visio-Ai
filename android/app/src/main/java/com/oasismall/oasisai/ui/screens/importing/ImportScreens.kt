@@ -31,6 +31,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.oasismall.oasisai.BuildConfig
+import com.oasismall.oasisai.ui.components.ImportantRayonsFilterNote
 import com.oasismall.oasisai.ui.components.ImportChangeCard
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -46,6 +48,9 @@ fun ImportScreen(
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val imports by viewModel.imports.collectAsStateWithLifecycle()
+    val rayonConfig by viewModel.importantRayonsConfig.collectAsStateWithLifecycle()
+    val rayonFiltered = rayonConfig.configured && rayonConfig.selectedRayons.isNotEmpty()
+    val rayonCount = rayonConfig.selectedRayons.size
 
     val picker = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.OpenDocument(),
@@ -79,6 +84,9 @@ fun ImportScreen(
                     "Import GestiumERP CSV/TSV. Daily diff runs automatically.",
                     style = MaterialTheme.typography.bodyMedium,
                 )
+            }
+            item {
+                ImportantRayonsFilterNote(filtered = rayonFiltered, count = rayonCount)
             }
             uiState.error?.let { error ->
                 item {
@@ -132,16 +140,47 @@ fun ImportScreen(
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text("Import preview", style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                "Visio Ai ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                             Text("File: ${preview.fileName}")
-                            Text("${preview.parseResult.rows.size} valid rows (delimiter '${preview.parseResult.delimiter}')")
+                            val totalInFile = preview.parseResult.rows.size +
+                                preview.parseResult.skippedRows
+                            if (preview.importantRayonsFiltered) {
+                                Text(
+                                    "$totalInFile rows in file · ${preview.scopedRowCount} in your rayons importants",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
+                                Text(
+                                    "Full catalog is imported; counts below are for selected rayons only.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            } else {
+                                Text("$totalInFile rows in file · ${preview.parseResult.rows.size} will import")
+                            }
                             if (preview.parseResult.barcodeLessRows > 0) {
                                 Text(
-                                    "${preview.parseResult.barcodeLessRows} without Code-barres (imported via Gestium Code)",
+                                    "${preview.parseResult.barcodeLessRows} without Code-barres → kept via Gestium Code (e.g. PIEDS DE VEAU)",
                                     color = MaterialTheme.colorScheme.primary,
+                                    style = MaterialTheme.typography.bodySmall,
                                 )
                             }
                             if (preview.parseResult.skippedRows > 0) {
-                                Text("${preview.parseResult.skippedRows} rows skipped (no designation, price, or identity)")
+                                Text(
+                                    "${preview.parseResult.skippedRows} rows skipped (missing designation, price, or Code)",
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                            }
+                            if (preview.parseResult.garbledDesignationRows > 0) {
+                                Text(
+                                    "${preview.parseResult.garbledDesignationRows} rows skipped (unreadable designation — ??????? from Gestium export)",
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
                             }
                             Text("Sample rows:", style = MaterialTheme.typography.labelMedium)
                             preview.sampleRows.take(8).forEach {
@@ -158,8 +197,9 @@ fun ImportScreen(
                     }
                 }
                 item {
+                    val context = LocalContext.current
                     Button(
-                        onClick = viewModel::confirmImport,
+                        onClick = { viewModel.confirmImport(context) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .navigationBarsPadding(),
@@ -184,8 +224,9 @@ fun ImportScreen(
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text("Last import", style = MaterialTheme.typography.titleSmall)
-                            Text("New: ${s.newCount} | Price changed: ${s.priceChangedCount}")
-                            Text("Renamed: ${s.renamedCount} | Removed: ${s.removedCount}")
+                            val counts = s.displayCounts
+                            Text("New: ${counts.newCount} | Price changed: ${counts.priceChangedCount}")
+                            Text("Renamed: ${counts.renamedCount} | Removed: ${counts.removedCount}")
                             if (s.missingImagesCount > 0) {
                                 Text("${s.missingImagesCount} articles missing images")
                             }
@@ -203,7 +244,11 @@ fun ImportScreen(
                     Column(Modifier.padding(12.dp)) {
                         Text(imp.fileName, fontWeight = FontWeight.SemiBold)
                         Text(SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.FRANCE).format(Date(imp.importedAt)))
-                        Text("${imp.rowCount} rows — +${imp.newCount} new, ${imp.priceChangedCount} price changes")
+                        if (rayonFiltered) {
+                            Text("+${imp.newCount} new, ${imp.priceChangedCount} price changes (catalog totals)")
+                        } else {
+                            Text("${imp.rowCount} rows — +${imp.newCount} new, ${imp.priceChangedCount} price changes")
+                        }
                     }
                 }
             }
@@ -221,6 +266,8 @@ fun ImportDetailScreen(
 ) {
     val changesFlow = remember(importId) { viewModel.observeChangesEnriched(importId) }
     val changes by changesFlow.collectAsStateWithLifecycle(initialValue = emptyList())
+    val rayonConfig by viewModel.importantRayonsConfig.collectAsStateWithLifecycle()
+    val rayonFiltered = rayonConfig.configured && rayonConfig.selectedRayons.isNotEmpty()
 
     Scaffold(
         topBar = {
@@ -239,6 +286,12 @@ fun ImportDetailScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            item {
+                ImportantRayonsFilterNote(
+                    filtered = rayonFiltered,
+                    count = rayonConfig.selectedRayons.size,
+                )
+            }
             item {
                 Text("${changes.size} changes shown", style = MaterialTheme.typography.bodySmall)
             }

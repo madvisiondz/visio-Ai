@@ -16,16 +16,28 @@ data class VisioProLivePoolState(
     val pendingIds: List<Long>,
 )
 
+data class VisioProCategoryCatalog(
+    val defs: List<VisioProArticleDef>,
+    val articlesById: Map<Long, com.oasismall.oasisai.data.db.dao.ArticleWithImage>,
+)
+
 class VisioProCatalogService(
     private val repository: OasisRepository,
     private val configStore: VisioProCatalogConfigStore,
 ) {
 
-    suspend fun resolveArticleDefs(category: VisioProCategory): List<VisioProArticleDef> {
+    suspend fun resolveArticleDefs(category: VisioProCategory): List<VisioProArticleDef> =
+        resolveCategoryCatalog(category).defs
+
+    /** Single DB round-trip for list + prices. */
+    suspend fun resolveCategoryCatalog(category: VisioProCategory): VisioProCategoryCatalog {
         val ids = currentOrderedIds(category)
-        if (ids.isEmpty()) return emptyList()
+        if (ids.isEmpty()) return VisioProCategoryCatalog(emptyList(), emptyMap())
         val byId = repository.getArticlesWithImagesByIds(ids).associateBy { it.id }
-        return ids.mapNotNull { id -> byId[id]?.let { VisioProArticleDefFactory.fromCatalogArticle(it, category) } }
+        val defs = ids.mapNotNull { id ->
+            byId[id]?.let { VisioProArticleDefFactory.fromCatalogArticle(it, category) }
+        }
+        return VisioProCategoryCatalog(defs = defs, articlesById = byId)
     }
 
     suspend fun countForCategory(category: VisioProCategory): Int =

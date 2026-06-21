@@ -39,6 +39,8 @@ data class CsvParseResult(
     val skippedRows: Int,
     /** Rows that had empty Code-barres but were kept via Gestium Code / Référence. */
     val barcodeLessRows: Int = 0,
+    /** Rows skipped because designation is unreadable (e.g. Arabic export shown as ???????). */
+    val garbledDesignationRows: Int = 0,
 )
 
 data class CsvValidation(
@@ -46,6 +48,34 @@ data class CsvValidation(
     val missingColumns: List<String>,
     val detectedHeaders: List<String>,
 )
+
+data class ImportChangeCounts(
+    val newCount: Int = 0,
+    val priceChangedCount: Int = 0,
+    val renamedCount: Int = 0,
+    val removedCount: Int = 0,
+) {
+    val hasChanges: Boolean =
+        newCount > 0 || priceChangedCount > 0 || renamedCount > 0 || removedCount > 0
+
+    companion object {
+        fun fromChangeTypes(types: Iterable<String>): ImportChangeCounts {
+            var newCount = 0
+            var priceChangedCount = 0
+            var renamedCount = 0
+            var removedCount = 0
+            types.forEach { type ->
+                when (type) {
+                    com.oasismall.oasisai.data.model.ImportChangeType.NEW.name -> newCount++
+                    com.oasismall.oasisai.data.model.ImportChangeType.PRICE_CHANGED.name -> priceChangedCount++
+                    com.oasismall.oasisai.data.model.ImportChangeType.RENAMED.name -> renamedCount++
+                    com.oasismall.oasisai.data.model.ImportChangeType.REMOVED.name -> removedCount++
+                }
+            }
+            return ImportChangeCounts(newCount, priceChangedCount, renamedCount, removedCount)
+        }
+    }
+}
 
 data class ImportDiffSummary(
     val importId: Long,
@@ -55,7 +85,21 @@ data class ImportDiffSummary(
     val removedCount: Int,
     val unchangedCount: Int,
     val missingImagesCount: Int = 0,
-)
+    val scopedToImportantRayons: Boolean = false,
+    val importantRayonsCount: Int = 0,
+    val scopedRowCount: Int = 0,
+    val scopedNewCount: Int = 0,
+    val scopedPriceChangedCount: Int = 0,
+    val scopedRenamedCount: Int = 0,
+    val scopedRemovedCount: Int = 0,
+) {
+    val displayCounts: ImportChangeCounts
+        get() = if (scopedToImportantRayons) {
+            ImportChangeCounts(scopedNewCount, scopedPriceChangedCount, scopedRenamedCount, scopedRemovedCount)
+        } else {
+            ImportChangeCounts(newCount, priceChangedCount, renamedCount, removedCount)
+        }
+}
 
 data class ImportResult(
     val success: Boolean,

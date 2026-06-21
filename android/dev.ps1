@@ -30,13 +30,13 @@ function Copy-DebugApkToRoot {
     if (-not (Test-Path $src)) {
         $src = Join-Path $PSScriptRoot "app\build\outputs\apk\debug\app-debug.apk"
     }
-    $dest = Join-Path (Split-Path $PSScriptRoot -Parent) "OasisAI-debug.apk"
+    $dest = Join-Path (Split-Path $PSScriptRoot -Parent) "VisioAI-debug.apk"
     if (-not (Test-Path $src)) {
         Write-Error "APK not found. Run build first: .\dev.ps1 build"
     }
     Copy-Item $src $dest -Force
     $mb = [math]::Round((Get-Item $dest).Length / 1MB, 1)
-    Write-Host "Copied to: $dest ($mb MB) — install THIS on your phone, not an old app-debug.apk from another folder."
+    Write-Host "Copied to: $dest ($mb MB) — install VisioAI-debug.apk on your phone."
 }
 
 switch ($Action) {
@@ -49,11 +49,11 @@ switch ($Action) {
     "run" {
         Start-EmulatorIfNeeded
         .\gradlew.bat installDebug
-        & (Join-Path $env:ANDROID_HOME "platform-tools\adb.exe") shell am start -n com.oasismall.oasisai/.MainActivity
+        & (Join-Path $env:ANDROID_HOME "platform-tools\adb.exe") shell am start -n com.oasismall.visioai/.MainActivity
     }
     "all" {
         Start-EmulatorIfNeeded
         .\gradlew.bat installDebug
-        & (Join-Path $env:ANDROID_HOME "platform-tools\adb.exe") shell am start -n com.oasismall.oasisai/.MainActivity
+        & (Join-Path $env:ANDROID_HOME "platform-tools\adb.exe") shell am start -n com.oasismall.visioai/.MainActivity
     }
 }

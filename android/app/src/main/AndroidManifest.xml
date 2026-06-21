@@ -68,6 +68,10 @@
             android:name=".domain.paray.ParayImportForegroundService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+        <service
+            android:name=".domain.background.OasisBackgroundTaskService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
     </application>
 
 </manifest>

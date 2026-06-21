@@ -9,8 +9,10 @@ import com.oasismall.oasisai.data.db.entity.PrintBatchItemEntity
 import com.oasismall.oasisai.data.model.ImportChangeType
 import com.oasismall.oasisai.data.repository.ImportChangeUiRow
 import com.oasismall.oasisai.data.repository.OasisRepository
+import com.oasismall.oasisai.domain.ImportChangeCounts
 import com.oasismall.oasisai.ui.components.CartSourceTags
 import com.oasismall.oasisai.data.model.CartType
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -39,6 +41,8 @@ data class ReportDesignPrintRow(
 data class ReportUiState(
     val latestImport: ImportEntity? = null,
     val previousImport: ImportEntity? = null,
+    val latestImportCounts: ImportChangeCounts = ImportChangeCounts(),
+    val previousImportCounts: ImportChangeCounts = ImportChangeCounts(),
     val csvChanges: List<ReportCsvChangeRow> = emptyList(),
     val designPrints: List<ReportDesignPrintRow> = emptyList(),
     val importantRayonsFiltered: Boolean = false,
@@ -49,18 +53,23 @@ data class ReportUiState(
 
     val latestImportSummary: String
         get() = latestImport?.let { imp ->
-            "${imp.fileName} — +${imp.newCount} new, ${imp.priceChangedCount} price, ${imp.renamedCount} renamed, ${imp.removedCount} removed"
+            formatImportChangeSummary(imp.fileName, latestImportCounts)
         } ?: "No CSV import yet"
 
     val previousImportSummary: String
         get() = previousImport?.let { imp ->
-            "${imp.fileName} (${formatDate(imp.importedAt)})"
+            "${formatImportChangeSummary(imp.fileName, previousImportCounts)} (${formatDate(imp.importedAt)})"
         } ?: "No previous import"
 }
+
+internal fun formatImportChangeSummary(fileName: String, counts: ImportChangeCounts): String =
+    "$fileName — +${counts.newCount} new, ${counts.priceChangedCount} price, " +
+        "${counts.renamedCount} renamed, ${counts.removedCount} removed"
 
 class ReportViewModel(
     private val repository: OasisRepository,
 ) : ViewModel() {
+    @OptIn(ExperimentalCoroutinesApi::class)
     val state: StateFlow<ReportUiState> = combine(
         repository.observeImports(),
         repository.observeRecentCsvChanges().flatMapLatest { changes ->
@@ -75,31 +84,46 @@ class ReportViewModel(
         repository.observeDesignShelfPrints(),
         repository.importantRayonsConfig,
     ) { imports, enrichedChanges, designBatches, rayonConfig ->
-        val importById = imports.associateBy { it.id }
-        val filteredChanges = enrichedChanges.filter { (_, article) ->
-            repository.matchesImportantRayon(article?.rayon, rayonConfig)
+        imports to Triple(enrichedChanges, designBatches, rayonConfig)
+    }.flatMapLatest { (imports, triple) ->
+        val (enrichedChanges, designBatches, rayonConfig) = triple
+        flow {
+            val latestTwoIds = imports.take(2).map { it.id }
+            val summaries = withContext(Dispatchers.IO) {
+                repository.summarizeImportsForDisplay(latestTwoIds, rayonConfig)
+            }
+            val importById = imports.associateBy { it.id }
+            val filteredChanges = enrichedChanges.filter { (_, article) ->
+                repository.matchesImportantRayon(article?.rayon, rayonConfig)
+            }
+            val latest = imports.firstOrNull()
+            val previous = imports.getOrNull(1)
+            emit(
+                ReportUiState(
+                    latestImport = latest,
+                    previousImport = previous,
+                    latestImportCounts = summaries[latest?.id] ?: ImportChangeCounts(),
+                    previousImportCounts = summaries[previous?.id] ?: ImportChangeCounts(),
+                    csvChanges = filteredChanges.map { (change, article) ->
+                        val imp = importById[change.importId]
+                        ReportCsvChangeRow(
+                            change = change,
+                            importFileName = imp?.fileName ?: "Import #${change.importId}",
+                            importDate = imp?.importedAt ?: 0L,
+                            article = article,
+                        )
+                    },
+                    designPrints = designBatches.map { batch ->
+                        ReportDesignPrintRow(
+                            batch = batch,
+                            items = emptyList(),
+                        )
+                    },
+                    importantRayonsFiltered = rayonConfig.configured && rayonConfig.selectedRayons.isNotEmpty(),
+                    importantRayonsCount = rayonConfig.selectedRayons.size,
+                ),
+            )
         }
-        ReportUiState(
-            latestImport = imports.firstOrNull(),
-            previousImport = imports.getOrNull(1),
-            csvChanges = filteredChanges.map { (change, article) ->
-                val imp = importById[change.importId]
-                ReportCsvChangeRow(
-                    change = change,
-                    importFileName = imp?.fileName ?: "Import #${change.importId}",
-                    importDate = imp?.importedAt ?: 0L,
-                    article = article,
-                )
-            },
-            designPrints = designBatches.map { batch ->
-                ReportDesignPrintRow(
-                    batch = batch,
-                    items = emptyList(),
-                )
-            },
-            importantRayonsFiltered = rayonConfig.configured && rayonConfig.selectedRayons.isNotEmpty(),
-            importantRayonsCount = rayonConfig.selectedRayons.size,
-        )
     }.flowOn(Dispatchers.IO)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ReportUiState())
 

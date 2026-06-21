@@ -24,6 +24,8 @@ data class VisioProTemplateLayout(
     val photoTop: Int,
     val photoRight: Int,
     val photoBottom: Int,
+    /** `cover` fills and crops; `contain` scales to fit without cropping. */
+    val photoFit: String = "cover",
     val designAsset: String,
     val designation: VisioProTextSlot?,
     val code: VisioProTextSlot?,

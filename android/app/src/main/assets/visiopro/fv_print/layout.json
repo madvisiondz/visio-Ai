@@ -9,7 +9,7 @@
     "top": 0,
     "right": 2843,
     "bottom": 1594,
-    "fit": "cover"
+    "fit": "contain"
   },
   "designAsset": "design_overlay.png",
   "text": {

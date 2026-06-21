@@ -67,7 +67,7 @@ import com.oasismall.oasisai.data.db.entity.PrintBatchEntity
 import com.oasismall.oasisai.domain.design.DesignBatchItemUi
 import com.oasismall.oasisai.ui.components.CatalogChangeBadge
 import com.oasismall.oasisai.ui.components.catalogChangeGlow
-import com.oasismall.oasisai.ui.components.hasCatalogChange
+import com.oasismall.oasisai.ui.components.shouldShowPriceChangeGlow
 import com.oasismall.oasisai.domain.design.DesignCartExpand
 import com.oasismall.oasisai.domain.design.shelfDisplayPrice
 import com.oasismall.oasisai.domain.design.shelfOriginalPrice
@@ -588,7 +588,7 @@ private fun DesignDoneRow(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .catalogChangeGlow(item.hasCatalogChange()),
+            .catalogChangeGlow(item.shouldShowPriceChangeGlow()),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
     ) {
         Row(
@@ -602,7 +602,7 @@ private fun DesignDoneRow(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(item.designation, fontWeight = FontWeight.Medium, maxLines = 2)
-                    CatalogChangeBadge(active = item.hasCatalogChange())
+                    CatalogChangeBadge(active = item.shouldShowPriceChangeGlow())
                 }
                 Text(
                     if (item.isPromoTicket) {
@@ -683,7 +683,7 @@ private fun DesignQueueRow(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .catalogChangeGlow(item.hasCatalogChange()),
+            .catalogChangeGlow(item.shouldShowPriceChangeGlow()),
     ) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(
@@ -721,7 +721,7 @@ private fun DesignQueueRow(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(item.designation, fontWeight = FontWeight.Medium, maxLines = 2, modifier = Modifier.weight(1f))
-                        CatalogChangeBadge(active = item.hasCatalogChange())
+                        CatalogChangeBadge(active = item.shouldShowPriceChangeGlow())
                         Row(
                             modifier = Modifier.padding(start = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,

@@ -31,19 +31,17 @@ object CsvParser {
 
     fun parseWithFallback(input: InputStream): CsvParseResult {
         val bytes = input.readBytes()
-        val attempts = fallbackCharsets.mapNotNull { charset ->
-            runCatching {
-                val result = parse(ByteArrayInputStream(bytes), charset)
-                result to validate(result.headers)
-            }.getOrNull()
+        var best = CsvParseResult(emptyList(), emptyList(), ',', 0, 0, 0)
+        for (charset in fallbackCharsets) {
+            val result = parse(ByteArrayInputStream(bytes), charset)
+            val validation = validate(result.headers)
+            if (validation.isValid && result.rows.isNotEmpty()) {
+                // Gestium exports are cp1252-first; stop after the first valid parse (was 3× full parse in v2.12.2).
+                return result
+            }
+            if (result.rows.size > best.rows.size) best = result
         }
-        val bestValid = attempts
-            .filter { (_, validation) -> validation.isValid }
-            .maxByOrNull { (result, _) -> result.rows.size }
-            ?.first
-        if (bestValid != null && bestValid.rows.isNotEmpty()) return bestValid
-        return attempts.maxByOrNull { (result, _) -> result.rows.size }?.first
-            ?: CsvParseResult(emptyList(), emptyList(), ',', 0, 0)
+        return best
     }
 
     fun validate(headers: List<String>): CsvValidation {
@@ -59,41 +57,73 @@ object CsvParser {
     }
 
     fun parse(input: InputStream, charset: Charset = Charsets.UTF_8): CsvParseResult {
-        val text = input.bufferedReader(charset).readText()
-        val lines = text.lines().filter { it.isNotBlank() }
-        if (lines.isEmpty()) {
-            return CsvParseResult(emptyList(), emptyList(), ',', 0, 0)
-        }
+        return input.bufferedReader(charset).use { reader ->
+            var headerLine = reader.readLine()
+            while (headerLine != null && headerLine.isBlank()) {
+                headerLine = reader.readLine()
+            }
+            if (headerLine == null) {
+                return CsvParseResult(emptyList(), emptyList(), ',', 0, 0, 0)
+            }
 
-        val delimiter = detectDelimiter(lines.first())
-        val rawHeaders = splitLine(lines.first(), delimiter).map { it.replace("\"", "").trim() }
-        val headers = rawHeaders.map { normalizeHeader(it) }
-        val columnMap = buildColumnMap(headers)
+            val delimiter = detectDelimiter(headerLine)
+            val rawHeaders = splitLine(headerLine, delimiter).map { it.replace("\"", "").trim() }
+            val headers = rawHeaders.map { normalizeHeader(it) }
+            val columnMap = buildColumnMap(headers)
 
-        var skipped = 0
-        var barcodeLess = 0
-        val rows = lines.drop(1).mapNotNull { line ->
-            val cells = splitLine(line, delimiter)
-            if (cells.size < 2) {
-                skipped++
-                null
-            } else {
-                val row = parseRow(cells, columnMap, rawHeaders)
-                if (row == null) {
+            var skipped = 0
+            var barcodeLess = 0
+            var garbledDesignation = 0
+            val designationIdx = columnMap["designation"]
+            val rows = ArrayList<ParsedArticleRow>(4096)
+
+            while (true) {
+                val line = reader.readLine() ?: break
+                if (line.isBlank()) continue
+                val cells = splitLine(line, delimiter)
+                if (cells.size < 2) {
                     skipped++
-                    null
-                } else if (row.barcode.isBlank() || row.designation.isBlank()) {
-                    skipped++
-                    null
-                } else {
-                    if (row.rawBarcodeWasEmpty) barcodeLess++
-                    row
+                    continue
+                }
+                val designation = designationIdx
+                    ?.let { cells.getOrNull(it)?.trim()?.replace("\"", "") }
+                    .orEmpty()
+                if (designation.isNotBlank() && isGarbledDesignation(designation)) {
+                    garbledDesignation++
+                    continue
+                }
+                val row = parseRow(cells, columnMap)
+                when {
+                    row == null -> skipped++
+                    row.barcode.isBlank() || row.designation.isBlank() -> skipped++
+                    else -> {
+                        if (row.rawBarcodeWasEmpty) barcodeLess++
+                        rows.add(row)
+                    }
                 }
             }
-        }
 
-        return CsvParseResult(rows, headers, delimiter, skipped, barcodeLess)
+            CsvParseResult(rows, headers, delimiter, skipped, barcodeLess, garbledDesignation)
+        }
     }
+
+    /**
+     * Gestium sometimes exports Arabic book titles as question marks when the charset is wrong.
+     * Skip those rows — they are not usable for designation-first search or labels.
+     */
+    fun isGarbledDesignation(designation: String): Boolean {
+        val trimmed = designation.trim()
+        if (trimmed.isEmpty()) return false
+        if (GARBLED_QUESTION_MARKS.containsMatchIn(trimmed)) return true
+        val letterLike = trimmed.count { it.isLetter() || it == '?' }
+        if (letterLike >= 4) {
+            val questionRatio = trimmed.count { it == '?' }.toDouble() / letterLike
+            if (questionRatio >= 0.45) return true
+        }
+        return false
+    }
+
+    private val GARBLED_QUESTION_MARKS = Regex("""\?{3,}""")
 
     private fun detectDelimiter(header: String): Char {
         val semicolon = header.count { it == ';' }
@@ -206,7 +236,6 @@ object CsvParser {
     private fun parseRow(
         cells: List<String>,
         columnMap: Map<String, Int>,
-        headers: List<String>,
     ): ParsedArticleRow? {
         val designationIdx = columnMap["designation"] ?: return null
         val priceIdx = columnMap["price"] ?: return null
@@ -234,16 +263,7 @@ object CsvParser {
             brand = columnMap["brand"]?.let { cells.getOrNull(it)?.trim()?.replace("\"", "") },
             stock = columnMap["stock"]?.let { parseFrenchNumber(cells.getOrNull(it)) },
             unit = columnMap["unit"]?.let { cells.getOrNull(it)?.trim()?.replace("\"", "") },
-            rawData = buildRawData(cells, headers),
             rawBarcodeWasEmpty = rawBarcode.isBlank(),
         ).resolveImportBarcode()
-    }
-
-    private fun buildRawData(cells: List<String>, headers: List<String>): String {
-        return cells.mapIndexedNotNull { index, cell ->
-            val value = cell.trim().replace("\"", "")
-            val label = headers.getOrNull(index)?.takeIf { it.isNotBlank() } ?: "Column ${index + 1}"
-            if (value.isBlank()) null else "$label: $value"
-        }.joinToString("\n")
     }
 }

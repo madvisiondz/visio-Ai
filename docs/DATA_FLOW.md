@@ -6,12 +6,83 @@
 CSV file (content URI or assets sample)
     ??? CsvParser (flexible French/English headers; **Rayon** / **Catégorie** / **Famille** mapped separately)
     ??? ImportService
-        ??? compare by barcode vs existing articles
-        ??? persist designation, price, **rayon**, famille, catégorie, rawData
-        ??? detect NEW / PRICE_CHANGED / RENAMED / REMOVED
+        ??? **ArticleImportSnapshot** (compare fields only — no `rawData` blobs)
+        ??? compare by barcode / codeart / normalized designation
+        ??? persist designation, price, **rayon**, famille, catégorie (`rawData` null on save)
+        ??? detect NEW / PRICE_CHANGED / RENAMED / REMOVED; skip unchanged row writes
         ??? write articles + import_changes + article_price_history
-    ??? ImageMatcher.syncImagesForArticles()
+    ??? ImageMatcher.upsertImagesForArticles() — **new articles only** on re-import; PNG index cached in memory
     ??? UI: Import summary + ImportDetailScreen (enriched rows: PNG thumbnail, Add to To share / To shoot)
+    ??? When **Rayons importants** configured: preview sample rows, change counts, and Report summaries show only those rayons (full DB import unchanged)
+```
+
+## Device transfer (v2.15)
+
+```
+Settings → Device transfer
+    → Purge Gestium catalog — archives sub-barcode flavor map first (`sub_barcode_registry.json`);
+        then DB articles/imports/carts cleared; PNG files kept on device
+    → Re-import CSV — ImportService auto-runs restoreLinkedFlavors() (re-links sub-barcodes to parents)
+    → Restore sub-barcode flavors — manual retry in Settings (same restore logic)
+    → Export full backup — VisioAi_backup_*.zip → Download/VisioAi/
+        (database JSON + product_images + visio_pro_* + paray_home + exports + settings)
+    → Import full backup — pick ZIP; restores files + DB with barcode ID remapping
+    → Export VisioPRO presets — per-category folder + ZIP (articles, photos, catalog PNGs, designs)
+    → Export PNG database — all gallery PNGs incl. sub-barcode variants
+```
+
+## Background long tasks (v2.15.6)
+
+```
+Settings / Import confirm
+    → OasisBackgroundTaskManager.enqueue(kind [, uri | csv parse | png uris])
+    → OasisBackgroundTaskService (foreground + wake lock)
+        → runs task on Dispatchers.IO; updates notification + shared StateFlow
+    → UI observes progress overlay; user may lock screen — task continues
+```
+
+Kinds: sync sub-PNGs, re-index, PNG export, full backup import/export, VisioPRO bundle, purge Gestium, sample data, load ready PNGs, CSV import.
+
+## PARAY Learn V1 (v2.16.0)
+
+```
+PARAY tab → Learn → Start learning
+    → queue: articles + barcode + FOUND PNG
+    → session: PNG front confirm (camera vs reference)
+    → auto capture Left → Right → Back
+    → learn_index.json (visual knowledge, separate from Room)
+    → on LEARNED: merge into visual_index.json for AGENT matcher
+```
+
+AGENT recognition unchanged — `ParayCameraMatcher` boosts scores using learned multi-view records.
+
+### Learn settings (configurable thresholds)
+
+```
+paray_home/memory/learn_settings.json
+  frontConfirmationThreshold
+  sideCaptureThreshold
+  backCaptureThreshold
+    → ParayLearnSettingsStore
+    → ParayLearnEngine(settings)   // no hardcoded confidence in engine
+```
+
+Settings UI to edit values — planned, not built.
+
+## 2a. Sub-barcode flavor persistence (v2.15.5)
+
+```
+Save sub-barcode PNG (Check & Shoot / PhotoRoom)
+    → filename: {designation}{altIndex}.png  (e.g. PommesGolden1.png)
+    → PNG metadata: Barcode, ParentBarcode, VariantType=sub, designation, price…
+
+Load PNGs / CSV import / Settings → Sync sub-PNGs
+    → scan product_images — detect VariantType=sub or ParentBarcode (legacy sub_*.png too)
+    → backfill metadata on old files; rename legacy sub_* → designation{n}.png
+    → link article_alternate_barcodes — scanner + search + To share variants
+
+Primary image re-index
+    → sub-variant PNGs excluded (not matched as main article gallery)
 ```
 
 ## 2. Article search & catalog
@@ -23,7 +94,7 @@ User query
     → Home / Catalog list (main + each sub-barcode as separate row)
 ```
 
-## 2a. Sub-barcode acquisition (v2.4.0)
+## 2b. Sub-barcode acquisition (v2.4.0)
 
 ```
 Scan sub-barcode (AGENT SUB-BC or Article → Add sub-barcode & batch shoot)

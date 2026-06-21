@@ -9,8 +9,8 @@ import org.junit.Test
 class BottomNavSelectionTest {
 
     @Test
-    fun bottomNav_hasEightPrimaryDestinations() {
-        assertEquals(8, bottomNavItems.size)
+    fun bottomNav_hasNinePrimaryDestinations() {
+        assertEquals(9, bottomNavItems.size)
     }
 
     @Test

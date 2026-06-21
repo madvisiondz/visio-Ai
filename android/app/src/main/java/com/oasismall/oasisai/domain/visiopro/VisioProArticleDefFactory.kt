@@ -16,24 +16,28 @@ object VisioProArticleDefFactory {
         hardcodedByCategory[category].orEmpty()
 
     fun fromCatalogArticle(article: ArticleWithImage, category: VisioProCategory): VisioProArticleDef {
+        val printCode = VisioProPrintCode.resolve(article)
         val matched = matchHardcoded(article, category)
         if (matched != null) {
-            return matched.copy(catalogArticleId = article.id)
+            return matched.copy(
+                catalogArticleId = article.id,
+                barcodeSuffix = printCode ?: matched.barcodeSuffix,
+            )
         }
-        val digits = article.barcode.filter { it.isDigit() }
         return VisioProArticleDef(
             slug = "cat_${article.id}",
             labelFr = article.designation,
             designationKeywords = listOf(article.designation, article.normalizedName),
             csvDesignation = article.designation,
-            barcodeSuffix = digits.takeLast(3).takeIf { it.length == 3 },
+            barcodeSuffix = printCode,
             catalogArticleId = article.id,
         )
     }
 
     private fun matchHardcoded(article: ArticleWithImage, category: VisioProCategory): VisioProArticleDef? {
         val normDesignation = NameNormalizer.normalize(article.designation)
-        val suffix = article.barcode.filter { it.isDigit() }.takeLast(3)
+        val suffix = VisioProPrintCode.resolve(article)
+            ?: article.barcode.filter { it.isDigit() }.takeLast(3)
         return hardcodedByCategory[category].orEmpty().firstOrNull { def ->
             def.barcodeSuffix?.let { it == suffix } == true ||
                 NameNormalizer.normalize(def.csvDesignation) == normDesignation ||

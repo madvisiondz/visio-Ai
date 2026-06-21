@@ -12,6 +12,9 @@ import com.oasismall.oasisai.data.db.dao.WorkflowHistoryItem
 import com.oasismall.oasisai.data.db.entity.ArticleAlternateBarcodeEntity
 import com.oasismall.oasisai.data.db.entity.ArticleEntity
 import com.oasismall.oasisai.data.db.entity.ArticlePriceHistoryEntity
+import com.oasismall.oasisai.data.db.entity.BatchCameraQueueEntity
+import com.oasismall.oasisai.data.db.entity.BulkCaptureEntity
+import com.oasismall.oasisai.data.db.entity.CameraBatchItemEntity
 import com.oasismall.oasisai.data.db.entity.ImportChangeEntity
 import com.oasismall.oasisai.data.db.entity.ImportEntity
 import com.oasismall.oasisai.data.db.entity.PreselectionItemEntity
@@ -25,9 +28,13 @@ import com.oasismall.oasisai.data.model.ArticleChangeStatus
 import com.oasismall.oasisai.data.model.CartType
 import com.oasismall.oasisai.data.model.PrintBatchStatus
 import com.oasismall.oasisai.data.model.TemplateType
+import com.oasismall.oasisai.domain.ImportChangeCounts
+import com.oasismall.oasisai.domain.ParsedArticleRow
 import com.oasismall.oasisai.domain.design.DesignCartExpand
 import com.oasismall.oasisai.domain.settings.ImportantRayonsConfig
 import com.oasismall.oasisai.domain.settings.ImportantRayonsStore
+import com.oasismall.oasisai.domain.flavors.SubBarcodeRegistry
+import com.oasismall.oasisai.domain.flavors.SubBarcodeRegistryEntry
 import com.oasismall.oasisai.util.BarcodeSuffixMatcher
 import com.oasismall.oasisai.util.NameNormalizer
 import com.oasismall.oasisai.util.SearchQuery
@@ -48,6 +55,8 @@ import java.io.File
 class OasisRepository(
     private val db: OasisDatabase,
     private val importantRayonsStore: ImportantRayonsStore,
+    private val subBarcodeRegistry: SubBarcodeRegistry? = null,
+    private val filesDir: File? = null,
 ) {
 
     val importantRayonsConfig: Flow<ImportantRayonsConfig> = importantRayonsStore.config
@@ -348,6 +357,71 @@ class OasisRepository(
     fun observeMeaningfulImportChanges(importId: Long): Flow<List<ImportChangeEntity>> =
         db.importChangeDao().observeMeaningfulByImport(importId)
 
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun observeMeaningfulImportChangesEnrichedFiltered(importId: Long): Flow<List<ImportChangeUiRow>> =
+        combine(
+            observeMeaningfulImportChanges(importId),
+            importantRayonsConfig,
+        ) { changes, config -> changes to config }
+            .flatMapLatest { (changes, config) ->
+                flow {
+                    val enriched = enrichImportChanges(changes)
+                    emit(
+                        if (importantRayonFilter(config) == null) {
+                            enriched
+                        } else {
+                            enriched.filter { matchesImportantRayon(it.article?.rayon, config) }
+                        },
+                    )
+                }
+            }
+
+    suspend fun summarizeImportsForDisplay(
+        importIds: List<Long>,
+        config: ImportantRayonsConfig,
+    ): Map<Long, ImportChangeCounts> {
+        if (importIds.isEmpty()) return emptyMap()
+        val filterActive = importantRayonFilter(config) != null
+        if (!filterActive) {
+            return importIds.associateWith { id ->
+                val imp = db.importDao().getById(id) ?: return@associateWith ImportChangeCounts()
+                ImportChangeCounts(
+                    newCount = imp.newCount,
+                    priceChangedCount = imp.priceChangedCount,
+                    renamedCount = imp.renamedCount,
+                    removedCount = imp.removedCount,
+                )
+            }
+        }
+        val changes = db.importChangeDao().getMeaningfulByImports(importIds)
+        val articleIds = changes.mapNotNull { it.articleId }.distinct()
+        val barcodes = changes.filter { it.articleId == null }.map { it.barcode }.distinct()
+        val articlesById = articleIds.chunked(500)
+            .flatMap { db.articleDao().getByIds(it) }
+            .associateBy { it.id }
+        val articlesByBarcode = barcodes.chunked(500)
+            .flatMap { db.articleDao().getByBarcodes(it) }
+            .associateBy { it.barcode }
+        fun rayonFor(change: ImportChangeEntity): String? =
+            change.articleId?.let { articlesById[it]?.rayon }
+                ?: articlesByBarcode[change.barcode]?.rayon
+        val filtered = changes.filter { matchesImportantRayon(rayonFor(it), config) }
+        val grouped = filtered.groupBy { it.importId }
+        return importIds.associateWith { id ->
+            ImportChangeCounts.fromChangeTypes(
+                grouped[id].orEmpty().map { it.changeType },
+            )
+        }
+    }
+
+    fun filterParsedRowsByImportantRayons(
+        rows: List<ParsedArticleRow>,
+        config: ImportantRayonsConfig = importantRayonsStore.config.value,
+    ): List<ParsedArticleRow> {
+        if (importantRayonFilter(config) == null) return rows
+        return rows.filter { matchesImportantRayon(it.rayon, config) }
+    }
+
     fun observeRecentCsvChanges(limit: Int = 300): Flow<List<ImportChangeEntity>> =
         db.importChangeDao().observeRecentChanges(limit)
 
@@ -434,6 +508,12 @@ class OasisRepository(
         val alt = db.articleAlternateBarcodeDao().getByBarcode(trimmed) ?: return null
         return db.articleDao().getById(alt.articleId)
     }
+
+    suspend fun getPrimaryArticleByBarcode(barcode: String): ArticleEntity? =
+        db.articleDao().getByBarcode(barcode.trim())
+
+    suspend fun getAllAlternateBarcodes(): List<ArticleAlternateBarcodeEntity> =
+        db.articleAlternateBarcodeDao().getAll()
 
     /** True when barcode is the primary Gestium CSV barcode (not only an alternate link). */
     suspend fun isPrimaryGestiumBarcode(barcode: String): Boolean =
@@ -541,8 +621,29 @@ class OasisRepository(
         val sub = subBarcode.trim()
         val main = mainBarcode.trim()
         linkAlternateBarcode(articleId, sub, imagePath)
+        rememberSubBarcodeInRegistry(articleId, main, sub, imagePath)
         logArticleEvent(articleId, "SUB_BC", "Sub-barcode $sub → main $main")
         return null
+    }
+
+    private suspend fun rememberSubBarcodeInRegistry(
+        articleId: Long,
+        mainBarcode: String,
+        subBarcode: String,
+        imagePath: String?,
+    ) {
+        val registry = subBarcodeRegistry ?: return
+        val parent = db.articleDao().getById(articleId)
+        registry.upsert(
+            SubBarcodeRegistryEntry(
+                subBarcode = subBarcode,
+                parentBarcode = mainBarcode,
+                parentDesignation = parent?.designation,
+                imageRelativePath = imagePath?.let { path ->
+                    filesDir?.let { dir -> toStoredPath(path, dir) } ?: path
+                },
+            ),
+        )
     }
 
     suspend fun unlinkAlternateBarcode(articleId: Long, barcode: String): String? {
@@ -551,6 +652,7 @@ class OasisRepository(
         if (alt.articleId != articleId) return "Sub-barcode not linked to this article."
         alt.imagePath?.let { path -> runCatching { File(path).delete() } }
         db.articleAlternateBarcodeDao().deleteByBarcode(trimmed)
+        subBarcodeRegistry?.remove(trimmed)
         logArticleEvent(articleId, "SUB_BC_REMOVE", "Removed sub-barcode $trimmed")
         return null
     }
@@ -560,6 +662,12 @@ class OasisRepository(
     }
 
     suspend fun getAllArticles(): List<ArticleEntity> = db.articleDao().getAll()
+
+    suspend fun listParayLearnReadyArticles(): List<ArticleWithImage> =
+        withContext(Dispatchers.IO) { db.articleDao().listLearnReadyArticles() }
+
+    suspend fun getArticlesImportSnapshot(): List<com.oasismall.oasisai.data.db.dao.ArticleImportSnapshot> =
+        db.articleDao().getImportSnapshots()
 
     /**
      * Placeholder article for Stamper when barcode is not in CSV yet.
@@ -642,17 +750,32 @@ class OasisRepository(
         priceHistory: List<ArticlePriceHistoryEntity>,
         changes: List<ImportChangeEntity>,
         importUpdate: ImportEntity,
-    ) {
-        articles.forEach { article ->
-            if (article.id == 0L) {
-                db.articleDao().insert(article)
-            } else {
-                db.articleDao().update(article)
-            }
+    ): List<ArticleEntity> = db.withTransaction {
+        val newArticles = articles.filter { it.id == 0L }
+        val updatedArticles = articles.filter { it.id != 0L }
+        newArticles.chunked(500).forEach { chunk ->
+            if (chunk.isNotEmpty()) db.articleDao().insertAll(chunk)
+        }
+        updatedArticles.chunked(500).forEach { chunk ->
+            if (chunk.isNotEmpty()) db.articleDao().insertAll(chunk)
         }
         if (priceHistory.isNotEmpty()) db.articlePriceHistoryDao().insertAll(priceHistory)
         if (changes.isNotEmpty()) db.importChangeDao().insertAll(changes)
         db.importDao().update(importUpdate)
+        resolveArticlesAfterSave(articles)
+    }
+
+    private suspend fun resolveArticlesAfterSave(articles: List<ArticleEntity>): List<ArticleEntity> {
+        if (articles.isEmpty()) return emptyList()
+        val needsIds = articles.filter { it.id == 0L }
+        if (needsIds.isEmpty()) return articles
+        val byBarcode = needsIds.map { it.barcode }.distinct()
+            .chunked(500)
+            .flatMap { db.articleDao().getByBarcodes(it) }
+            .associateBy { it.barcode }
+        return articles.map { article ->
+            if (article.id != 0L) article else byBarcode[article.barcode] ?: article
+        }
     }
 
     suspend fun saveProductImage(image: ProductImageEntity) {
@@ -663,6 +786,15 @@ class OasisRepository(
 
     suspend fun replaceProductImages(images: List<ProductImageEntity>) {
         replaceProductImagesBatched(images)
+    }
+
+    suspend fun upsertProductImagesBatched(images: List<ProductImageEntity>, batchSize: Int = 800) {
+        if (images.isEmpty()) return
+        db.withTransaction {
+            images.chunked(batchSize).forEach { chunk ->
+                db.productImageDao().insertAll(chunk)
+            }
+        }
     }
 
     suspend fun replaceProductImagesBatched(images: List<ProductImageEntity>, batchSize: Int = 800) {
@@ -1068,6 +1200,213 @@ class OasisRepository(
         )
     }
 
+    suspend fun getAlternateBarcodeImagePaths(): List<File> =
+        db.articleAlternateBarcodeDao().getAll()
+            .mapNotNull { it.imagePath?.trim()?.takeIf { p -> p.isNotEmpty() }?.let(::File) }
+            .filter { it.exists() }
+
+    suspend fun purgeGestiumCatalog() {
+        db.withTransaction {
+            db.preselectionDao().deleteAll()
+            db.articleAlternateBarcodeDao().deleteAll()
+            db.productImageDao().deleteAll()
+            db.articlePriceHistoryDao().deleteAll()
+            db.importChangeDao().deleteAll()
+            db.articleDao().deleteAll()
+            db.importDao().deleteAll()
+        }
+    }
+
+    suspend fun purgeAllAppData() {
+        db.withTransaction {
+            db.preselectionDao().deleteAll()
+            db.articleAlternateBarcodeDao().deleteAll()
+            db.productImageDao().deleteAll()
+            db.articlePriceHistoryDao().deleteAll()
+            db.importChangeDao().deleteAll()
+            db.articleDao().deleteAll()
+            db.importDao().deleteAll()
+            db.workflowHistoryDao().deleteAll()
+            db.printBatchDao().deleteAllItems()
+            db.printBatchDao().deleteAll()
+            db.promoAlertDao().deleteAll()
+            db.bulkCaptureDao().deleteAll()
+            db.cameraBatchDao().deleteAll()
+            db.batchCameraQueueDao().clearAll()
+        }
+    }
+
+    suspend fun exportDatabaseTables(): DatabaseExportTables = DatabaseExportTables(
+        articles = db.articleDao().getAll(),
+        alternateBarcodes = db.articleAlternateBarcodeDao().getAll(),
+        imports = db.importDao().getAll(),
+        importChanges = db.importChangeDao().getAll(),
+        priceHistory = db.articlePriceHistoryDao().getAll(),
+        productImages = db.productImageDao().getAll(),
+        preselectionItems = db.preselectionDao().getAll(),
+        printTemplates = db.printTemplateDao().getAll(),
+        printBatches = db.printBatchDao().getAll(),
+        printBatchItems = db.printBatchDao().getAllItems(),
+        promoAlerts = db.promoAlertDao().getAll(),
+        workflowHistory = db.workflowHistoryDao().getAll(),
+        bulkCaptures = db.bulkCaptureDao().getAll(),
+        cameraBatchItems = db.cameraBatchDao().getAll(),
+        batchCameraQueue = db.batchCameraQueueDao().getAll(),
+    )
+
+    suspend fun restoreDatabaseTables(
+        tables: DatabaseExportTables,
+        filesDir: File,
+    ) {
+        db.withTransaction {
+            db.preselectionDao().deleteAll()
+            db.articleAlternateBarcodeDao().deleteAll()
+            db.productImageDao().deleteAll()
+            db.articlePriceHistoryDao().deleteAll()
+            db.importChangeDao().deleteAll()
+            db.articleDao().deleteAll()
+            db.importDao().deleteAll()
+            db.workflowHistoryDao().deleteAll()
+            db.printBatchDao().deleteAllItems()
+            db.printBatchDao().deleteAll()
+            db.promoAlertDao().deleteAll()
+            db.bulkCaptureDao().deleteAll()
+            db.cameraBatchDao().deleteAll()
+            db.batchCameraQueueDao().clearAll()
+
+            val newImports = tables.imports.map { it.copy(id = 0) }
+            newImports.forEach { db.importDao().insert(it) }
+            val freshImports = db.importDao().getAll()
+            val resolvedImportIdMap = tables.imports.zip(freshImports).associate { (old, new) -> old.id to new.id }
+
+            val newArticles = tables.articles.map { article ->
+                article.copy(
+                    id = 0,
+                    sourceImportId = article.sourceImportId?.let { resolvedImportIdMap[it] },
+                )
+            }
+            newArticles.chunked(500).forEach { chunk ->
+                if (chunk.isNotEmpty()) db.articleDao().insertAll(chunk)
+            }
+            val freshArticles = db.articleDao().getAll().associateBy { it.barcode }
+            val resolvedArticleIdMap = tables.articles.associate { old ->
+                old.id to (freshArticles[old.barcode]?.id ?: 0L)
+            }
+
+            tables.alternateBarcodes.forEach { alt ->
+                val articleId = resolvedArticleIdMap[alt.articleId] ?: return@forEach
+                db.articleAlternateBarcodeDao().insert(
+                    alt.copy(
+                        id = 0,
+                        articleId = articleId,
+                        imagePath = remapStoredPath(alt.imagePath, filesDir),
+                    ),
+                )
+            }
+
+            tables.productImages.forEach { img ->
+                val articleId = resolvedArticleIdMap[img.articleId] ?: return@forEach
+                db.productImageDao().insert(
+                    img.copy(
+                        id = 0,
+                        articleId = articleId,
+                        imagePath = remapStoredPath(img.imagePath, filesDir),
+                    ),
+                )
+            }
+
+            tables.priceHistory.forEach { entry ->
+                val articleId = resolvedArticleIdMap[entry.articleId] ?: return@forEach
+                val importId = resolvedImportIdMap[entry.importId] ?: return@forEach
+                db.articlePriceHistoryDao().insert(
+                    entry.copy(id = 0, articleId = articleId, importId = importId),
+                )
+            }
+
+            tables.importChanges.forEach { change ->
+                db.importChangeDao().insertAll(
+                    listOf(
+                        change.copy(
+                            id = 0,
+                            importId = resolvedImportIdMap[change.importId] ?: return@forEach,
+                            articleId = change.articleId?.let { resolvedArticleIdMap[it] },
+                        ),
+                    ),
+                )
+            }
+
+            tables.preselectionItems.forEach { item ->
+                val articleId = resolvedArticleIdMap[item.articleId] ?: return@forEach
+                db.preselectionDao().insert(item.copy(id = 0, articleId = articleId))
+            }
+
+            tables.printBatches.forEach { batch ->
+                db.printBatchDao().insert(
+                    batch.copy(
+                        id = 0,
+                        exportPath = remapStoredPath(batch.exportPath, filesDir),
+                        previewPath = batch.previewPath?.let { remapStoredPath(it, filesDir) },
+                    ),
+                )
+            }
+            val freshBatches = db.printBatchDao().getAll()
+            val resolvedBatchIdMap = tables.printBatches.zip(freshBatches).associate { (old, new) -> old.id to new.id }
+
+            tables.printBatchItems.forEach { item ->
+                db.printBatchDao().insertItems(
+                    listOf(
+                        item.copy(
+                            id = 0,
+                            batchId = resolvedBatchIdMap[item.batchId] ?: return@forEach,
+                            articleId = item.articleId?.let { resolvedArticleIdMap[it] },
+                            imageSnapshotPath = item.imageSnapshotPath?.let { remapStoredPath(it, filesDir) },
+                        ),
+                    ),
+                )
+            }
+
+            tables.promoAlerts.forEach { alert ->
+                db.promoAlertDao().insert(
+                    alert.copy(
+                        id = 0,
+                        batchId = resolvedBatchIdMap[alert.batchId] ?: alert.batchId,
+                    ),
+                )
+            }
+
+            tables.workflowHistory.forEach { event ->
+                db.workflowHistoryDao().insert(
+                    event.copy(
+                        id = 0,
+                        articleId = event.articleId?.let { resolvedArticleIdMap[it] },
+                    ),
+                )
+            }
+
+            tables.bulkCaptures.forEach { capture ->
+                db.bulkCaptureDao().upsert(
+                    capture.copy(imagePath = remapStoredPath(capture.imagePath, filesDir)),
+                )
+            }
+
+            tables.cameraBatchItems.forEach { item ->
+                db.cameraBatchDao().insert(
+                    item.copy(
+                        id = 0,
+                        articleId = item.articleId?.let { resolvedArticleIdMap[it] },
+                        shotPath = remapStoredPath(item.shotPath, filesDir),
+                        photoroomPath = item.photoroomPath?.let { remapStoredPath(it, filesDir) },
+                        linkParentArticleId = item.linkParentArticleId?.let { resolvedArticleIdMap[it] },
+                    ),
+                )
+            }
+
+            tables.batchCameraQueue.forEach { item ->
+                db.batchCameraQueueDao().insertAll(listOf(item.copy(id = 0)))
+            }
+        }
+    }
+
     companion object {
         const val DESIGN_DONE_MAX = 50
     }
@@ -1095,3 +1434,38 @@ data class ArticlePanelMeta(
     val lastPrintedAt: Long? = null,
     val subBarcodes: List<SubBarcodeInfo> = emptyList(),
 )
+
+data class DatabaseExportTables(
+    val articles: List<ArticleEntity>,
+    val alternateBarcodes: List<ArticleAlternateBarcodeEntity>,
+    val imports: List<ImportEntity>,
+    val importChanges: List<ImportChangeEntity>,
+    val priceHistory: List<ArticlePriceHistoryEntity>,
+    val productImages: List<ProductImageEntity>,
+    val preselectionItems: List<PreselectionItemEntity>,
+    val printTemplates: List<PrintTemplateEntity>,
+    val printBatches: List<PrintBatchEntity>,
+    val printBatchItems: List<PrintBatchItemEntity>,
+    val promoAlerts: List<PromoAlertEntity>,
+    val workflowHistory: List<WorkflowHistoryEntity>,
+    val bulkCaptures: List<BulkCaptureEntity>,
+    val cameraBatchItems: List<CameraBatchItemEntity>,
+    val batchCameraQueue: List<BatchCameraQueueEntity>,
+)
+
+internal fun remapStoredPath(path: String?, filesDir: File): String {
+    if (path.isNullOrBlank()) return ""
+    if (path.startsWith("files/")) {
+        return File(filesDir, path.removePrefix("files/")).absolutePath
+    }
+    return path
+}
+
+internal fun toStoredPath(absolutePath: String, filesDir: File): String {
+    val filesRoot = filesDir.absolutePath
+    return if (absolutePath.startsWith(filesRoot)) {
+        "files/" + absolutePath.removePrefix(filesRoot).trimStart(File.separatorChar)
+    } else {
+        absolutePath
+    }
+}

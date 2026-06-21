@@ -30,8 +30,10 @@ class ParayAgent(
     private val visualIndex = ParayVisualIndex(home)
     private val fingerprintStore = ParayFingerprintStore(home)
     private val barcodeMemory = ParayBarcodeMemory(home)
+    val learnStore = ParayLearnStore(home)
+    val learnSettingsStore = ParayLearnSettingsStore(home)
     val sessionStore = ParaySessionStore(home)
-    private val cameraMatcher = ParayCameraMatcher(visualIndex, fingerprintStore)
+    private val cameraMatcher = ParayCameraMatcher(visualIndex, fingerprintStore, learnStore)
     private val learnLog = home.learnEventsFile
 
     private val layoutFit = LayoutFitAgent(
@@ -44,6 +46,62 @@ class ParayAgent(
     fun gpuProfile(): GpuProfile = layoutFit.gpuProfile()
 
     fun learnedProductCount(): Int = visualIndex.count()
+
+    fun parayLearnedCount(): Int = learnStore.learnedCount()
+
+    fun learnQueue(repository: OasisRepository) = ParayLearnQueue(repository, learnStore)
+
+    suspend fun loadLearnSettings(): ParayLearnSettings = learnSettingsStore.get()
+
+    fun learnEngine(settings: ParayLearnSettings = learnSettingsStore.current()) =
+        ParayLearnEngine(settings)
+
+    /** Persist completed learn record and merge into visual index for AGENT recognition. */
+    fun saveLearnRecord(record: ParayLearnRecord) {
+        learnStore.put(record)
+        if (record.status != ParayLearnStatus.LEARNED) return
+        val best = listOfNotNull(
+            record.frontCapture,
+            record.leftCapture,
+            record.rightCapture,
+            record.backCapture,
+        ).maxByOrNull { it.confidence } ?: return
+        val (wordCount, charCount) = VisualFeatureExtractor.typographyOf(record.designation)
+        visualIndex.learn(
+            ProductVisualSignature(
+                articleId = record.articleId,
+                barcode = record.barcode,
+                designation = record.designation,
+                shapeAspect = best.shapeAspect,
+                fillRatio = best.fillRatio,
+                dominantColors = best.dominantColors,
+                designationWordCount = wordCount,
+                designationCharCount = charCount,
+                templateId = VisualFeatureExtractor.templateId(),
+                labelPalette = VisualFeatureExtractor.shelfLabelPalette(),
+                observationCount = record.learnedViewCount.coerceAtLeast(4),
+                lastLearnedAt = record.learnedAt ?: System.currentTimeMillis(),
+                imageFileName = File(record.pngFrontPath).name,
+            ),
+        )
+        appendLearnEvent(
+            ProductVisualSignature(
+                articleId = record.articleId,
+                barcode = record.barcode,
+                designation = record.designation,
+                shapeAspect = best.shapeAspect,
+                fillRatio = best.fillRatio,
+                dominantColors = best.dominantColors,
+                designationWordCount = wordCount,
+                designationCharCount = charCount,
+                templateId = "paray_learn_v1",
+                labelPalette = VisualFeatureExtractor.shelfLabelPalette(),
+                observationCount = record.learnedViewCount,
+                lastLearnedAt = record.learnedAt ?: System.currentTimeMillis(),
+                imageFileName = File(record.pngFrontPath).name,
+            ),
+        )
+    }
 
     fun fingerprintCount(): Int = fingerprintStore.count()
 

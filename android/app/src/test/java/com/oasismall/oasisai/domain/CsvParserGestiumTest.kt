@@ -1,6 +1,7 @@
 package com.oasismall.oasisai.domain
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.nio.charset.Charset
@@ -47,5 +48,31 @@ class CsvParserGestiumTest {
         assertTrue(result.rows.any { it.designation == "PIEDS DE VEAU" })
         assertEquals("CA:13145", result.rows.first { it.designation == "PIEDS DE VEAU" }.barcode)
         assertEquals(0, result.skippedRows)
+    }
+
+    @Test
+    fun garbledDesignation_withQuestionMarkRuns_isSkipped() {
+        val garbledRow =
+            """
+            "???? ???? ? ???? ??????? ? ??????? ????????",,"75555","","4000","-1","","","290,00","290,00","1","","0,00","298,70","298,70","","","Librairie","N/D","0","0","9789961475119","0039"
+            """.trimIndent()
+        val goodRow =
+            """
+            "SKOR SUCRE CEVITAL 1KG",,"00008","1200.PALL","","4978","","","90,00","90,00","10","498","0,00","88,00","88,00","CEVITAL","","Epicerie","N/D","93660","0","6130234002366","FR714"
+            """.trimIndent()
+        val csv = "$gestiumHeader\n$garbledRow\n$goodRow"
+        val cp1252 = Charset.forName("Windows-1252")
+        val result = CsvParser.parse(csv.byteInputStream(cp1252), cp1252)
+        assertEquals(1, result.garbledDesignationRows)
+        assertEquals(1, result.rows.size)
+        assertEquals("SKOR SUCRE CEVITAL 1KG", result.rows.single().designation)
+    }
+
+    @Test
+    fun isGarbledDesignation_detectsRunsAndHighQuestionRatio() {
+        assertTrue(CsvParser.isGarbledDesignation("???? ???? ? ????"))
+        assertTrue(CsvParser.isGarbledDesignation("??? ??????? 5 ???????"))
+        assertFalse(CsvParser.isGarbledDesignation("SKOR SUCRE CEVITAL 1KG"))
+        assertFalse(CsvParser.isGarbledDesignation("WAFA FILM TRANSPARENT 200M"))
     }
 }

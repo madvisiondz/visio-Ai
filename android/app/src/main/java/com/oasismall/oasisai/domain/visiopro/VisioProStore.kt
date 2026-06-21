@@ -66,6 +66,9 @@ class VisioProStore(context: Context) {
             val obj = root.optJSONObject(slug) ?: JSONObject()
             if (price == null) {
                 obj.remove("manualPrice")
+                obj.remove("manualPriceOverridden")
+                obj.remove("csvPriceWhenOverridden")
+                obj.remove("manualPriceChangedAt")
             } else {
                 obj.put("manualPrice", price)
             }
@@ -73,6 +76,83 @@ class VisioProStore(context: Context) {
             writeRoot(root)
         }
     }
+
+    suspend fun setManualPriceOverride(slug: String, price: Double, csvBaseline: Double) =
+        withContext(Dispatchers.IO) {
+            synchronized(lock) {
+                val root = readRoot()
+                val obj = root.optJSONObject(slug) ?: JSONObject()
+                obj.put("manualPrice", price)
+                obj.put("manualPriceOverridden", true)
+                obj.put("csvPriceWhenOverridden", csvBaseline)
+                obj.put("manualPriceChangedAt", System.currentTimeMillis())
+                root.put(slug, obj)
+                writeRoot(root)
+            }
+        }
+
+    suspend fun clearManualPriceOverride(slug: String) = setManualPrice(slug, null)
+
+    suspend fun setManualDesignation(slug: String, designation: String?) = withContext(Dispatchers.IO) {
+        synchronized(lock) {
+            val root = readRoot()
+            val obj = root.optJSONObject(slug) ?: JSONObject()
+            val trimmed = designation?.trim().orEmpty()
+            if (trimmed.isBlank()) {
+                obj.remove("manualDesignation")
+            } else {
+                obj.put("manualDesignation", trimmed)
+            }
+            root.put(slug, obj)
+            writeRoot(root)
+        }
+    }
+
+    suspend fun setManualDesignationFontRatio(slug: String, ratio: Float?) = withContext(Dispatchers.IO) {
+        synchronized(lock) {
+            val root = readRoot()
+            val obj = root.optJSONObject(slug) ?: JSONObject()
+            if (ratio == null || ratio <= 0f) {
+                obj.remove("manualDesignationFontRatio")
+            } else {
+                obj.put("manualDesignationFontRatio", ratio.toDouble())
+            }
+            root.put(slug, obj)
+            writeRoot(root)
+        }
+    }
+
+    suspend fun getPresetDesignationFontRatio(slug: String, presetId: String): Float? =
+        withContext(Dispatchers.IO) {
+            synchronized(lock) {
+                val obj = readRoot().optJSONObject(slug) ?: return@withContext null
+                obj.optJSONObject("presetFontRatios")
+                    ?.optDouble(presetId)
+                    ?.toFloat()
+                    ?.takeIf { it > 0f }
+            }
+        }
+
+    suspend fun setPresetDesignationFontRatio(slug: String, presetId: String, ratio: Float?) =
+        withContext(Dispatchers.IO) {
+            synchronized(lock) {
+                val root = readRoot()
+                val obj = root.optJSONObject(slug) ?: JSONObject()
+                val ratios = obj.optJSONObject("presetFontRatios") ?: JSONObject()
+                if (ratio == null || ratio <= 0f) {
+                    ratios.remove(presetId)
+                } else {
+                    ratios.put(presetId, ratio.toDouble())
+                }
+                if (ratios.length() == 0) {
+                    obj.remove("presetFontRatios")
+                } else {
+                    obj.put("presetFontRatios", ratios)
+                }
+                root.put(slug, obj)
+                writeRoot(root)
+            }
+        }
 
     suspend fun setPrintModified(slug: String, modified: Boolean) = withContext(Dispatchers.IO) {
         synchronized(lock) {
@@ -135,6 +215,19 @@ class VisioProStore(context: Context) {
             slug = slug,
             manualPrice = if (obj.has("manualPrice") && !obj.isNull("manualPrice")) {
                 obj.getDouble("manualPrice")
+            } else {
+                null
+            },
+            manualPriceOverridden = obj.optBoolean("manualPriceOverridden", false),
+            csvPriceWhenOverridden = if (obj.has("csvPriceWhenOverridden") && !obj.isNull("csvPriceWhenOverridden")) {
+                obj.getDouble("csvPriceWhenOverridden")
+            } else {
+                null
+            },
+            manualPriceChangedAt = obj.optLong("manualPriceChangedAt").takeIf { it > 0L },
+            manualDesignation = obj.optString("manualDesignation").takeIf { it.isNotBlank() },
+            manualDesignationFontRatio = if (obj.has("manualDesignationFontRatio") && !obj.isNull("manualDesignationFontRatio")) {
+                obj.getDouble("manualDesignationFontRatio").toFloat()
             } else {
                 null
             },

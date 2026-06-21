@@ -26,6 +26,10 @@
 
 ## Phase 3 — Polish (in progress)
 
+- [x] **v2.16.0** PARAY Learn V1 — trusted-product queue, front confirm, multi-view capture, AGENT matcher boost
+- [x] **v2.15.6** Background foreground service — all Settings long tasks + CSV import survive screen lock
+- [x] **v2.15.2** Sub-barcode flavor registry — survives Gestium purge; auto-restore on CSV import
+- [x] **v2.15.0** Device transfer — purge, full backup ZIP, VisioPRO bundle, PNG export all variants
 - [x] **v2.4.0** Sub-barcode confirm + deferred PhotoRoom link + per-barcode images + removable chips (Room v14)
 - [x] v2.11.0 Design Historique tab + batch detail reprint; dated export paths; CSV-change glow (Room v18)
 - [x] v2.5.0 Design queue order preserved; AGENT Bulk mode + `bulk_captures` (Room v11)
@@ -76,6 +80,13 @@
 5. Pre-selection → Print → **Shelf A4** → Generate PDF
 6. Print History → verify batch
 7. Import a second CSV with changed prices (when ready)
+
+## Phase 4c — PARAY Learn (in progress)
+
+- [x] **v2.16.0** PARAY tab + Learn queue + session (front confirm, L/R/B capture)
+- [x] Configurable thresholds architecture — `learn_settings.json`, engine reads settings
+- [ ] Settings UI sliders for front / side / back thresholds
+- [ ] Memory / Knowledge / Statistics tabs
 
 ## Phase 4b — VisioPRO ✅ (v2.6.3)
 

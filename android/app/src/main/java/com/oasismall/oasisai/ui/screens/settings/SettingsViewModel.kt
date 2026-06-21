@@ -7,12 +7,9 @@ import androidx.lifecycle.viewModelScope
 import com.oasismall.oasisai.data.db.dao.DashboardStats
 import com.oasismall.oasisai.data.repository.OasisRepository
 import com.oasismall.oasisai.domain.ImageMatcher
-import com.oasismall.oasisai.domain.ImportService
-import com.oasismall.oasisai.domain.ReadyPngLoader
-import com.oasismall.oasisai.domain.ReadyPngModel
-import com.oasismall.oasisai.domain.visio.ProductImagesExporter
+import com.oasismall.oasisai.domain.background.OasisBackgroundTaskKind
+import com.oasismall.oasisai.domain.background.OasisBackgroundTaskManager
 import com.oasismall.oasisai.domain.visio.PhotoroomStorage
-import com.oasismall.oasisai.util.TaskProgress
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -20,15 +17,20 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 data class SettingsUiState(
     val isReindexing: Boolean = false,
     val isLoadingSample: Boolean = false,
     val isLoadingImages: Boolean = false,
     val isExportingPngs: Boolean = false,
-    val progress: TaskProgress? = null,
+    val isPurgingCatalog: Boolean = false,
+    val isExportingBackup: Boolean = false,
+    val isImportingBackup: Boolean = false,
+    val isExportingVisioPro: Boolean = false,
+    val isRestoringSubBarcodeFlavors: Boolean = false,
+    val progress: com.oasismall.oasisai.util.TaskProgress? = null,
     val message: String? = null,
     val messageIsError: Boolean = false,
 )
@@ -45,10 +47,8 @@ data class DatabaseOverview(
 
 class SettingsViewModel(
     private val repository: OasisRepository,
-    private val importService: ImportService,
     private val imageMatcher: ImageMatcher,
-    private val readyPngLoader: ReadyPngLoader,
-    private val productImagesExporter: ProductImagesExporter,
+    private val backgroundTasks: OasisBackgroundTaskManager,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
@@ -83,6 +83,57 @@ class SettingsViewModel(
 
     init {
         refreshPngCountsLight()
+        viewModelScope.launch {
+            backgroundTasks.state.collect { task ->
+                _uiState.update { ui ->
+                    if (task.running) {
+                        ui.copy(
+                            isRestoringSubBarcodeFlavors = task.kind == OasisBackgroundTaskKind.SYNC_SUB_PNGS,
+                            isReindexing = task.kind == OasisBackgroundTaskKind.REINDEX_IMAGES,
+                            isExportingPngs = task.kind == OasisBackgroundTaskKind.EXPORT_PNG_DATABASE,
+                            isPurgingCatalog = task.kind == OasisBackgroundTaskKind.PURGE_GESTIUM,
+                            isExportingBackup = task.kind == OasisBackgroundTaskKind.EXPORT_FULL_BACKUP,
+                            isImportingBackup = task.kind == OasisBackgroundTaskKind.IMPORT_FULL_BACKUP,
+                            isExportingVisioPro = task.kind == OasisBackgroundTaskKind.EXPORT_VISIOPRO_BUNDLE,
+                            isLoadingSample = task.kind == OasisBackgroundTaskKind.LOAD_SAMPLE_DATA,
+                            isLoadingImages = task.kind == OasisBackgroundTaskKind.LOAD_READY_PNGS,
+                            progress = task.progress,
+                            message = null,
+                            messageIsError = false,
+                        )
+                    } else {
+                        val finished = task.successMessage != null || task.errorMessage != null
+                        if (finished) {
+                            refreshPngCountsLight()
+                            if (task.kind == OasisBackgroundTaskKind.REINDEX_IMAGES ||
+                                task.kind == OasisBackgroundTaskKind.IMPORT_FULL_BACKUP ||
+                                task.kind == OasisBackgroundTaskKind.LOAD_READY_PNGS
+                            ) {
+                                refreshPngCountsFull()
+                            }
+                        }
+                        ui.copy(
+                            isRestoringSubBarcodeFlavors = false,
+                            isReindexing = false,
+                            isExportingPngs = false,
+                            isPurgingCatalog = false,
+                            isExportingBackup = false,
+                            isImportingBackup = false,
+                            isExportingVisioPro = false,
+                            isLoadingSample = false,
+                            isLoadingImages = false,
+                            progress = null,
+                            message = when {
+                                task.successMessage != null -> task.successMessage
+                                task.errorMessage != null -> task.errorMessage
+                                else -> ui.message
+                            },
+                            messageIsError = task.errorMessage != null,
+                        )
+                    }
+                }
+            }
+        }
     }
 
     fun refreshPhotoroomFolder(context: Context) {
@@ -118,207 +169,55 @@ class SettingsViewModel(
 
     fun clearMessage() {
         _uiState.value = _uiState.value.copy(message = null)
+        backgroundTasks.clearMessages()
     }
 
     fun showMessage(value: String) {
         _uiState.value = _uiState.value.copy(message = value, messageIsError = false)
     }
 
-    fun loadSampleData(context: Context) {
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(
-                isLoadingSample = true,
-                message = null,
-                progress = TaskProgress("Loading sample data", 0),
-            )
-            val result = withContext(Dispatchers.IO) {
-                importService.importSample(context) { progress ->
-                    _uiState.value = _uiState.value.copy(isLoadingSample = true, progress = progress)
-                }
-            }
-            refreshPngCountsLight()
-            _uiState.value = _uiState.value.copy(
-                isLoadingSample = false,
-                progress = null,
-                message = if (result.success) {
-                    "Sample data loaded (${result.summary?.newCount ?: 0} articles)."
-                } else {
-                    result.errorMessage ?: "Sample import failed"
-                },
-                messageIsError = !result.success,
-            )
+    private fun start(context: Context, kind: OasisBackgroundTaskKind, uri: Uri? = null) {
+        if (backgroundTasks.isRunning()) {
+            showMessage("Another task is already running — check the notification.")
+            return
         }
+        backgroundTasks.enqueue(kind, uri)
+        backgroundTasks.startIfPending(context)
     }
 
-    fun exportProductImages(context: Context) {
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(
-                isExportingPngs = true,
-                message = null,
-                progress = TaskProgress("Exporting PNG database", 0),
-            )
-            runCatching {
-                withContext(Dispatchers.IO) {
-                    productImagesExporter.export { progress ->
-                        _uiState.value = _uiState.value.copy(isExportingPngs = true, progress = progress)
-                    }
-                }
-            }.fold(
-                onSuccess = { result ->
-                    _uiState.value = _uiState.value.copy(
-                        isExportingPngs = false,
-                        progress = null,
-                        message = if (result.copied == 0 && result.skipped == 0) {
-                            "No PNGs in product_images to export."
-                        } else {
-                            "Exported ${result.copied} PNG(s) to ${result.displayPath}/" +
-                                if (result.skipped > 0) " (${result.skipped} already there)" else ""
-                        },
-                        messageIsError = false,
-                    )
-                },
-                onFailure = { err ->
-                    _uiState.value = _uiState.value.copy(
-                        isExportingPngs = false,
-                        progress = null,
-                        message = "${err.javaClass.simpleName}: ${err.message}",
-                        messageIsError = true,
-                    )
-                },
-            )
-        }
-    }
+    fun loadSampleData(context: Context) =
+        start(context, OasisBackgroundTaskKind.LOAD_SAMPLE_DATA)
 
-    fun reindexProductImages() {
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(
-                isReindexing = true,
-                message = null,
-                progress = TaskProgress("Preparing image re-index", 0),
-            )
-            runReindex { progress ->
-                _uiState.value = _uiState.value.copy(isReindexing = true, progress = progress)
-            }.fold(
-                onSuccess = { msg ->
-                    refreshPngCountsFull()
-                    _uiState.value = _uiState.value.copy(
-                        isReindexing = false,
-                        progress = null,
-                        message = msg,
-                        messageIsError = false,
-                    )
-                },
-                onFailure = { err ->
-                    _uiState.value = _uiState.value.copy(
-                        isReindexing = false,
-                        progress = null,
-                        message = "${err.javaClass.simpleName}: ${err.message}",
-                        messageIsError = true,
-                    )
-                },
-            )
-        }
-    }
+    fun exportProductImages(context: Context) =
+        start(context, OasisBackgroundTaskKind.EXPORT_PNG_DATABASE)
+
+    fun reindexProductImages(context: Context) =
+        start(context, OasisBackgroundTaskKind.REINDEX_IMAGES)
 
     fun loadReadyPngImages(context: Context, uris: List<Uri>) {
-        if (uris.isEmpty()) return
-        viewModelScope.launch { runReadyPngLoad { readyPngLoader.loadFromUris(context, uris, it) } }
+        if (uris.isEmpty() || backgroundTasks.isRunning()) return
+        backgroundTasks.enqueueReadyPngUris(uris)
+        backgroundTasks.startIfPending(context)
     }
 
     fun loadReadyPngFolder(context: Context, treeUri: Uri) {
-        viewModelScope.launch { runReadyPngLoad { readyPngLoader.loadFromFolderTree(context, treeUri, it) } }
+        if (backgroundTasks.isRunning()) return
+        backgroundTasks.enqueueReadyPngFolder(treeUri)
+        backgroundTasks.startIfPending(context)
     }
 
-    private suspend fun runReadyPngLoad(
-        block: suspend ((TaskProgress) -> Unit) -> com.oasismall.oasisai.domain.ReadyPngLoadResult,
-    ) {
-        _uiState.value = _uiState.value.copy(
-            isLoadingImages = true,
-            message = null,
-            progress = TaskProgress("Loading Oasis ready PNGs", 0),
-        )
-        runCatching {
-            val loadResult = withContext(Dispatchers.IO) {
-                block { progress ->
-                    _uiState.value = _uiState.value.copy(isLoadingImages = true, progress = progress)
-                }
-            }
-            val articleCount = withContext(Dispatchers.IO) { repository.getAllArticles().size }
-            val reindexMsg = if (articleCount == 0) {
-                "Import Gestium CSV first, then re-index to link images to articles."
-            } else {
-                reindexAfterLoad()
-            }
-            refreshPngCountsFull()
-            buildLoadMessage(loadResult, reindexMsg)
-        }.fold(
-            onSuccess = { msg ->
-                _uiState.value = _uiState.value.copy(
-                    isLoadingImages = false,
-                    progress = null,
-                    message = msg,
-                    messageIsError = false,
-                )
-            },
-            onFailure = { err ->
-                refreshPngCountsLight()
-                _uiState.value = _uiState.value.copy(
-                    isLoadingImages = false,
-                    progress = null,
-                    message = "${err.javaClass.simpleName}: ${err.message}",
-                    messageIsError = true,
-                )
-            },
-        )
-    }
+    fun purgeGestiumCatalog(context: Context) =
+        start(context, OasisBackgroundTaskKind.PURGE_GESTIUM)
 
-    private suspend fun reindexAfterLoad(): String = withContext(Dispatchers.IO) {
-        _uiState.value = _uiState.value.copy(progress = TaskProgress("Matching PNGs to articles", 75))
-        val articles = repository.getAllArticles()
-        imageMatcher.syncImagesForArticles(articles) { progress ->
-            val shifted = 75 + (progress.normalizedPercent * 20 / 100)
-            _uiState.value = _uiState.value.copy(
-                isLoadingImages = true,
-                progress = progress.copy(percent = shifted),
-            )
-        }
-        val missing = repository.countMissingImages()
-        "Re-indexed ${articles.size} articles; $missing still missing images."
-    }
+    fun syncSubPngs(context: Context) =
+        start(context, OasisBackgroundTaskKind.SYNC_SUB_PNGS)
 
-    private fun buildLoadMessage(
-        load: com.oasismall.oasisai.domain.ReadyPngLoadResult,
-        reindexMsg: String,
-    ): String {
-        val limitNote = if (load.limitedByPicker) {
-            " (max ${ReadyPngLoader.MAX_FILES_PER_PICK} per load — run again for more)"
-        } else {
-            ""
-        }
-        return buildString {
-            append("Loaded ${load.copied} new PNGs")
-            if (load.alreadyPresent > 0) append(", ${load.alreadyPresent} already on device")
-            if (load.skipped > 0) append(", ${load.skipped} skipped")
-            append(limitNote)
-            append(". ")
-            append(reindexMsg)
-            append(" Tags: ${ReadyPngModel.SOURCE_LABEL}.")
-        }
-    }
+    fun exportFullBackup(context: Context, outputUri: Uri) =
+        start(context, OasisBackgroundTaskKind.EXPORT_FULL_BACKUP, outputUri)
 
-    private suspend fun runReindex(onProgress: (TaskProgress) -> Unit): Result<String> = runCatching {
-        withContext(Dispatchers.IO) {
-            onProgress(TaskProgress("Loading articles", 5))
-            val articles = repository.getAllArticles()
-            if (articles.isEmpty()) {
-                return@withContext "Import Gestium CSV first — no articles to match."
-            }
-            imageMatcher.syncImagesForArticles(articles, onProgress)
-            onProgress(TaskProgress("Counting missing images", 95))
-            val missing = repository.countMissingImages()
-            onProgress(TaskProgress("Re-index complete", 100))
-            val modelCount = imageMatcher.scanPngFilesIndexed().count { it.isOasisReadyModel }
-            "Re-indexed ${articles.size} articles ($modelCount Oasis-model PNGs). $missing still missing images."
-        }
-    }
+    fun importFullBackup(context: Context, uri: Uri) =
+        start(context, OasisBackgroundTaskKind.IMPORT_FULL_BACKUP, uri)
+
+    fun exportVisioProBundle(context: Context, outputUri: Uri) =
+        start(context, OasisBackgroundTaskKind.EXPORT_VISIOPRO_BUNDLE, outputUri)
 }

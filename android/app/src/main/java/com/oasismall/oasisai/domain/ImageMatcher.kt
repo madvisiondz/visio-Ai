@@ -30,7 +30,33 @@ class ImageMatcher(
     private val imagesDir: File
         get() = File(context.filesDir, "product_images").also { it.mkdirs() }
 
+    @Volatile
+    private var cachedPngIndex: List<IndexedPng>? = null
+
+    @Volatile
+    private var cachedPngFolderKey: Long = -1L
+
+    fun invalidatePngCache() {
+        cachedPngIndex = null
+        cachedPngFolderKey = -1L
+    }
+
     fun getImagesDirectory(): File = imagesDir
+
+    /** All PNG files in gallery + sub-barcode paths referenced in DB. */
+    suspend fun collectAllPngFiles(): List<File> = withContext(Dispatchers.IO) {
+        val out = LinkedHashMap<String, File>()
+        imagesDir.listFiles()
+            ?.filter { it.isFile && it.extension.equals("png", true) }
+            ?.forEach { out[it.absolutePath] = it }
+        repository.getAlternateBarcodeImagePaths().forEach { file ->
+            if (file.exists()) out[file.absolutePath] = file
+        }
+        repository.getProductImagesSnapshot()
+            .mapNotNull { it.imagePath?.let(::File)?.takeIf { f -> f.exists() && f.extension.equals("png", true) } }
+            .forEach { out[it.absolutePath] = it }
+        out.values.sortedBy { it.name.lowercase() }
+    }
 
     /** Fast count — no PNG chunk reads (safe for Settings overview). */
     fun countPngFiles(): Int =
@@ -93,9 +119,74 @@ class ImageMatcher(
         onProgress?.invoke(TaskProgress("Image re-index complete", 100))
     }
 
+    /** Updates image links for specific articles only — no full-table wipe (used after CSV import). */
+    suspend fun upsertImagesForArticles(
+        articles: List<ArticleEntity>,
+        onProgress: ((TaskProgress) -> Unit)? = null,
+    ) = withContext(Dispatchers.IO) {
+        val activeArticles = articles.filter { it.isActive && it.id != 0L }
+        if (activeArticles.isEmpty()) {
+            onProgress?.invoke(TaskProgress("No article changes to link", 100))
+            return@withContext
+        }
+        val total = activeArticles.size
+        onProgress?.invoke(TaskProgress("Indexing PNG files", 5))
+        val indexed = scanPngFilesIndexed(onProgress)
+        val byCodeart = indexed
+            .filter { !it.codeart.isNullOrBlank() }
+            .groupBy { it.codeart.orEmpty() }
+        val byBarcode = indexed
+            .filter { !it.barcode.isNullOrBlank() }
+            .groupBy { it.barcode.orEmpty() }
+        val byDesignation = indexed.groupBy { it.designationKey }
+        val existingImages = repository.getProductImagesSnapshot().associateBy { it.articleId }
+        val imageRows = ArrayList<ProductImageEntity>(total)
+
+        activeArticles.forEachIndexed { index, article ->
+            coroutineContext.ensureActive()
+            val matchEntries = findMatchEntries(article, byCodeart, byBarcode, byDesignation)
+            val chosen = matchEntries.firstOrNull()
+            val status = when {
+                matchEntries.isEmpty() -> ImageStatus.MISSING
+                matchEntries.size == 1 -> ImageStatus.FOUND
+                else -> ImageStatus.MULTIPLE_MATCHES
+            }
+            val existing = existingImages[article.id]
+            val createdAt = chosen?.file?.lastModified()?.takeIf { it > 0L }
+                ?: existing?.createdAt?.takeIf { it > 0L }
+                ?: System.currentTimeMillis()
+            imageRows.add(
+                ProductImageEntity(
+                    articleId = article.id,
+                    designationKey = article.normalizedName,
+                    barcode = chosen?.barcode ?: article.barcode,
+                    imagePath = chosen?.file?.absolutePath ?: "",
+                    imageStatus = status.name,
+                    createdAt = createdAt,
+                    lastSentAt = existing?.lastSentAt,
+                ),
+            )
+            if (index % 100 == 0 || index == total - 1) {
+                yield()
+                val percent = 10 + ((index + 1) * 75 / total.coerceAtLeast(1))
+                onProgress?.invoke(TaskProgress("Matching images (${index + 1}/$total)", percent))
+            }
+        }
+        onProgress?.invoke(TaskProgress("Saving image links", 90))
+        repository.upsertProductImagesBatched(imageRows)
+        onProgress?.invoke(TaskProgress("Image links updated", 100))
+    }
+
     suspend fun scanPngFilesIndexed(
         onProgress: ((TaskProgress) -> Unit)? = null,
     ): List<IndexedPng> = withContext(Dispatchers.IO) {
+        val folderKey = pngFolderKey()
+        cachedPngIndex?.let { cached ->
+            if (folderKey == cachedPngFolderKey) {
+                onProgress?.invoke(TaskProgress("Using cached PNG index", 15))
+                return@withContext cached
+            }
+        }
         val files = imagesDir.listFiles()
             ?.filter { it.isFile && it.extension.equals("png", true) }
             .orEmpty()
@@ -103,14 +194,27 @@ class ImageMatcher(
         val out = ArrayList<IndexedPng>(files.size)
         files.forEachIndexed { index, file ->
             coroutineContext.ensureActive()
-            out.add(indexPngFile(file))
+            indexPngFile(file)?.let { out.add(it) }
             if (index % 50 == 0 || index == files.lastIndex) {
                 yield()
                 val pct = 5 + (index * 10 / total)
                 onProgress?.invoke(TaskProgress("Reading PNG tags (${index + 1}/$total)", pct))
             }
         }
+        cachedPngIndex = out
+        cachedPngFolderKey = folderKey
         out
+    }
+
+    private fun pngFolderKey(): Long {
+        val files = imagesDir.listFiles()?.filter { it.isFile && it.extension.equals("png", true) }.orEmpty()
+        if (files.isEmpty()) return 0L
+        var maxModified = 0L
+        for (file in files) {
+            val modified = file.lastModified()
+            if (modified > maxModified) maxModified = modified
+        }
+        return files.size.toLong() shl 32 xor maxModified
     }
 
     fun resolveTargetFile(article: ArticleEntity): File {
@@ -126,10 +230,11 @@ class ImageMatcher(
     fun scanPngFiles(): List<IndexedPng> =
         imagesDir.listFiles()
             ?.filter { it.isFile && it.extension.equals("png", true) }
-            ?.map { indexPngFile(it) }
+            ?.mapNotNull { indexPngFile(it) }
             .orEmpty()
 
-    private fun indexPngFile(file: File): IndexedPng {
+    private fun indexPngFile(file: File): IndexedPng? {
+        if (PngMetadata.isSubVariantPng(file)) return null
         val details = runCatching { PngMetadata.readArticleDetails(file) }.getOrNull()
             ?: PngMetadata.PngArticleDetails()
         val stem = file.nameWithoutExtension
@@ -257,13 +362,16 @@ class ImageMatcher(
         return File(imagesDir, "$key.png")
     }
 
-    /** Saves PNG for a sub-barcode (separate from main article gallery image). */
+    /** Saves PNG for a sub-barcode — filename is designation+alt index; identity in metadata. */
     suspend fun registerSubBarcodeImage(
         subBarcode: String,
         parentArticle: ArticleEntity,
         sourceFile: File,
     ): String {
-        val target = resolveTargetFileForSubBarcode(subBarcode)
+        val existingPath = repository.getAlternateBarcodesForArticle(parentArticle.id)
+            .firstOrNull { it.barcode == subBarcode.trim() }
+            ?.imagePath
+        val target = resolveTargetFileForSubBarcode(parentArticle, subBarcode, existingPath)
         sourceFile.copyTo(target, overwrite = true)
         PngMetadata.writeArticleDetails(
             file = target,
@@ -273,13 +381,41 @@ class ImageMatcher(
             priceBefore = parentArticle.previousPrice,
             rayon = parentArticle.category,
             codeart = parentArticle.codeart,
+            parentBarcode = parentArticle.barcode,
+            variantType = "sub",
         )
         return target.absolutePath
     }
 
-    fun resolveTargetFileForSubBarcode(subBarcode: String): File {
-        val key = PngMetadata.barcodeFileStem(subBarcode)
-        return File(imagesDir, "sub_$key.png")
+    fun resolveTargetFileForSubBarcode(
+        parentArticle: ArticleEntity,
+        subBarcode: String,
+        existingImagePath: String? = null,
+    ): File {
+        existingImagePath?.let { path ->
+            File(path).takeIf { it.isFile }?.let { return it }
+        }
+        val stem = PngMetadata.subVariantDesignationStem(parentArticle.designation)
+        val index = nextSubVariantAltIndex(parentArticle.barcode, stem)
+        return File(imagesDir, PngMetadata.subVariantFileName(stem, index))
+    }
+
+    private fun nextSubVariantAltIndex(parentBarcode: String, designationStem: String): Int {
+        val used = mutableSetOf<Int>()
+        imagesDir.listFiles()
+            ?.filter { it.isFile && it.extension.equals("png", true) }
+            ?.forEach { file ->
+                val details = runCatching { PngMetadata.readArticleDetails(file) }.getOrDefault(
+                    PngMetadata.PngArticleDetails(),
+                )
+                if (details.parentBarcode != null && details.parentBarcode != parentBarcode) return@forEach
+                PngMetadata.parseSubVariantAltIndex(file.nameWithoutExtension, designationStem)?.let {
+                    used.add(it)
+                }
+            }
+        var index = 1
+        while (used.contains(index)) index++
+        return index
     }
 
     private suspend fun registerCapturedImageAtTarget(

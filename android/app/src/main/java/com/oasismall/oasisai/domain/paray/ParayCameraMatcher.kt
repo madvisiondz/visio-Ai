@@ -3,15 +3,14 @@ package com.oasismall.oasisai.domain.paray
 import android.graphics.Bitmap
 import com.oasismall.oasisai.domain.layoutagent.ContentBounds
 import com.oasismall.oasisai.domain.layoutagent.ProductContentBounds
-import kotlin.math.abs
 
 /**
- * Offline camera matching — compares live frame features to PARAY visual index.
- * v1: shape + color similarity. v2: GPU embeddings.
+ * Offline camera matching — compares live frame to PARAY visual index + learned multi-view records.
  */
 class ParayCameraMatcher(
     private val index: ParayVisualIndex,
     private val fingerprintStore: ParayFingerprintStore,
+    private val learnStore: ParayLearnStore,
 ) {
     fun identify(bitmap: Bitmap, topK: Int = 5): List<ParayMatch> {
         val bounds = ProductContentBounds.detect(bitmap)
@@ -22,20 +21,28 @@ class ParayCameraMatcher(
         }
         val probe = VisualFeatureExtractor.extract(bitmap, content)
         val records = index.allSignatures()
-        if (records.isEmpty()) return emptyList()
-
+        val learned = learnStore.allRecords().associateBy { it.articleId }
         val embeddings = fingerprintStore.allEmbeddings().associate { it.first to it.second }
 
-        return records
-            .map { sig ->
-                var score = similarity(probe.shapeAspect, probe.fillRatio, probe.dominantColors, sig)
-                embeddings[sig.barcode]?.let { stored ->
+        if (records.isEmpty() && learned.isEmpty()) return emptyList()
+
+        val articleIds = (records.map { it.articleId } + learned.keys).distinct()
+
+        return articleIds
+            .mapNotNull { articleId ->
+                val sig = records.firstOrNull { it.articleId == articleId }
+                val learn = learned[articleId]
+                var score = sig?.let { similarity(probe, it) } ?: 0f
+                learn?.let { score = maxOf(score, learnedViewScore(probe, it)) }
+                embeddings[sig?.barcode ?: learn?.barcode]?.let {
                     score = (score * 0.55f + 0.45f).coerceIn(0f, 1f)
                 }
+                val barcode = sig?.barcode ?: learn?.barcode ?: return@mapNotNull null
+                val designation = sig?.designation ?: learn?.designation ?: return@mapNotNull null
                 ParayMatch(
-                    articleId = sig.articleId,
-                    barcode = sig.barcode,
-                    designation = sig.designation,
+                    articleId = articleId,
+                    barcode = barcode,
+                    designation = designation,
                     confidence = score,
                 )
             }
@@ -44,35 +51,32 @@ class ParayCameraMatcher(
             .take(topK)
     }
 
+    private fun learnedViewScore(probe: VisualFeatureExtractor.Features, record: ParayLearnRecord): Float {
+        val views = buildList {
+            record.frontCapture?.toFeatures()?.let { add(it) }
+            record.leftCapture?.toFeatures()?.let { add(it) }
+            record.rightCapture?.toFeatures()?.let { add(it) }
+            record.backCapture?.toFeatures()?.let { add(it) }
+        }
+        if (views.isEmpty()) return 0f
+        val best = views.maxOf { ParayVisualSimilarity.score(probe, it) }
+        val boost = when (record.status) {
+            ParayLearnStatus.LEARNED -> 0.12f
+            ParayLearnStatus.PARTIALLY_LEARNED -> 0.05f
+            else -> 0f
+        }
+        return (best + boost).coerceIn(0f, 1f)
+    }
+
     private fun similarity(
-        aspect: Float,
-        fill: Float,
-        colors: List<Int>,
+        probe: VisualFeatureExtractor.Features,
         sig: ProductVisualSignature,
     ): Float {
-        val aspectScore = 1f - (abs(aspect - sig.shapeAspect) / maxOf(aspect, sig.shapeAspect, 0.1f)).coerceIn(0f, 1f)
-        val fillScore = 1f - abs(fill - sig.fillRatio).coerceIn(0f, 1f)
-        val colorScore = colorOverlap(colors, sig.dominantColors)
         val obsBoost = (sig.observationCount.coerceAtMost(20) / 20f) * 0.05f
-        return (aspectScore * 0.35f + fillScore * 0.2f + colorScore * 0.4f + obsBoost).coerceIn(0f, 1f)
-    }
-
-    private fun colorOverlap(a: List<Int>, b: List<Int>): Float {
-        if (a.isEmpty() || b.isEmpty()) return 0f
-        var hits = 0
-        for (c in a) {
-            if (b.any { nearColor(c, it) }) hits++
-        }
-        return hits.toFloat() / a.size
-    }
-
-    private fun nearColor(c1: Int, c2: Int): Boolean {
-        val r1 = (c1 shr 16) and 0xFF
-        val g1 = (c1 shr 8) and 0xFF
-        val b1 = c1 and 0xFF
-        val r2 = (c2 shr 16) and 0xFF
-        val g2 = (c2 shr 8) and 0xFF
-        val b2 = c2 and 0xFF
-        return abs(r1 - r2) + abs(g1 - g2) + abs(b1 - b2) < 48
+        return ParayVisualSimilarity.score(
+            probe,
+            VisualFeatureExtractor.Features(sig.shapeAspect, sig.fillRatio, sig.dominantColors),
+            obsBoost,
+        )
     }
 }

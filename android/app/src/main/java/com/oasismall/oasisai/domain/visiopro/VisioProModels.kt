@@ -62,6 +62,14 @@ data class VisioProPreset(
 data class VisioProArticleMemory(
     val slug: String,
     val manualPrice: Double? = null,
+    /** True when the user explicitly changed price away from CSV. */
+    val manualPriceOverridden: Boolean = false,
+    val csvPriceWhenOverridden: Double? = null,
+    val manualPriceChangedAt: Long? = null,
+    /** User override for card designation (typically Arabic on print/social). */
+    val manualDesignation: String? = null,
+    /** Per-article designation font size ratio (canvas width fraction). */
+    val manualDesignationFontRatio: Float? = null,
     val lastSocialExportAt: Long? = null,
     val lastPrintExportAt: Long? = null,
     val printModified: Boolean = false,
@@ -70,6 +78,7 @@ data class VisioProArticleMemory(
 data class VisioProPriceResult(
     val price: Double?,
     val source: VisioProPriceSource,
+    val csvBaseline: Double? = null,
 )
 
 data class VisioProPresetUi(
@@ -78,4 +87,11 @@ data class VisioProPresetUi(
     val priceSource: VisioProPriceSource,
     val lastExportAt: Long?,
     val editablePriceText: String,
+    val editableDesignationText: String,
+    val csvCatalogPrice: Double? = null,
+    val csvBaselinePrice: Double? = null,
+    val userOverrodePrice: Boolean = false,
+    val manualPriceChangedAt: Long? = null,
+    val previousCatalogPrice: Double? = null,
+    val priceChangeGlow: Boolean = false,
 )

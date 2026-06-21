@@ -40,6 +40,8 @@ import com.oasismall.oasisai.ui.screens.visiopro.settings.VisioProSettingsViewMo
 class OasisViewModelFactory(
     private val app: OasisApp,
 ) : ViewModelProvider.Factory {
+
+    val repository get() = app.repository
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         return when {
@@ -48,10 +50,8 @@ class OasisViewModelFactory(
             modelClass.isAssignableFrom(SettingsViewModel::class.java) ->
                 SettingsViewModel(
                     app.repository,
-                    app.importService,
                     app.imageMatcher,
-                    app.readyPngLoader,
-                    app.productImagesExporter,
+                    app.backgroundTaskManager,
                 ) as T
             modelClass.isAssignableFrom(ImportantRayonsViewModel::class.java) ->
                 ImportantRayonsViewModel(app.repository) as T
@@ -59,8 +59,12 @@ class OasisViewModelFactory(
                 ParayImportViewModel(app.parayImportManager) as T
             modelClass.isAssignableFrom(ParayHomeViewModel::class.java) ->
                 ParayHomeViewModel(app.paray) as T
+            modelClass.isAssignableFrom(com.oasismall.oasisai.ui.screens.paraylearn.ParayMainViewModel::class.java) ->
+                com.oasismall.oasisai.ui.screens.paraylearn.ParayMainViewModel(app.repository, app.paray) as T
+            modelClass.isAssignableFrom(com.oasismall.oasisai.ui.screens.paraylearn.ParayLearnSessionViewModel::class.java) ->
+                com.oasismall.oasisai.ui.screens.paraylearn.ParayLearnSessionViewModel(app.repository, app.paray) as T
             modelClass.isAssignableFrom(ImportViewModel::class.java) ->
-                ImportViewModel(app.repository, app.importService) as T
+                ImportViewModel(app.repository, app.backgroundTaskManager) as T
             modelClass.isAssignableFrom(CatalogViewModel::class.java) ->
                 CatalogViewModel(app.repository) as T
             modelClass.isAssignableFrom(ArticleDetailViewModel::class.java) ->
@@ -114,11 +118,12 @@ class OasisViewModelFactory(
                     app.visioProPriceResolver,
                     app.visioProExporter,
                     app.visioProRenderFacade,
+                    app.visioProPrintImageLinker,
                 ) as T
             modelClass.isAssignableFrom(VisioProSettingsViewModel::class.java) ->
-                VisioProSettingsViewModel(app.visioProCatalogService) as T
+                VisioProSettingsViewModel(app.visioProCatalogService, app.visioProPrintImageLinker) as T
             modelClass.isAssignableFrom(VisioProHomeViewModel::class.java) ->
-                VisioProHomeViewModel(app.visioProCatalogService) as T
+                VisioProHomeViewModel(app.visioProCatalogService, app.visioProPrintImageLinker) as T
             modelClass.isAssignableFrom(VisioProDesignerHubViewModel::class.java) ->
                 VisioProDesignerHubViewModel(app.visioProDesignStore) as T
             else -> throw IllegalArgumentException("Unknown ViewModel: ${modelClass.name}")

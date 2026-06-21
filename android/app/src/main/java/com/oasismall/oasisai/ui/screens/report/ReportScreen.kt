@@ -32,6 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.oasismall.oasisai.data.db.entity.PrintBatchItemEntity
+import com.oasismall.oasisai.ui.components.ImportantRayonsFilterNote
 import com.oasismall.oasisai.ui.components.ImportChangeCard
 import com.oasismall.oasisai.util.PriceFormatter
 
@@ -238,21 +239,5 @@ private fun DesignPrintCard(
                 Text("Loading articles…", style = MaterialTheme.typography.bodySmall)
             }
         }
-    }
-}
-
-@Composable
-private fun ImportantRayonsFilterNote(filtered: Boolean, count: Int) {
-    if (!filtered) return
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        shape = MaterialTheme.shapes.small,
-    ) {
-        Text(
-            "CSV changes filtered to $count important rayon(s) — Settings → Rayons importants",
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-            style = MaterialTheme.typography.bodySmall,
-        )
     }
 }

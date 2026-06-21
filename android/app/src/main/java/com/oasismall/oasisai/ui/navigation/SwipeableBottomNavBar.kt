@@ -160,6 +160,7 @@ fun isBottomNavSelected(itemRoute: String, currentRoute: String?): Boolean {
 
 fun showMainBottomBar(currentRoute: String?): Boolean {
     if (currentRoute == null) return false
+    if (currentRoute == OasisRoute.ParayLearnSession.route) return false
     if (currentRoute == OasisRoute.VisioProHome.route || currentRoute.startsWith("visio_pro/")) {
         return true
     }

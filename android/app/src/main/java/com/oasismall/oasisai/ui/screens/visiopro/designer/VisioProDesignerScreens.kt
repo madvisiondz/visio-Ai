@@ -98,6 +98,7 @@ import com.oasismall.oasisai.domain.visiopro.designer.VisioProDesignerDocument
 import com.oasismall.oasisai.domain.visiopro.designer.VisioProNormRect
 import com.oasismall.oasisai.domain.visiopro.designer.VisioProPresetDesignKey
 import com.oasismall.oasisai.domain.visiopro.designer.isSpatial
+import com.oasismall.oasisai.ui.screens.visiopro.VisioProNumericPriceField
 import com.oasismall.oasisai.util.PriceFormatter
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -815,12 +816,11 @@ private fun SampleContentSection(
             }
         }
         VisioProDesignLayerKind.PRICE -> {
-            OutlinedTextField(
+            VisioProNumericPriceField(
                 value = PriceFormatter.formatNumber(document.samplePrice),
                 onValueChange = onSamplePrice,
-                label = { Text("Prix échantillon (DA)") },
+                label = "Prix échantillon (DA)",
                 modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
             )
         }
         VisioProDesignLayerKind.CODE -> {

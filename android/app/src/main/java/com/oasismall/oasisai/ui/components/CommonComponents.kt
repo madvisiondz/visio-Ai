@@ -43,7 +43,7 @@ fun ArticleCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .catalogChangeGlow(article.hasCatalogChange()),
+            .catalogChangeGlow(article.shouldShowPriceChangeGlow()),
         onClick = onClick,
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         border = border,
@@ -74,8 +74,15 @@ fun ArticleCard(
                 Text(PriceFormatter.format(article.price), color = MaterialTheme.colorScheme.primary)
                 Text(article.barcode, style = MaterialTheme.typography.bodySmall)
                 StatusChip(article.changeStatus, article.needsTicketUpdate)
-                if (article.hasCatalogChange()) {
+                if (article.shouldShowPriceChangeGlow()) {
                     CatalogChangeBadge(active = true)
+                }
+                if (article.hasPriceChange() && article.previousPrice != null && article.previousPrice != article.price) {
+                    Text(
+                        "Prix CSV : ${PriceFormatter.format(article.previousPrice)} → ${PriceFormatter.format(article.price)}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
                 }
             }
             trailing?.invoke()
@@ -231,9 +238,8 @@ fun ImportChangeCard(
         modifier = modifier
             .fillMaxWidth()
             .catalogChangeGlow(
-                change.changeType == ImportChangeType.PRICE_CHANGED.name ||
-                    change.changeType == ImportChangeType.NEW.name ||
-                    change.changeType == ImportChangeType.RENAMED.name,
+                row.article?.shouldShowPriceChangeGlow() == true ||
+                    change.changeType == ImportChangeType.PRICE_CHANGED.name,
             ),
         onClick = {
             if (onArticleClick != null && articleId != null) {
@@ -339,6 +345,22 @@ private fun formatImportChangeValue(changeType: String, value: String): String =
     } else {
         value
     }
+
+@Composable
+fun ImportantRayonsFilterNote(filtered: Boolean, count: Int, modifier: Modifier = Modifier) {
+    if (!filtered) return
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        shape = MaterialTheme.shapes.small,
+    ) {
+        Text(
+            "CSV reports show only $count important rayon(s) — Settings → Rayons importants",
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
+}
 
 @Composable
 fun OpenCameraBatchButton(

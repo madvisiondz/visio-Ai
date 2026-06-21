@@ -24,9 +24,32 @@ import com.oasismall.oasisai.data.db.entity.WorkflowHistoryEntity
 import com.oasismall.oasisai.data.model.ArticleChangeStatus
 import kotlinx.coroutines.flow.Flow
 
+/** Import diff only — excludes heavy [com.oasismall.oasisai.data.db.entity.ArticleEntity.rawData]. */
+data class ArticleImportSnapshot(
+    val id: Long,
+    val barcode: String,
+    val designation: String,
+    val normalizedName: String,
+    val price: Double,
+    val previousPrice: Double?,
+    val codeart: String?,
+    val reference: String?,
+    val category: String?,
+    val rayon: String?,
+    val famille: String?,
+    val brand: String?,
+    val stock: Double?,
+    val unit: String?,
+    val lastSeenAt: Long,
+    val changeStatus: String,
+    val isActive: Boolean,
+    val needsTicketUpdate: Boolean,
+)
+
 data class ArticleWithImage(
     val id: Long,
     val barcode: String,
+    val codeart: String? = null,
     val designation: String,
     val normalizedName: String,
     val price: Double,
@@ -61,6 +84,7 @@ data class PreselectionWithArticle(
     val previousPrice: Double?,
     val codeart: String?,
     val category: String?,
+    val rayon: String? = null,
     val imagePath: String?,
     val imageCreatedAt: Long?,
     val imageLastSentAt: Long?,
@@ -138,7 +162,7 @@ interface ArticleDao {
 
     @Query(
         """
-        SELECT a.id, a.barcode, a.designation, a.normalizedName, a.price, a.previousPrice,
+        SELECT a.id, a.barcode, a.codeart, a.designation, a.normalizedName, a.price, a.previousPrice,
                a.reference, a.category, a.rayon, a.brand, a.stock, a.unit, a.changeStatus,
                a.isActive, a.needsTicketUpdate, a.rawData,
                (SELECT p.imagePath FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imagePath,
@@ -160,7 +184,7 @@ interface ArticleDao {
 
     @Query(
         """
-        SELECT a.id, a.barcode, a.designation, a.normalizedName, a.price, a.previousPrice,
+        SELECT a.id, a.barcode, a.codeart, a.designation, a.normalizedName, a.price, a.previousPrice,
                a.reference, a.category, a.rayon, a.brand, a.stock, a.unit, a.changeStatus,
                a.isActive, a.needsTicketUpdate, a.rawData,
                (SELECT p.imagePath FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imagePath,
@@ -183,7 +207,7 @@ interface ArticleDao {
 
     @Query(
         """
-        SELECT a.id, a.barcode, a.designation, a.normalizedName, a.price, a.previousPrice,
+        SELECT a.id, a.barcode, a.codeart, a.designation, a.normalizedName, a.price, a.previousPrice,
                a.reference, a.category, a.rayon, a.brand, a.stock, a.unit, a.changeStatus,
                a.isActive, a.needsTicketUpdate, a.rawData,
                (SELECT p.imagePath FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imagePath,
@@ -218,7 +242,7 @@ interface ArticleDao {
 
     @Query(
         """
-        SELECT a.id, a.barcode, a.designation, a.normalizedName, a.price, a.previousPrice,
+        SELECT a.id, a.barcode, a.codeart, a.designation, a.normalizedName, a.price, a.previousPrice,
                a.reference, a.category, a.rayon, a.brand, a.stock, a.unit, a.changeStatus,
                a.isActive, a.needsTicketUpdate, a.rawData,
                (SELECT p.imagePath FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imagePath,
@@ -234,7 +258,7 @@ interface ArticleDao {
 
     @Query(
         """
-        SELECT a.id, a.barcode, a.designation, a.normalizedName, a.price, a.previousPrice,
+        SELECT a.id, a.barcode, a.codeart, a.designation, a.normalizedName, a.price, a.previousPrice,
                a.reference, a.category, a.rayon, a.brand, a.stock, a.unit, a.changeStatus,
                a.isActive, a.needsTicketUpdate, a.rawData,
                (SELECT p.imagePath FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imagePath,
@@ -250,7 +274,7 @@ interface ArticleDao {
 
     @Query(
         """
-        SELECT a.id, a.barcode, a.designation, a.normalizedName, a.price, a.previousPrice,
+        SELECT a.id, a.barcode, a.codeart, a.designation, a.normalizedName, a.price, a.previousPrice,
                a.reference, a.category, a.rayon, a.brand, a.stock, a.unit, a.changeStatus,
                a.isActive, a.needsTicketUpdate, a.rawData,
                (SELECT p.imagePath FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imagePath,
@@ -265,7 +289,7 @@ interface ArticleDao {
 
     @Query(
         """
-        SELECT a.id, a.barcode, a.designation, a.normalizedName, a.price, a.previousPrice,
+        SELECT a.id, a.barcode, a.codeart, a.designation, a.normalizedName, a.price, a.previousPrice,
                a.reference, a.category, a.rayon, a.brand, a.stock, a.unit, a.changeStatus,
                a.isActive, a.needsTicketUpdate, a.rawData,
                (SELECT p.imagePath FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imagePath,
@@ -281,7 +305,7 @@ interface ArticleDao {
 
     @Query(
         """
-        SELECT a.id, a.barcode, a.designation, a.normalizedName, a.price, a.previousPrice,
+        SELECT a.id, a.barcode, a.codeart, a.designation, a.normalizedName, a.price, a.previousPrice,
                a.reference, a.category, a.rayon, a.brand, a.stock, a.unit, a.changeStatus,
                a.isActive, a.needsTicketUpdate, a.rawData,
                (SELECT p.imagePath FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imagePath,
@@ -297,7 +321,7 @@ interface ArticleDao {
 
     @Query(
         """
-        SELECT a.id, a.barcode, a.designation, a.normalizedName, a.price, a.previousPrice,
+        SELECT a.id, a.barcode, a.codeart, a.designation, a.normalizedName, a.price, a.previousPrice,
                a.reference, a.category, a.rayon, a.brand, a.stock, a.unit, a.changeStatus,
                a.isActive, a.needsTicketUpdate, a.rawData,
                (SELECT p.imagePath FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imagePath,
@@ -318,7 +342,7 @@ interface ArticleDao {
 
     @Query(
         """
-        SELECT a.id, a.barcode, a.designation, a.normalizedName, a.price, a.previousPrice,
+        SELECT a.id, a.barcode, a.codeart, a.designation, a.normalizedName, a.price, a.previousPrice,
                a.reference, a.category, a.rayon, a.brand, a.stock, a.unit, a.changeStatus,
                a.isActive, a.needsTicketUpdate, a.rawData,
                (SELECT p.imagePath FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imagePath,
@@ -340,7 +364,7 @@ interface ArticleDao {
 
     @Query(
         """
-        SELECT a.id, a.barcode, a.designation, a.normalizedName, a.price, a.previousPrice,
+        SELECT a.id, a.barcode, a.codeart, a.designation, a.normalizedName, a.price, a.previousPrice,
                a.reference, a.category, a.rayon, a.brand, a.stock, a.unit, a.changeStatus,
                a.isActive, a.needsTicketUpdate, a.rawData,
                (SELECT p.imagePath FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imagePath,
@@ -361,7 +385,7 @@ interface ArticleDao {
 
     @Query(
         """
-        SELECT a.id, a.barcode, a.designation, a.normalizedName, a.price, a.previousPrice,
+        SELECT a.id, a.barcode, a.codeart, a.designation, a.normalizedName, a.price, a.previousPrice,
                a.reference, a.category, a.rayon, a.brand, a.stock, a.unit, a.changeStatus,
                a.isActive, a.needsTicketUpdate, a.rawData,
                (SELECT p.imagePath FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imagePath,
@@ -418,7 +442,7 @@ interface ArticleDao {
 
     @Query(
         """
-        SELECT a.id, a.barcode, a.designation, a.normalizedName, a.price, a.previousPrice,
+        SELECT a.id, a.barcode, a.codeart, a.designation, a.normalizedName, a.price, a.previousPrice,
                a.reference, a.category, a.rayon, a.brand, a.stock, a.unit, a.changeStatus,
                a.isActive, a.needsTicketUpdate, a.rawData,
                (SELECT p.imagePath FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imagePath,
@@ -434,7 +458,7 @@ interface ArticleDao {
 
     @Query(
         """
-        SELECT a.id, a.barcode, a.designation, a.normalizedName, a.price, a.previousPrice,
+        SELECT a.id, a.barcode, a.codeart, a.designation, a.normalizedName, a.price, a.previousPrice,
                a.reference, a.category, a.rayon, a.brand, a.stock, a.unit, a.changeStatus,
                a.isActive, a.needsTicketUpdate, a.rawData,
                (SELECT p.imagePath FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imagePath,
@@ -450,7 +474,7 @@ interface ArticleDao {
 
     @Query(
         """
-        SELECT a.id, a.barcode, a.designation, a.normalizedName, a.price, a.previousPrice,
+        SELECT a.id, a.barcode, a.codeart, a.designation, a.normalizedName, a.price, a.previousPrice,
                a.reference, a.category, a.rayon, a.brand, a.stock, a.unit, a.changeStatus,
                a.isActive, a.needsTicketUpdate, a.rawData,
                (SELECT p.imagePath FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imagePath,
@@ -466,7 +490,7 @@ interface ArticleDao {
 
     @Query(
         """
-        SELECT a.id, a.barcode, a.designation, a.normalizedName, a.price, a.previousPrice,
+        SELECT a.id, a.barcode, a.codeart, a.designation, a.normalizedName, a.price, a.previousPrice,
                a.reference, a.category, a.rayon, a.brand, a.stock, a.unit, a.changeStatus,
                a.isActive, a.needsTicketUpdate, a.rawData,
                (SELECT p.imagePath FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imagePath,
@@ -486,7 +510,7 @@ interface ArticleDao {
 
     @Query(
         """
-        SELECT a.id, a.barcode, a.designation, a.normalizedName, a.price, a.previousPrice,
+        SELECT a.id, a.barcode, a.codeart, a.designation, a.normalizedName, a.price, a.previousPrice,
                a.reference, a.category, a.rayon, a.brand, a.stock, a.unit, a.changeStatus,
                a.isActive, a.needsTicketUpdate, a.rawData,
                (SELECT p.imagePath FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imagePath,
@@ -508,7 +532,7 @@ interface ArticleDao {
 
     @Query(
         """
-        SELECT a.id, a.barcode, a.designation, a.normalizedName, a.price, a.previousPrice,
+        SELECT a.id, a.barcode, a.codeart, a.designation, a.normalizedName, a.price, a.previousPrice,
                a.reference, a.category, a.rayon, a.brand, a.stock, a.unit, a.changeStatus,
                a.isActive, a.needsTicketUpdate, a.rawData,
                (SELECT p.imagePath FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imagePath,
@@ -537,6 +561,45 @@ interface ArticleDao {
 
     @Query("SELECT * FROM articles WHERE normalizedName = :normalizedName")
     suspend fun getByNormalizedName(normalizedName: String): List<ArticleEntity>
+
+    @Query("SELECT * FROM articles WHERE id IN (:ids)")
+    suspend fun getByIds(ids: List<Long>): List<ArticleEntity>
+
+    @Query("SELECT * FROM articles WHERE barcode IN (:barcodes)")
+    suspend fun getByBarcodes(barcodes: List<String>): List<ArticleEntity>
+
+    @Query(
+        """
+        SELECT id, barcode, designation, normalizedName, price, previousPrice, codeart, reference,
+               category, rayon, famille, brand, stock, unit, lastSeenAt, changeStatus, isActive, needsTicketUpdate
+        FROM articles
+        """,
+    )
+    suspend fun getImportSnapshots(): List<ArticleImportSnapshot>
+
+    /** Trusted products for PARAY Learn — article + barcode + linked PNG. */
+    @Query(
+        """
+        SELECT a.id, a.barcode, a.codeart, a.designation, a.normalizedName, a.price, a.previousPrice,
+               a.reference, a.category, a.rayon, a.brand, a.stock, a.unit, a.changeStatus,
+               a.isActive, a.needsTicketUpdate, a.rawData,
+               (SELECT p.imagePath FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imagePath,
+               (SELECT p.imageStatus FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imageStatus,
+               (SELECT p.createdAt FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imageCreatedAt,
+               (SELECT p.lastSentAt FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imageLastSentAt
+        FROM articles a
+        WHERE a.isActive = 1
+          AND TRIM(a.barcode) != ''
+          AND EXISTS (
+              SELECT 1 FROM product_images p
+              WHERE p.articleId = a.id
+                AND p.imageStatus = 'FOUND'
+                AND p.imagePath IS NOT NULL AND TRIM(p.imagePath) != ''
+          )
+        ORDER BY a.designation ASC
+        """,
+    )
+    suspend fun listLearnReadyArticles(): List<ArticleWithImage>
 
     @Query("SELECT * FROM articles")
     suspend fun getAll(): List<ArticleEntity>
@@ -592,6 +655,9 @@ interface ArticleDao {
 
     @Query("SELECT COUNT(*) FROM articles WHERE needsTicketUpdate = 1 AND isActive = 1")
     suspend fun countNeedsTicket(): Int
+
+    @Query("DELETE FROM articles")
+    suspend fun deleteAll()
 }
 
 @Dao
@@ -610,6 +676,12 @@ interface ImportDao {
 
     @Query("SELECT * FROM imports WHERE id = :id")
     suspend fun getById(id: Long): ImportEntity?
+
+    @Query("SELECT * FROM imports ORDER BY importedAt DESC")
+    suspend fun getAll(): List<ImportEntity>
+
+    @Query("DELETE FROM imports")
+    suspend fun deleteAll()
 }
 
 @Dao
@@ -634,6 +706,15 @@ interface ImportChangeDao {
 
     @Query(
         """
+        SELECT * FROM import_changes
+        WHERE importId IN (:importIds) AND changeType != 'UNCHANGED'
+        ORDER BY importId, changeType, designation
+        """,
+    )
+    suspend fun getMeaningfulByImports(importIds: List<Long>): List<ImportChangeEntity>
+
+    @Query(
+        """
         SELECT ic.* FROM import_changes ic
         INNER JOIN imports imp ON imp.id = ic.importId
         WHERE ic.changeType != 'UNCHANGED'
@@ -642,6 +723,12 @@ interface ImportChangeDao {
         """,
     )
     fun observeRecentChanges(limit: Int): Flow<List<ImportChangeEntity>>
+
+    @Query("SELECT * FROM import_changes ORDER BY importId, changeType, designation")
+    suspend fun getAll(): List<ImportChangeEntity>
+
+    @Query("DELETE FROM import_changes")
+    suspend fun deleteAll()
 }
 
 @Dao
@@ -657,6 +744,12 @@ interface ArticlePriceHistoryDao {
 
     @Query("SELECT * FROM article_price_history WHERE articleId = :articleId ORDER BY changedAt DESC")
     fun observeForArticle(articleId: Long): Flow<List<ArticlePriceHistoryEntity>>
+
+    @Query("SELECT * FROM article_price_history ORDER BY changedAt DESC")
+    suspend fun getAll(): List<ArticlePriceHistoryEntity>
+
+    @Query("DELETE FROM article_price_history")
+    suspend fun deleteAll()
 }
 
 @Dao
@@ -738,6 +831,12 @@ interface WorkflowHistoryDao {
         """,
     )
     fun observeLatest(): Flow<List<WorkflowHistoryItem>>
+
+    @Query("SELECT * FROM workflow_history ORDER BY createdAt DESC")
+    suspend fun getAll(): List<WorkflowHistoryEntity>
+
+    @Query("DELETE FROM workflow_history")
+    suspend fun deleteAll()
 }
 
 @Dao
@@ -754,13 +853,19 @@ interface PreselectionDao {
     @Query("DELETE FROM preselection_items WHERE cartType = :cartType")
     suspend fun clear(cartType: String)
 
+    @Query("DELETE FROM preselection_items")
+    suspend fun deleteAll()
+
+    @Query("SELECT * FROM preselection_items ORDER BY cartType, sortOrder, addedAt")
+    suspend fun getAll(): List<PreselectionItemEntity>
+
     @Query(
         """
         SELECT p.id AS preselectionId, p.articleId, p.sortOrder, p.addedAt, p.note, p.intendedTemplateType,
                p.copyCount, p.variantBarcode, p.isPromoTicket, p.promoPrice, p.promoOriginalPrice,
                a.designation,
                CASE WHEN p.variantBarcode != '' THEN p.variantBarcode ELSE a.barcode END AS barcode,
-               a.price, a.previousPrice, a.codeart, a.category,
+               a.price, a.previousPrice, a.codeart, a.category, a.rayon,
                a.changeStatus, a.needsTicketUpdate,
                COALESCE(
                  (SELECT ab.imagePath FROM article_alternate_barcodes ab
@@ -793,7 +898,7 @@ interface PreselectionDao {
                p.copyCount, p.variantBarcode, p.isPromoTicket, p.promoPrice, p.promoOriginalPrice,
                a.designation,
                CASE WHEN p.variantBarcode != '' THEN p.variantBarcode ELSE a.barcode END AS barcode,
-               a.price, a.previousPrice, a.codeart, a.category,
+               a.price, a.previousPrice, a.codeart, a.category, a.rayon,
                a.changeStatus, a.needsTicketUpdate,
                COALESCE(
                  (SELECT ab.imagePath FROM article_alternate_barcodes ab
@@ -902,6 +1007,9 @@ interface PrintTemplateDao {
 
     @Query("SELECT COUNT(*) FROM print_templates")
     suspend fun count(): Int
+
+    @Query("SELECT * FROM print_templates ORDER BY type, name")
+    suspend fun getAll(): List<PrintTemplateEntity>
 }
 
 @Dao
@@ -962,6 +1070,18 @@ interface PrintBatchDao {
         """,
     )
     fun observeDesignShelfPrints(limit: Int): Flow<List<PrintBatchEntity>>
+
+    @Query("SELECT * FROM print_batches ORDER BY createdAt DESC")
+    suspend fun getAll(): List<PrintBatchEntity>
+
+    @Query("SELECT * FROM print_batch_items ORDER BY batchId, sortOrder")
+    suspend fun getAllItems(): List<PrintBatchItemEntity>
+
+    @Query("DELETE FROM print_batch_items")
+    suspend fun deleteAllItems()
+
+    @Query("DELETE FROM print_batches")
+    suspend fun deleteAll()
 }
 
 @Dao
@@ -980,6 +1100,12 @@ interface PromoAlertDao {
 
     @Query("DELETE FROM promo_alerts WHERE status = 'PENDING'")
     suspend fun clearPending()
+
+    @Query("SELECT * FROM promo_alerts ORDER BY alertDate ASC")
+    suspend fun getAll(): List<PromoAlertEntity>
+
+    @Query("DELETE FROM promo_alerts")
+    suspend fun deleteAll()
 }
 
 @Dao
@@ -1027,6 +1153,12 @@ interface ArticleAlternateBarcodeDao {
         """,
     )
     suspend fun getAllPairs(): List<PhoneSyncAlternatePair>
+
+    @Query("SELECT * FROM article_alternate_barcodes ORDER BY articleId, addedAt")
+    suspend fun getAll(): List<ArticleAlternateBarcodeEntity>
+
+    @Query("DELETE FROM article_alternate_barcodes")
+    suspend fun deleteAll()
 }
 
 @Dao
@@ -1042,6 +1174,12 @@ interface BulkCaptureDao {
 
     @Query("SELECT * FROM bulk_captures ORDER BY capturedAt DESC")
     fun observeAll(): Flow<List<BulkCaptureEntity>>
+
+    @Query("SELECT * FROM bulk_captures ORDER BY capturedAt DESC")
+    suspend fun getAll(): List<BulkCaptureEntity>
+
+    @Query("DELETE FROM bulk_captures")
+    suspend fun deleteAll()
 }
 
 @Dao
@@ -1108,6 +1246,12 @@ interface CameraBatchDao {
 
     @Query("SELECT * FROM camera_batch_items WHERE id = :id LIMIT 1")
     suspend fun getById(id: Long): CameraBatchItemEntity?
+
+    @Query("SELECT * FROM camera_batch_items ORDER BY capturedAt DESC")
+    suspend fun getAll(): List<CameraBatchItemEntity>
+
+    @Query("DELETE FROM camera_batch_items")
+    suspend fun deleteAll()
 }
 
 @Dao
@@ -1132,4 +1276,7 @@ interface BatchCameraQueueDao {
 
     @Query("SELECT COUNT(*) FROM batch_camera_queue WHERE done = 0")
     fun observePendingCount(): Flow<Int>
+
+    @Query("SELECT * FROM batch_camera_queue ORDER BY sortOrder ASC")
+    suspend fun getAll(): List<BatchCameraQueueEntity>
 }

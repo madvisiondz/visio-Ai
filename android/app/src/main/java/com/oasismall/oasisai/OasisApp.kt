@@ -8,6 +8,8 @@ import com.oasismall.oasisai.data.db.OasisDatabase
 import com.oasismall.oasisai.data.repository.OasisRepository
 import com.oasismall.oasisai.domain.ImageMatcher
 import com.oasismall.oasisai.domain.backgroundremoval.BackgroundRemovalService
+import com.oasismall.oasisai.domain.flavors.SubBarcodeRegistry
+import com.oasismall.oasisai.domain.flavors.SubBarcodeFlavorService
 import com.oasismall.oasisai.domain.ImportService
 import com.oasismall.oasisai.domain.settings.ImportantRayonsStore
 import com.oasismall.oasisai.domain.paray.ParayAgent
@@ -60,11 +62,22 @@ class OasisApp : Application() {
             .build()
     }
 
+    val backgroundTaskManager: com.oasismall.oasisai.domain.background.OasisBackgroundTaskManager by lazy {
+        com.oasismall.oasisai.domain.background.OasisBackgroundTaskManager()
+    }
     val importantRayonsStore: ImportantRayonsStore by lazy { ImportantRayonsStore(this) }
-    val repository: OasisRepository by lazy { OasisRepository(database, importantRayonsStore) }
+    val subBarcodeRegistry: SubBarcodeRegistry by lazy { SubBarcodeRegistry(this) }
+    val repository: OasisRepository by lazy {
+        OasisRepository(database, importantRayonsStore, subBarcodeRegistry, filesDir)
+    }
     val imageMatcher: ImageMatcher by lazy { ImageMatcher(this, repository) }
+    val subBarcodeFlavorService: SubBarcodeFlavorService by lazy {
+        SubBarcodeFlavorService(this, repository, imageMatcher)
+    }
     val readyPngLoader: ReadyPngLoader by lazy { ReadyPngLoader(imageMatcher) }
-    val importService: ImportService by lazy { ImportService(repository, imageMatcher, visioProCatalogService) }
+    val importService: ImportService by lazy {
+        ImportService(repository, imageMatcher, subBarcodeFlavorService)
+    }
     val printGenerator: PrintGenerator by lazy { PrintGenerator(this, repository) }
     val promoService: PromoService by lazy { PromoService(repository) }
     val backgroundRemovalService: BackgroundRemovalService by lazy { BackgroundRemovalService(this) }
@@ -99,12 +112,36 @@ class OasisApp : Application() {
         VisioProRenderFacade(visioProAilRenderer, visioProTemplateAssets)
     }
     val visioProPriceResolver: VisioProPriceResolver by lazy {
-        VisioProPriceResolver(repository, visioProStore)
+        VisioProPriceResolver(repository)
+    }
+    val gestiumCatalogPurge: com.oasismall.oasisai.domain.transfer.GestiumCatalogPurge by lazy {
+        com.oasismall.oasisai.domain.transfer.GestiumCatalogPurge(
+            repository, imageMatcher, visioProCatalogConfigStore, subBarcodeFlavorService,
+        )
+    }
+    val deviceBackupExporter: com.oasismall.oasisai.domain.transfer.DeviceBackupExporter by lazy {
+        com.oasismall.oasisai.domain.transfer.DeviceBackupExporter(this, repository, visioProCatalogConfigStore)
+    }
+    val deviceBackupImporter: com.oasismall.oasisai.domain.transfer.DeviceBackupImporter by lazy {
+        com.oasismall.oasisai.domain.transfer.DeviceBackupImporter(
+            this, repository, imageMatcher, importantRayonsStore, visioProCatalogConfigStore,
+        )
+    }
+    val visioProBundleExporter: com.oasismall.oasisai.domain.transfer.VisioProBundleExporter by lazy {
+        com.oasismall.oasisai.domain.transfer.VisioProBundleExporter(
+            this, visioProCatalogService, visioProCatalogConfigStore, visioProStore,
+        )
+    }
+    val visioProPrintImageLinker: com.oasismall.oasisai.domain.visiopro.VisioProPrintImageLinker by lazy {
+        com.oasismall.oasisai.domain.visiopro.VisioProPrintImageLinker(
+            this, repository, visioProCatalogService, visioProPhotoStore, imageMatcher,
+        )
     }
 
     override fun onCreate() {
         super.onCreate()
         appScope.launch {
+            com.oasismall.oasisai.domain.transfer.UserExportStorage.cleanupStaleExportCache(cacheDir)
             repository.seedDefaultTemplates()
             promoService.refreshAlerts()
         }

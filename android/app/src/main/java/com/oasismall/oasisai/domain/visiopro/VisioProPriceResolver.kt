@@ -1,64 +1,64 @@
 package com.oasismall.oasisai.domain.visiopro
 
+import com.oasismall.oasisai.data.db.dao.ArticleWithImage
 import com.oasismall.oasisai.data.repository.OasisRepository
 import com.oasismall.oasisai.util.PriceFormatter
+import kotlin.math.abs
 
 class VisioProPriceResolver(
     private val repository: OasisRepository,
-    private val store: VisioProStore,
 ) {
 
-    suspend fun resolve(preset: VisioProPreset): VisioProPriceResult {
+    fun resolveFromCatalog(
+        preset: VisioProPreset,
+        memory: VisioProArticleMemory?,
+        catalog: ArticleWithImage?,
+    ): VisioProPriceResult {
         if (!preset.theme.showPrice) {
             return VisioProPriceResult(null, VisioProPriceSource.NONE)
         }
+        val csvPrice = catalog?.price
+        if (memory?.manualPriceOverridden == true && memory.manualPrice != null) {
+            return VisioProPriceResult(
+                price = memory.manualPrice,
+                source = VisioProPriceSource.MANUAL,
+                csvBaseline = memory.csvPriceWhenOverridden ?: csvPrice,
+            )
+        }
+        if (csvPrice != null) {
+            return VisioProPriceResult(csvPrice, VisioProPriceSource.CSV, csvPrice)
+        }
+        return VisioProPriceResult(null, VisioProPriceSource.NONE)
+    }
 
-        val memory = store.getMemory(preset.article.slug)
-        preset.article.catalogArticleId?.let { articleId ->
-            repository.getArticleWithImageById(articleId)?.price?.let {
-                return resolveWithManual(memory, it, preset.channel)
-            }
+    suspend fun resolveFallback(preset: VisioProPreset, memory: VisioProArticleMemory?): VisioProPriceResult {
+        if (!preset.theme.showPrice) {
+            return VisioProPriceResult(null, VisioProPriceSource.NONE)
+        }
+        val catalog = preset.article.catalogArticleId?.let { repository.getArticleWithImageById(it) }
+        if (catalog != null) {
+            return resolveFromCatalog(preset, memory, catalog)
         }
         val csvPrice = repository.findPriceForVisioProArticle(
             csvDesignation = preset.article.csvDesignation,
             barcodeSuffix = preset.article.barcodeSuffix,
             keywords = preset.article.designationKeywords,
         )
-
-        return when (preset.channel) {
-            VisioProChannel.SOCIAL -> {
-                memory.manualPrice?.let {
-                    return VisioProPriceResult(it, VisioProPriceSource.MANUAL)
-                }
-                csvPrice?.let {
-                    return VisioProPriceResult(it, VisioProPriceSource.CSV)
-                }
-                VisioProPriceResult(null, VisioProPriceSource.NONE)
-            }
-            VisioProChannel.PRINT -> {
-                csvPrice?.let {
-                    return VisioProPriceResult(it, VisioProPriceSource.CSV)
-                }
-                memory.manualPrice?.let {
-                    return VisioProPriceResult(it, VisioProPriceSource.SOCIAL_MEMORY)
-                }
-                VisioProPriceResult(null, VisioProPriceSource.NONE)
-            }
+        if (memory?.manualPriceOverridden == true && memory.manualPrice != null) {
+            return VisioProPriceResult(
+                price = memory.manualPrice,
+                source = VisioProPriceSource.MANUAL,
+                csvBaseline = memory.csvPriceWhenOverridden ?: csvPrice,
+            )
         }
-    }
-
-    private fun resolveWithManual(
-        memory: VisioProArticleMemory,
-        csvPrice: Double,
-        channel: VisioProChannel,
-    ): VisioProPriceResult = when (channel) {
-        VisioProChannel.SOCIAL -> {
-            memory.manualPrice?.let { VisioProPriceResult(it, VisioProPriceSource.MANUAL) }
-                ?: VisioProPriceResult(csvPrice, VisioProPriceSource.CSV)
-        }
-        VisioProChannel.PRINT -> VisioProPriceResult(csvPrice, VisioProPriceSource.CSV)
+        csvPrice?.let { return VisioProPriceResult(it, VisioProPriceSource.CSV, it) }
+        return VisioProPriceResult(null, VisioProPriceSource.NONE)
     }
 
     fun formatPrice(price: Double?): String =
         price?.let { PriceFormatter.format(it) } ?: "—"
+
+    companion object {
+        fun pricesMatch(a: Double, b: Double): Boolean = abs(a - b) < 0.009
+    }
 }

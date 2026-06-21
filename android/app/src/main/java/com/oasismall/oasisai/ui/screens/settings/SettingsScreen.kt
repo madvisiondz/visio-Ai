@@ -19,6 +19,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.AutoFixHigh
@@ -27,6 +29,7 @@ import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Storefront
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.Sync
@@ -122,8 +125,40 @@ fun SettingsScreen(
             onNavigateParayImport()
         }
     }
+    val backupImportPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) viewModel.importFullBackup(context, uri)
+    }
+    val backupExportPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/zip"),
+    ) { uri ->
+        if (uri != null) viewModel.exportFullBackup(context, uri)
+    }
+    val visioProExportPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/zip"),
+    ) { uri ->
+        if (uri != null) viewModel.exportVisioProBundle(context, uri)
+    }
 
-    val busy = uiState.isLoadingImages || uiState.isReindexing || uiState.isLoadingSample || uiState.isExportingPngs
+    fun defaultBackupZipName(): String {
+        val stamp = java.text.SimpleDateFormat("yyyy-MM-dd_HHmm", java.util.Locale.US)
+            .format(java.util.Date())
+        return "VisioAi_backup_$stamp.zip"
+    }
+
+    fun defaultVisioProZipName(): String {
+        val stamp = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+            .format(java.util.Date())
+        return "VisioPRO_export_$stamp.zip"
+    }
+
+    var showPurgeConfirm by remember { mutableStateOf(false) }
+    var showImportConfirm by remember { mutableStateOf(false) }
+
+    val busy = uiState.isLoadingImages || uiState.isReindexing || uiState.isLoadingSample ||
+        uiState.isExportingPngs || uiState.isPurgingCatalog || uiState.isExportingBackup ||
+        uiState.isImportingBackup || uiState.isExportingVisioPro || uiState.isRestoringSubBarcodeFlavors
 
     Scaffold(topBar = {
         TopAppBar(
@@ -312,7 +347,7 @@ fun SettingsScreen(
             item {
                 SettingsRow(
                     title = "Export PNG database",
-                    subtitle = "Copy product_images/ → Download/VisioAi/Product_images[date]/ (Visio metadata preserved)",
+                    subtitle = "All gallery PNGs incl. sub-barcode variants → Download/VisioAi/Product_images[date]/",
                     icon = Icons.Default.FileUpload,
                     enabled = !busy,
                     onClick = { viewModel.exportProductImages(context) },
@@ -326,7 +361,7 @@ fun SettingsScreen(
                     title = "Re-index product images",
                     subtitle = "Match PNGs by barcode (file Details) then designation; write missing tags",
                     icon = Icons.Default.Refresh,
-                    onClick = viewModel::reindexProductImages,
+                    onClick = { viewModel.reindexProductImages(context) },
                     trailing = {
                         if (uiState.isReindexing) CircularProgressIndicator()
                     },
@@ -346,6 +381,68 @@ fun SettingsScreen(
                     subtitle = "Select ready PNGs, scan barcode, then name/link them",
                     icon = Icons.Default.Image,
                     onClick = onNavigateGalleryLink,
+                )
+            }
+
+            item { SectionTitle("Device transfer") }
+            item {
+                SettingsRow(
+                    title = "Export full backup (ZIP)",
+                    subtitle = "Choose where to save — catalog, carts, PNGs, VisioPRO, PARAY, Design (not kept in app cache)",
+                    icon = Icons.Default.CloudUpload,
+                    enabled = !busy,
+                    onClick = { backupExportPicker.launch(defaultBackupZipName()) },
+                    trailing = {
+                        if (uiState.isExportingBackup) CircularProgressIndicator()
+                    },
+                )
+            }
+            item {
+                SettingsRow(
+                    title = "Import full backup (ZIP)",
+                    subtitle = "Restore everything from a VisioAi_backup_*.zip (replaces current data)",
+                    icon = Icons.Default.FileDownload,
+                    enabled = !busy,
+                    onClick = { showImportConfirm = true },
+                    trailing = {
+                        if (uiState.isImportingBackup) CircularProgressIndicator()
+                    },
+                )
+            }
+            item {
+                SettingsRow(
+                    title = "Export VisioPRO presets",
+                    subtitle = "Choose where to save ZIP — sections, photos, catalog PNGs, designs, prices",
+                    icon = Icons.Default.Storefront,
+                    enabled = !busy,
+                    onClick = { visioProExportPicker.launch(defaultVisioProZipName()) },
+                    trailing = {
+                        if (uiState.isExportingVisioPro) CircularProgressIndicator()
+                    },
+                )
+            }
+            item {
+                SettingsRow(
+                    title = "Sync sub-PNGs",
+                    subtitle = "Scan flavor PNGs (metadata) → link sub-barcodes for search & scanner; renames legacy sub_*.png",
+                    icon = Icons.Default.Link,
+                    enabled = !busy,
+                    onClick = { viewModel.syncSubPngs(context) },
+                    trailing = {
+                        if (uiState.isRestoringSubBarcodeFlavors) CircularProgressIndicator()
+                    },
+                )
+            }
+            item {
+                SettingsRow(
+                    title = "Purge Gestium catalog",
+                    subtitle = "Remove articles & carts — saves sub-barcode flavor map, keeps PNG files on device",
+                    icon = Icons.Default.DeleteForever,
+                    enabled = !busy,
+                    onClick = { showPurgeConfirm = true },
+                    trailing = {
+                        if (uiState.isPurgingCatalog) CircularProgressIndicator()
+                    },
                 )
             }
 
@@ -430,12 +527,57 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.titleMedium,
                     )
                     Text(
-                        "Keep Oasis AI open — large image loads take several minutes",
+                        "Runs in background — you can lock the screen. Check the notification for progress.",
                         color = Color.White.copy(alpha = 0.75f),
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
             }
+        }
+
+        if (showPurgeConfirm) {
+            AlertDialog(
+                onDismissRequest = { showPurgeConfirm = false },
+                title = { Text("Purge Gestium catalog?") },
+                text = {
+                    Text(
+                        "This removes all imported articles, CSV import history, carts, and VisioPRO list links. " +
+                            "Sub-barcode flavor links are saved to a local registry first. PNG files stay on the device — " +
+                            "re-import your CSV and flavors re-link automatically.",
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        showPurgeConfirm = false
+                        viewModel.purgeGestiumCatalog(context)
+                    }) { Text("Purge") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showPurgeConfirm = false }) { Text("Cancel") }
+                },
+            )
+        }
+
+        if (showImportConfirm) {
+            AlertDialog(
+                onDismissRequest = { showImportConfirm = false },
+                title = { Text("Import full backup?") },
+                text = {
+                    Text(
+                        "This replaces catalog, images, VisioPRO settings, carts, and history on this phone " +
+                            "with the selected VisioAi_backup ZIP.",
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        showImportConfirm = false
+                        backupImportPicker.launch(arrayOf("application/zip", "application/octet-stream", "*/*"))
+                    }) { Text("Choose ZIP") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showImportConfirm = false }) { Text("Cancel") }
+                },
+            )
         }
         }
     }

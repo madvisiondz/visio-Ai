@@ -4,8 +4,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.oasismall.oasisai.domain.settings.ImportantRayonsConfig
+import com.oasismall.oasisai.ui.components.LocalImportantRayonsConfig
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -64,6 +67,10 @@ import androidx.compose.ui.platform.LocalContext
 import com.oasismall.oasisai.OasisApp
 import com.oasismall.oasisai.ui.screens.parayhome.ParayHomeScreen
 import com.oasismall.oasisai.ui.screens.parayhome.ParayHomeViewModel
+import com.oasismall.oasisai.ui.screens.paraylearn.ParayLearnSessionScreen
+import com.oasismall.oasisai.ui.screens.paraylearn.ParayLearnSessionViewModel
+import com.oasismall.oasisai.ui.screens.paraylearn.ParayMainScreen
+import com.oasismall.oasisai.ui.screens.paraylearn.ParayMainViewModel
 import com.oasismall.oasisai.ui.screens.parayimport.ParayImportScreen
 import com.oasismall.oasisai.ui.screens.parayimport.ParayImportViewModel
 import com.oasismall.oasisai.ui.screens.phonesync.PhoneSyncScreen
@@ -92,7 +99,10 @@ fun OasisNavHost(factory: OasisViewModelFactory) {
     val backStack by navController.currentBackStackEntryAsState()
     val currentRoute = backStack?.destination?.route
     val showBottomBar = showMainBottomBar(currentRoute)
+    val rayonsConfig by factory.repository.importantRayonsConfig
+        .collectAsStateWithLifecycle(initialValue = ImportantRayonsConfig())
 
+    CompositionLocalProvider(LocalImportantRayonsConfig provides rayonsConfig) {
     Scaffold(
         bottomBar = {
             if (showBottomBar) {
@@ -174,8 +184,11 @@ fun OasisNavHost(factory: OasisViewModelFactory) {
             composable(OasisRoute.VisioProHome.route) {
                 val vm: VisioProHomeViewModel = viewModel(factory = factory)
                 val counts by vm.counts.collectAsStateWithLifecycle()
+                val syncMessage by vm.syncMessage.collectAsStateWithLifecycle()
                 VisioProHomeScreen(
                     categoryCounts = counts,
+                    syncMessage = syncMessage,
+                    onDismissSyncMessage = vm::clearSyncMessage,
                     onOpenCategory = { category ->
                         navController.navigate(OasisRoute.VisioProCategory.create(category.name))
                     },
@@ -251,6 +264,24 @@ fun OasisNavHost(factory: OasisViewModelFactory) {
                 ParayImportScreen(
                     viewModel = vm,
                     onBack = { navController.popBackStack() },
+                )
+            }
+            composable(OasisRoute.ParayMain.route) {
+                val vm: ParayMainViewModel = viewModel(factory = factory)
+                ParayMainScreen(
+                    viewModel = vm,
+                    onStartLearning = { navController.navigate(OasisRoute.ParayLearnSession.route) },
+                    onNavigateParayHome = { navController.navigate(OasisRoute.ParayHome.route) },
+                )
+            }
+            composable(OasisRoute.ParayLearnSession.route) {
+                val vm: ParayLearnSessionViewModel = viewModel(factory = factory)
+                ParayLearnSessionScreen(
+                    viewModel = vm,
+                    onBack = { navController.popBackStack() },
+                    onFinished = {
+                        navController.popBackStack(OasisRoute.ParayMain.route, inclusive = false)
+                    },
                 )
             }
             composable(OasisRoute.Design.route) {
@@ -522,5 +553,6 @@ fun OasisNavHost(factory: OasisViewModelFactory) {
                 )
             }
         }
+    }
     }
 }

@@ -20,23 +20,28 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Reorder
 import androidx.compose.material.icons.filled.Restore
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Storefront
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -49,6 +54,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -68,7 +74,17 @@ fun VisioProSettingsScreen(
     onOpenCategory: (VisioProCategory) -> Unit,
 ) {
     val rows by viewModel.rows.collectAsStateWithLifecycle()
+    val isLinking by viewModel.isLinkingPrintPhotos.collectAsStateWithLifecycle()
+    val message by viewModel.message.collectAsStateWithLifecycle()
+    val snackbar = remember { SnackbarHostState() }
     val lifecycleOwner = LocalLifecycleOwner.current
+
+    LaunchedEffect(message) {
+        message?.let {
+            snackbar.showSnackbar(it)
+            viewModel.clearMessage()
+        }
+    }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -89,6 +105,7 @@ fun VisioProSettingsScreen(
                 },
             )
         },
+        snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         LazyColumn(
             modifier = Modifier
@@ -102,6 +119,32 @@ fun VisioProSettingsScreen(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            item {
+                ListItem(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(enabled = !isLinking) { viewModel.syncPrintPhotosToCatalog() }
+                        .padding(horizontal = 4.dp),
+                    headlineContent = {
+                        Text("Lier photos Impression → To share", fontWeight = FontWeight.Medium)
+                    },
+                    supportingContent = {
+                        Text(
+                            "Scan unique des onglets Impression (Fruits, Légumes, …) vers le catalogue PNG — pour les articles déjà en To share",
+                        )
+                    },
+                    leadingContent = {
+                        Icon(Icons.Default.Image, contentDescription = null)
+                    },
+                    trailingContent = {
+                        if (isLinking) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Default.Sync, contentDescription = null)
+                        }
+                    },
                 )
             }
             items(rows) { row ->
@@ -167,8 +210,9 @@ fun VisioProListEditorScreen(
     if (ui.showOrderSheet) {
         VisioProOrderSheet(
             articles = ui.orderedSelectedArticles,
+            onOrderChange = viewModel::updateOrderDraft,
             onDone = { ids -> viewModel.applyOrder(ids) },
-            onDismiss = { viewModel.dismissOrderSheet() },
+            onCancel = { viewModel.cancelOrderSheet() },
         )
     }
 
@@ -188,6 +232,15 @@ fun VisioProListEditorScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour")
+                    }
+                },
+                actions = {
+                    TextButton(
+                        onClick = { viewModel.save(onSaved) },
+                        enabled = ui.selectedIds.isNotEmpty() && !ui.isSaving,
+                    ) {
+                        Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
+                        Text(if (ui.isSaving) "…" else "Enregistrer")
                     }
                 },
             )
@@ -210,13 +263,6 @@ fun VisioProListEditorScreen(
                         "Ordre d'affichage (${ui.orderedSelectedArticles.size})",
                         modifier = Modifier.padding(start = 8.dp),
                     )
-                }
-                Button(
-                    onClick = { viewModel.save(onSaved) },
-                    enabled = ui.selectedIds.isNotEmpty() && !ui.isSaving,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("Enregistrer la sélection")
                 }
                 OutlinedButton(
                     onClick = { viewModel.resetToDefaults() },
@@ -291,8 +337,9 @@ fun VisioProListEditorScreen(
 @Composable
 private fun VisioProOrderSheet(
     articles: List<com.oasismall.oasisai.data.db.dao.ArticleWithImage>,
+    onOrderChange: (List<Long>) -> Unit,
     onDone: (List<Long>) -> Unit,
-    onDismiss: () -> Unit,
+    onCancel: () -> Unit,
 ) {
     val orderState = remember(articles) {
         mutableStateListOf<Long>().apply { addAll(articles.map { it.id }) }
@@ -302,17 +349,25 @@ private fun VisioProOrderSheet(
     var dragStartIndex by remember { mutableIntStateOf(-1) }
     var dragAccumulatedY by remember { mutableFloatStateOf(0f) }
     val listState = rememberLazyListState()
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { newValue -> newValue != SheetValue.Hidden },
+    )
     val itemHeightPx = with(LocalDensity.current) { 72.dp.toPx() }
+
+    fun publishOrder() {
+        onOrderChange(orderState.toList())
+    }
 
     fun moveEntry(fromIndex: Int, toIndex: Int) {
         if (fromIndex !in orderState.indices || toIndex !in orderState.indices || fromIndex == toIndex) return
         val id = orderState.removeAt(fromIndex)
         orderState.add(toIndex, id)
+        publishOrder()
     }
 
     ModalBottomSheet(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { /* drag/outside dismiss blocked */ },
         sheetState = sheetState,
     ) {
         Column(
@@ -320,14 +375,27 @@ private fun VisioProOrderSheet(
                 .fillMaxWidth()
                 .padding(bottom = 24.dp),
         ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TextButton(onClick = onCancel) {
+                    Text("Annuler")
+                }
+                Text(
+                    "Ordre d'affichage",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                TextButton(onClick = { onDone(orderState.toList()) }) {
+                    Text("Terminé")
+                }
+            }
             Text(
-                "Ordre d'affichage",
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                "Glissez ⋮⋮ ou utilisez ↑ ↓. Puis Terminé.",
+                "Glissez ⋮⋮ ou utilisez ↑ ↓. L'ordre est mémorisé tant que vous restez sur cet écran.",
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -408,14 +476,6 @@ private fun VisioProOrderSheet(
                         },
                     )
                 }
-            }
-            Button(
-                onClick = { onDone(orderState.toList()) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-            ) {
-                Text("Terminé")
             }
         }
     }

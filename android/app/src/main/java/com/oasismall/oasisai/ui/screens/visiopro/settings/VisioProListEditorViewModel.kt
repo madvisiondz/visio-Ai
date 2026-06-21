@@ -98,23 +98,40 @@ class VisioProListEditorViewModel(
         }
     }
 
+    private var orderSnapshotAtSheetOpen: List<Long>? = null
+
     fun openOrderSheet() {
+        val snapshot = _ui.value.orderedIds.filter { it in _ui.value.selectedIds }
+        orderSnapshotAtSheetOpen = snapshot
         _ui.update { it.copy(showOrderSheet = true) }
     }
 
     fun dismissOrderSheet() {
+        orderSnapshotAtSheetOpen = null
         _ui.update { it.copy(showOrderSheet = false) }
     }
 
-    fun applyOrder(newOrder: List<Long>) {
+    fun cancelOrderSheet() {
+        orderSnapshotAtSheetOpen?.let { snapshot ->
+            _ui.update { state ->
+                val rest = state.orderedIds.filter { it !in snapshot }
+                state.copy(orderedIds = snapshot + rest)
+            }
+        }
+        dismissOrderSheet()
+    }
+
+    fun updateOrderDraft(newOrder: List<Long>) {
         _ui.update { state ->
             val selected = state.selectedIds
             val tail = state.orderedIds.filter { it !in newOrder && it in selected }
-            state.copy(
-                orderedIds = newOrder.filter { it in selected } + tail,
-                showOrderSheet = false,
-            )
+            state.copy(orderedIds = newOrder.filter { it in selected } + tail)
         }
+    }
+
+    fun applyOrder(newOrder: List<Long>) {
+        updateOrderDraft(newOrder)
+        dismissOrderSheet()
     }
 
     fun save(onSaved: () -> Unit = {}) {

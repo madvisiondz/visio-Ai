@@ -12,6 +12,8 @@ class VisioProRenderFacade(
         articlePhoto: Bitmap?,
         catalogPhoto: Bitmap?,
         design: com.oasismall.oasisai.domain.visiopro.designer.VisioProDesignerDocument? = null,
+        displayDesignation: String? = null,
+        designationFontRatio: Float? = null,
     ): Bitmap {
         val themedPreset = design?.let {
             preset.copy(theme = com.oasismall.oasisai.domain.visiopro.designer.VisioProDesignerDefaults.themeFromDocument(it))
@@ -25,6 +27,8 @@ class VisioProRenderFacade(
                         price = price,
                         photoBitmap = articlePhoto,
                         design = design,
+                        displayDesignation = displayDesignation,
+                        designationFontRatio = designationFontRatio,
                     ),
                 )?.let { return it }
             }
@@ -37,6 +41,8 @@ class VisioProRenderFacade(
                         price = price,
                         photoBitmap = photo,
                         design = design,
+                        displayDesignation = displayDesignation,
+                        designationFontRatio = designationFontRatio,
                     ),
                 )?.let { return it }
             }
@@ -47,6 +53,8 @@ class VisioProRenderFacade(
                 price = price,
                 productBitmap = articlePhoto ?: catalogPhoto,
                 design = design,
+                displayDesignation = displayDesignation,
+                designationFontRatio = designationFontRatio,
             ),
         )
     }

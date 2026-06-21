@@ -33,12 +33,16 @@ com.oasismall.oasisai/
 │   ├── model/               # Enums
 │   └── repository/          # OasisRepository
 ├── domain/
-│   ├── CsvParser.kt       # Parses known fields + stores full raw CSV detail
-│   ├── ImportService.kt     # Import + diff
-│   ├── ImageMatcher.kt      # IO-thread PNG matching + bulk image index update
-│   ├── PrintGenerator.kt    # PDF layouts
+│   ├── CsvParser.kt       # Streaming parse; flexible French/English headers
+│   ├── ImportCatalogMaps.kt # Lightweight snapshot → barcode/codeart/name maps
+│   ├── ImportService.kt     # Import + diff via ArticleImportSnapshot (no rawData load)
+│   ├── ImageMatcher.kt      # IO-thread PNG matching; cached PNG index; upsert for new articles only
+│   ├── flavors/             # Sub-barcode registry + purge/archive/restore (v2.15.2)
+│   ├── background/          # OasisBackgroundTaskService — long tasks survive screen off (v2.15.6)
+│   ├── transfer/            # Device backup ZIP, Gestium purge, VisioPRO bundle export
 │   ├── design/ShelfA4Renderer.kt  # In-app shelf 12-up A4 JPEG
-│   ├── paray/               # PARAY visual agent — shape/color/typo + PC fingerprint import + camera ID
+│   ├── paray/               # Visual agent — Learn V1, camera ID, fingerprints
+│   │                        # learn_settings.json + learn_index.json (visual ≠ Room identity)
 │   ├── layoutagent/         # Layout fit submodule (used by PARAY)
 │   └── PromoService.kt      # Expiry alerts
 ├── ui/
@@ -60,7 +64,7 @@ com.oasismall.oasisai/
 
 See `PROJECT.md` §16. Room schema is currently **v11** (`bulk_captures` for AGENT Bulk mode).
 
-`articles.rawData` preserves all CSV columns for article detail display. `product_images.createdAt` and `product_images.lastSentAt` support the office workflow for tracking when PNGs were imported/created and last shared as files.
+`articles.rawData` optional (null on CSV import since v2.14.7); import diff uses `ArticleImportSnapshot` without loading blobs. `product_images.createdAt` and `product_images.lastSentAt` support the office workflow for tracking when PNGs were imported/created and last shared as files.
 
 The To shoot Stamper keeps selected gallery images as URI references until the user presses Done. This avoids loading/copying all selected PNGs into memory at once; Coil previews only visible cards, and the final copy/link work runs on `Dispatchers.IO`. The slider uses center-card detection plus trailing space so edge cards, including the last card, can become the active scan target.
 

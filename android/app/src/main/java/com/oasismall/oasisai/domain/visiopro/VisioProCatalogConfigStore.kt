@@ -67,6 +67,12 @@ class VisioProCatalogConfigStore(context: Context) {
         }
     }
 
+    suspend fun clearAll() = withContext(Dispatchers.IO) {
+        synchronized(lock) {
+            if (file.exists()) file.delete()
+        }
+    }
+
     private fun readCategoryConfigLocked(category: VisioProCategory): VisioProCategoryConfig =
         readCategoryConfigFromValue(readRoot().opt(category.name))
 

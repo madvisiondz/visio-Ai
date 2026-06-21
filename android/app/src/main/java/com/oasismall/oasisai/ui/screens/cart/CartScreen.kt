@@ -37,7 +37,7 @@ import com.oasismall.oasisai.ui.components.CartSourceLegend
 import com.oasismall.oasisai.ui.components.CatalogChangeBadge
 import com.oasismall.oasisai.ui.components.OpenCameraBatchButton
 import com.oasismall.oasisai.ui.components.cartSourceStyle
-import com.oasismall.oasisai.ui.components.hasCatalogChange
+import com.oasismall.oasisai.ui.components.shouldShowPriceChangeGlow
 import com.oasismall.oasisai.ui.components.sourceBorder
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -256,6 +256,7 @@ private fun PreselectionWithArticle.toArticleWithImage() = ArticleWithImage(
     previousPrice = previousPrice,
     reference = null,
     category = category,
+    rayon = rayon,
     brand = null,
     stock = null,
     unit = null,
@@ -273,7 +274,7 @@ private fun PreselectionWithArticle.toArticleWithImage() = ArticleWithImage(
 private fun ShareCartStatusFooter(item: PreselectionWithArticle) {
     val fmt = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        if (item.hasCatalogChange()) {
+        if (item.shouldShowPriceChangeGlow()) {
             CatalogChangeBadge(active = true)
         }
         Text(

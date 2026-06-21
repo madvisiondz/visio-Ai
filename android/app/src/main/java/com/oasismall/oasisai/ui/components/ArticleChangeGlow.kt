@@ -21,18 +21,31 @@ import com.oasismall.oasisai.data.db.dao.ArticleWithImage
 import com.oasismall.oasisai.data.db.dao.PreselectionWithArticle
 import com.oasismall.oasisai.data.model.ArticleChangeStatus
 import com.oasismall.oasisai.domain.design.DesignBatchItemUi
+import com.oasismall.oasisai.domain.settings.includesRayon
 
-fun ArticleWithImage.hasCatalogChange(): Boolean =
-    needsTicketUpdate ||
-        changeStatus == ArticleChangeStatus.PRICE_CHANGED.name ||
-        changeStatus == ArticleChangeStatus.NEW.name ||
-        changeStatus == ArticleChangeStatus.RENAMED.name
+fun ArticleWithImage.hasPriceChange(): Boolean =
+    changeStatus == ArticleChangeStatus.PRICE_CHANGED.name || needsTicketUpdate
 
-fun PreselectionWithArticle.hasCatalogChange(): Boolean =
-    needsTicketUpdate ||
-        changeStatus == ArticleChangeStatus.PRICE_CHANGED.name ||
-        changeStatus == ArticleChangeStatus.NEW.name ||
-        changeStatus == ArticleChangeStatus.RENAMED.name
+@Composable
+fun ArticleWithImage.shouldShowPriceChangeGlow(): Boolean {
+    val config = LocalImportantRayonsConfig.current
+    return hasPriceChange() && config.includesRayon(rayon)
+}
+
+fun PreselectionWithArticle.hasPriceChange(): Boolean =
+    changeStatus == ArticleChangeStatus.PRICE_CHANGED.name || needsTicketUpdate
+
+@Composable
+fun PreselectionWithArticle.shouldShowPriceChangeGlow(): Boolean {
+    val config = LocalImportantRayonsConfig.current
+    return hasPriceChange() && config.includesRayon(rayon)
+}
+
+/** @deprecated Use [shouldShowPriceChangeGlow] for price-only highlight scoped to important rayons. */
+fun ArticleWithImage.hasCatalogChange(): Boolean = hasPriceChange()
+
+/** @deprecated Use [shouldShowPriceChangeGlow]. */
+fun PreselectionWithArticle.hasCatalogChange(): Boolean = hasPriceChange()
 
 @Composable
 fun Modifier.catalogChangeGlow(active: Boolean): Modifier {
@@ -70,7 +83,7 @@ fun CatalogChangeBadge(active: Boolean) {
         shape = MaterialTheme.shapes.small,
     ) {
         androidx.compose.material3.Text(
-            "Modifié CSV",
+            "Prix modifié",
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onPrimaryContainer,

@@ -26,8 +26,6 @@ data class DesignBatchItemUi(
     val hasCatalogChange: Boolean
         get() = needsTicketUpdate ||
             changeStatus == ArticleChangeStatus.PRICE_CHANGED.name ||
-            changeStatus == ArticleChangeStatus.NEW.name ||
-            changeStatus == ArticleChangeStatus.RENAMED.name ||
             kotlin.math.abs(price - priceAtPrint) > 0.009
 
     fun toPreselection(sortOrder: Int, preselectionId: Long = -sortOrder.toLong()): PreselectionWithArticle =
@@ -45,6 +43,7 @@ data class DesignBatchItemUi(
             previousPrice = previousPrice,
             codeart = null,
             category = null,
+            rayon = null,
             imagePath = imagePath,
             imageCreatedAt = null,
             imageLastSentAt = null,

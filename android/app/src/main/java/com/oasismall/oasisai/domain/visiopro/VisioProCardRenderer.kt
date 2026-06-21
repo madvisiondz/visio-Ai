@@ -19,6 +19,8 @@ object VisioProCardRenderer {
         val price: Double?,
         val productBitmap: Bitmap? = null,
         val design: com.oasismall.oasisai.domain.visiopro.designer.VisioProDesignerDocument? = null,
+        val displayDesignation: String? = null,
+        val designationFontRatio: Float? = null,
     )
 
     fun render(input: RenderInput): Bitmap {
@@ -93,15 +95,23 @@ object VisioProCardRenderer {
 
         val namePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = design?.designationColor ?: theme.bodyText
-            textSize = w * (design?.designationFontRatio ?: if (preset.channel == VisioProChannel.SOCIAL) 0.11f else 0.13f)
+            textSize = w * (
+                input.designationFontRatio
+                    ?: design?.designationFontRatio
+                    ?: if (preset.channel == VisioProChannel.SOCIAL) 0.11f else 0.13f
+                )
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         }
         val nameRect = design?.designationRect
         val nameY = nameRect?.let { (it.top + it.bottom) / 2f * h + namePaint.textSize * 0.35f }
             ?: if (theme.showPrice) h * 0.80f else h * 0.92f
         val nameX = nameRect?.left?.times(w) ?: w * 0.08f
-        val label = design?.sampleDesignation ?: preset.article.labelFr
-        canvas.drawText(label.uppercase(), nameX, nameY, namePaint)
+        val rawLabel = input.displayDesignation?.takeIf { it.isNotBlank() }
+            ?: design?.sampleDesignation
+            ?: preset.article.labelAr
+            ?: preset.article.labelFr
+        val label = if (rawLabel.any { it.code in 0x0600..0x06FF }) rawLabel else rawLabel.uppercase()
+        canvas.drawText(label, nameX, nameY, namePaint)
 
         if (theme.showPrice) {
             val priceLabel = input.price?.let { PriceFormatter.format(it) } ?: "— DA"

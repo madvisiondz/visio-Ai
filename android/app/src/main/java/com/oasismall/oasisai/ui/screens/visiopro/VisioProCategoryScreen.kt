@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,6 +17,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -23,8 +26,10 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -36,25 +41,36 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -65,6 +81,8 @@ import com.oasismall.oasisai.domain.visiopro.VisioProCategory
 import com.oasismall.oasisai.domain.visiopro.VisioProChannel
 import com.oasismall.oasisai.domain.visiopro.VisioProPresetCatalog
 import com.oasismall.oasisai.domain.visiopro.VisioProPriceSource
+import com.oasismall.oasisai.ui.components.CatalogChangeBadge
+import com.oasismall.oasisai.ui.components.catalogChangeGlow
 import com.oasismall.oasisai.util.PriceFormatter
 import com.oasismall.oasisai.util.createVisioProCaptureUri
 import java.text.SimpleDateFormat
@@ -150,6 +168,16 @@ fun VisioProCategoryScreen(
         }
     }
 
+    LaunchedEffect(filteredPresets) {
+        viewModel.setNavigationPresetIds(filteredPresets.map { it.preset.id })
+    }
+
+    val navigationPosition = remember(filteredPresets, ui.selectedPresetId) {
+        val ids = filteredPresets.map { it.preset.id }
+        val index = ids.indexOf(ui.selectedPresetId)
+        if (index >= 0) index + 1 to ids.size else null
+    }
+
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
 
     Scaffold(
@@ -218,6 +246,61 @@ fun VisioProCategoryScreen(
                 singleLine = true,
             )
 
+            val checkedCount = ui.checkedPresetIds.size
+            val visibleIds = filteredPresets.map { it.preset.id }
+            val allVisibleChecked = visibleIds.isNotEmpty() && visibleIds.all { it in ui.checkedPresetIds }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Checkbox(
+                    checked = allVisibleChecked,
+                    onCheckedChange = { checked ->
+                        if (checked) {
+                            viewModel.selectAllVisible(visibleIds)
+                        } else {
+                            viewModel.clearChecked()
+                        }
+                    },
+                )
+                Text(
+                    if (checkedCount > 0) "$checkedCount sélectionné(s)" else "Sélectionner",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f),
+                )
+                Button(
+                    onClick = { viewModel.exportCheckedList() },
+                    enabled = checkedCount > 0 && !ui.isExporting,
+                ) {
+                    if (ui.isExporting) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.padding(end = 8.dp),
+                            strokeWidth = 2.dp,
+                        )
+                    } else {
+                        Icon(
+                            Icons.Default.FileDownload,
+                            contentDescription = null,
+                            modifier = Modifier.padding(end = 6.dp),
+                        )
+                    }
+                    Text(
+                        if (ui.isExporting) "Export…" else "Exporter sélection",
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            Text(
+                "Exporte chaque carte rendue en PNG (pas de page A4) — réseaux sociaux ou impression selon l'onglet.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 0.dp),
+            )
+
             if (ui.isLoading) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
@@ -228,31 +311,82 @@ fun VisioProCategoryScreen(
                     contentPadding = PaddingValues(bottom = 24.dp),
                 ) {
                     items(filteredPresets, key = { it.preset.id }) { row ->
-                        val priceLabel = row.price?.let { "${PriceFormatter.formatNumber(it)} DA" } ?: "—"
+                        val showInlinePrice =
+                            row.preset.theme.showPrice &&
+                                category != VisioProCategory.FISH
+                        val openEditor = { viewModel.selectPreset(row.preset.id) }
+                        val isChecked = row.preset.id in ui.checkedPresetIds
                         ListItem(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { viewModel.selectPreset(row.preset.id) },
+                                .catalogChangeGlow(row.priceChangeGlow),
+                            leadingContent = {
+                                Checkbox(
+                                    checked = isChecked,
+                                    onCheckedChange = { viewModel.togglePresetChecked(row.preset.id) },
+                                )
+                            },
                             headlineContent = {
                                 Text(
                                     row.preset.article.labelFr,
                                     fontWeight = FontWeight.Medium,
                                     maxLines = 2,
                                     overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.clickable(onClick = openEditor),
                                 )
                             },
                             supportingContent = {
-                                Text(
-                                    buildString {
-                                        append(priceLabel)
-                                        row.preset.article.barcodeSuffix?.let { append(" · code $it") }
-                                        if (row.lastExportAt != null) append(" · exporté")
-                                    },
-                                )
+                                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    Text(
+                                        buildString {
+                                            if (!showInlinePrice) {
+                                                val priceLabel =
+                                                    row.price?.let { "${PriceFormatter.formatNumber(it)} DA" } ?: "—"
+                                                append(priceLabel)
+                                                row.preset.article.barcodeSuffix?.let { append(" · code $it") }
+                                            } else {
+                                                row.preset.article.barcodeSuffix?.let { append("code $it") }
+                                            }
+                                            if (row.lastExportAt != null) append(" · exporté")
+                                        },
+                                        modifier = Modifier.clickable(onClick = openEditor),
+                                    )
+                                    if (row.userOverrodePrice && row.csvBaselinePrice != null) {
+                                        Text(
+                                            "Prix saisi · CSV ${PriceFormatter.formatNumber(row.csvBaselinePrice)} DA",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.tertiary,
+                                        )
+                                    }
+                                    if (row.priceChangeGlow && row.previousCatalogPrice != null && row.csvCatalogPrice != null) {
+                                        Text(
+                                            "Prix CSV : ${PriceFormatter.formatNumber(row.previousCatalogPrice)} → ${PriceFormatter.formatNumber(row.csvCatalogPrice)} DA",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.primary,
+                                        )
+                                    }
+                                    if (row.priceChangeGlow) {
+                                        CatalogChangeBadge(active = true)
+                                    }
+                                }
                             },
                             trailingContent = {
-                                if (row.lastExportAt != null) {
-                                    Text("✓", color = MaterialTheme.colorScheme.primary)
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    if (showInlinePrice) {
+                                        VisioProNumericPriceField(
+                                            value = row.editablePriceText,
+                                            onValueChange = { viewModel.updateInlinePrice(row.preset.id, it) },
+                                            onCommit = { viewModel.commitInlinePrice(row.preset.id) },
+                                            minWidthDp = 72,
+                                            modifier = Modifier.widthIn(min = 72.dp, max = 108.dp),
+                                        )
+                                    }
+                                    if (row.lastExportAt != null) {
+                                        Text("✓", color = MaterialTheme.colorScheme.primary)
+                                    }
                                 }
                             },
                         )
@@ -271,6 +405,14 @@ fun VisioProCategoryScreen(
             VisioProArticleEditorSheet(
                 ui = ui,
                 category = category,
+                articleIndex = navigationPosition?.first,
+                articleCount = navigationPosition?.second,
+                onDesignationChange = viewModel::updateDesignationInput,
+                onDesignationFontRatioChange = viewModel::updateDesignationFontRatio,
+                onApplyDesignation = viewModel::commitManualDesignation,
+                onResetDesignation = viewModel::reloadDesignationFromPreset,
+                onNavigateNext = { viewModel.navigateArticle(forward = true) },
+                onNavigatePrevious = { viewModel.navigateArticle(forward = false) },
                 onPriceChange = viewModel::updatePriceInput,
                 onApplyPrice = viewModel::commitManualPrice,
                 onReloadCsv = viewModel::reloadFromCsv,
@@ -288,6 +430,14 @@ fun VisioProCategoryScreen(
 private fun VisioProArticleEditorSheet(
     ui: VisioProUiState,
     category: VisioProCategory,
+    articleIndex: Int?,
+    articleCount: Int?,
+    onDesignationChange: (String) -> Unit,
+    onDesignationFontRatioChange: (Float) -> Unit,
+    onApplyDesignation: () -> Unit,
+    onResetDesignation: () -> Unit,
+    onNavigateNext: () -> Unit,
+    onNavigatePrevious: () -> Unit,
     onPriceChange: (String) -> Unit,
     onApplyPrice: () -> Unit,
     onReloadCsv: () -> Unit,
@@ -298,29 +448,60 @@ private fun VisioProArticleEditorSheet(
     onLoadImage: () -> Unit,
 ) {
     val selectedRow = ui.presets.firstOrNull { it.preset.id == ui.selectedPresetId }
-    val label = selectedRow?.preset?.article?.labelFr.orEmpty()
+    val labelFr = selectedRow?.preset?.article?.labelFr.orEmpty()
     val isSocial = ui.channel == VisioProChannel.SOCIAL
+    val scrollState = rememberScrollState()
+    val swipeThresholdPx = with(LocalDensity.current) { 72.dp.toPx() }
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .verticalScroll(scrollState)
             .padding(horizontal = 20.dp)
             .padding(bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text(label, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(labelFr, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                if (articleIndex != null && articleCount != null) {
+                    Text(
+                        "Article $articleIndex / $articleCount · glissez la carte ← →",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
 
         Box(
             Modifier
                 .fillMaxWidth()
-                .padding(vertical = 4.dp),
+                .padding(vertical = 4.dp)
+                .pointerInput(ui.selectedPresetId) {
+                    var totalDragX = 0f
+                    detectHorizontalDragGestures(
+                        onDragEnd = {
+                            when {
+                                totalDragX <= -swipeThresholdPx -> onNavigateNext()
+                                totalDragX >= swipeThresholdPx -> onNavigatePrevious()
+                            }
+                            totalDragX = 0f
+                        },
+                        onHorizontalDrag = { _, dragAmount -> totalDragX += dragAmount },
+                    )
+                },
             contentAlignment = Alignment.Center,
         ) {
             ui.previewBitmap?.let { bitmap ->
                 val aspect = bitmap.width.toFloat() / bitmap.height.coerceAtLeast(1)
                 Image(
                     bitmap = bitmap.asImageBitmap(),
-                    contentDescription = label,
+                    contentDescription = labelFr,
                     modifier = Modifier
                         .widthIn(max = 400.dp)
                         .fillMaxWidth()
@@ -330,6 +511,63 @@ private fun VisioProArticleEditorSheet(
             } ?: CircularProgressIndicator()
         }
 
+        Text("Désignation sur la carte", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium)
+        Text(
+            "Saisissez en arabe pour l'impression et les réseaux sociaux (varie par article).",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            val rtlStyle = MaterialTheme.typography.bodyLarge.copy(textDirection = TextDirection.Rtl)
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                OutlinedTextField(
+                    value = ui.designationInput,
+                    onValueChange = onDesignationChange,
+                    label = { Text("Désignation (AR)") },
+                    modifier = Modifier.weight(1f),
+                    singleLine = false,
+                    maxLines = 3,
+                    textStyle = rtlStyle,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { onApplyDesignation() }),
+                )
+            }
+            Button(onClick = onApplyDesignation) {
+                Text("OK")
+            }
+            IconButton(onClick = onResetDesignation) {
+                Icon(Icons.Default.Refresh, contentDescription = "Réinitialiser la désignation")
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Taille désignation", style = MaterialTheme.typography.bodySmall)
+            Text(
+                "${(ui.designationFontRatio * 100).toInt()} %",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+        Slider(
+            value = ui.designationFontRatio,
+            onValueChange = onDesignationFontRatioChange,
+            valueRange = 0.02f..0.12f,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Text(
+            "Ajustez par article (chaque carte a sa propre taille). Glissez la carte ← → pour passer à l'article suivant.",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
         if (selectedRow?.preset?.theme?.showPrice != false && category != VisioProCategory.FISH) {
             Text("Prix", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium)
             Row(
@@ -337,12 +575,12 @@ private fun VisioProArticleEditorSheet(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                OutlinedTextField(
+                VisioProNumericPriceField(
                     value = ui.priceInput,
                     onValueChange = onPriceChange,
-                    label = { Text("Montant (DA)") },
+                    label = "Montant (DA)",
                     modifier = Modifier.weight(1f),
-                    singleLine = true,
+                    onCommit = onApplyPrice,
                 )
                 Button(onClick = onApplyPrice) {
                     Text("OK")
@@ -352,10 +590,20 @@ private fun VisioProArticleEditorSheet(
                 }
             }
             Text(
-                priceSourceLabel(ui.priceSource),
+                priceSourceLabel(ui.priceSource, ui.channel, selectedRow?.csvBaselinePrice),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            if (selectedRow?.previousCatalogPrice != null && selectedRow.csvCatalogPrice != null &&
+                selectedRow.priceChangeGlow
+            ) {
+                Text(
+                    "Changement CSV : ${PriceFormatter.formatNumber(selectedRow.previousCatalogPrice)} → ${PriceFormatter.formatNumber(selectedRow.csvCatalogPrice)} DA",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
         }
 
         if (isSocial && ui.usesDailyPhoto) {
@@ -461,15 +709,26 @@ private fun VisioProArticleEditorSheet(
                 enabled = !ui.isExporting && ui.previewBitmap != null,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text(if (ui.isExporting) "Export…" else "Exporter étiquette magasin")
+                Text(if (ui.isExporting) "Export…" else "Exporter cette carte")
             }
         }
     }
 }
 
-private fun priceSourceLabel(source: VisioProPriceSource): String = when (source) {
-    VisioProPriceSource.CSV -> "Prix catalogue CSV"
-    VisioProPriceSource.MANUAL -> "Prix saisi manuellement"
+private fun priceSourceLabel(
+    source: VisioProPriceSource,
+    channel: VisioProChannel,
+    csvBaseline: Double? = null,
+): String = when (source) {
+    VisioProPriceSource.CSV -> "Prix catalogue CSV (modifiable ci-dessus)"
+    VisioProPriceSource.MANUAL -> {
+        val csvHint = csvBaseline?.let { " — CSV : ${PriceFormatter.formatNumber(it)} DA" }.orEmpty()
+        if (channel == VisioProChannel.PRINT) {
+            "Prix modifié par vous (impression)$csvHint"
+        } else {
+            "Prix modifié par vous$csvHint"
+        }
+    }
     VisioProPriceSource.SOCIAL_MEMORY -> "Prix mémorisé"
     VisioProPriceSource.NONE -> "Aucun prix CSV — saisissez manuellement"
 }

@@ -12,6 +12,7 @@ import com.oasismall.oasisai.domain.visiopro.designer.QuadInt
 import com.oasismall.oasisai.util.PriceFormatter
 import org.json.JSONObject
 import kotlin.math.max
+import kotlin.math.min
 
 class VisioProTemplateAssets(context: Context) {
 
@@ -29,14 +30,16 @@ class VisioProTemplateAssets(context: Context) {
         val json = appContext.assets.open(path).bufferedReader().use { it.readText() }
         val root = JSONObject(json)
         val text = root.optJSONObject("text") ?: JSONObject()
+        val photoJson = root.getJSONObject("photo")
         val loaded = VisioProTemplateLayout(
             templateId = root.getString("templateId"),
             width = root.getInt("width"),
             height = root.getInt("height"),
-            photoLeft = root.getJSONObject("photo").getInt("left"),
-            photoTop = root.getJSONObject("photo").getInt("top"),
-            photoRight = root.getJSONObject("photo").getInt("right"),
-            photoBottom = root.getJSONObject("photo").getInt("bottom"),
+            photoLeft = photoJson.getInt("left"),
+            photoTop = photoJson.getInt("top"),
+            photoRight = photoJson.getInt("right"),
+            photoBottom = photoJson.getInt("bottom"),
+            photoFit = photoJson.optString("fit", "cover"),
             designAsset = root.getString("designAsset"),
             designation = text.optJSONObject("designation")?.let { parseSlot(it) },
             code = root.optJSONObject("code")?.let { parseSlot(it) },
@@ -90,6 +93,8 @@ class VisioProAilRenderer(
         val price: Double?,
         val photoBitmap: Bitmap?,
         val design: com.oasismall.oasisai.domain.visiopro.designer.VisioProDesignerDocument? = null,
+        val displayDesignation: String? = null,
+        val designationFontRatio: Float? = null,
     )
 
     fun render(input: RenderInput): Bitmap? {
@@ -107,7 +112,7 @@ class VisioProAilRenderer(
         val photo = design?.photoPixels() ?: QuadInt(layout.photoLeft, layout.photoTop, layout.photoRight, layout.photoBottom)
         val photoRect = RectF(photo.left.toFloat(), photo.top.toFloat(), photo.right.toFloat(), photo.bottom.toFloat())
         input.photoBitmap?.let { photo ->
-            drawCover(canvas, photo, photoRect)
+            drawPhoto(canvas, photo, photoRect, layout.photoFit)
         } ?: run {
             val placeholderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = when (templateId) {
@@ -134,17 +139,19 @@ class VisioProAilRenderer(
         canvas.drawBitmap(overlay, 0f, 0f, null)
 
         val article = input.preset.article
-        val designation = if (design != null && templateId == "ail_social") {
-            design.sampleDesignationAr.ifBlank { article.labelAr ?: article.labelFr }
-        } else {
-            article.labelAr ?: article.labelFr
+        val designation = input.displayDesignation?.takeIf { it.isNotBlank() }
+            ?: if (design != null && templateId == "ail_social") {
+                design.sampleDesignationAr.ifBlank { article.labelAr ?: article.labelFr }
+            } else {
+                article.labelAr ?: article.labelFr
+            }
+        val designationSlot = (design?.designationSlot() ?: layout.designation)?.let { slot ->
+            input.designationFontRatio?.let { slot.copy(fontSizeRatio = it) } ?: slot
         }
-        val designationSlot = design?.designationSlot() ?: layout.designation
         designationSlot?.let { drawText(canvas, designation, it, layout.width, bold = true) }
 
         if (templateId == "fv_print") {
-            val codeSuffix = design?.sampleCode ?: article.barcodeSuffix
-            codeSuffix?.let { suffix ->
+            article.barcodeSuffix?.let { suffix ->
                 val slot = design?.codeSlot() ?: layout.code
                 slot?.let {
                     val label = it.format?.replace("{value}", suffix) ?: suffix
@@ -160,16 +167,40 @@ class VisioProAilRenderer(
         return bitmap
     }
 
+    private fun drawPhoto(canvas: Canvas, source: Bitmap, dest: RectF, fit: String) {
+        when (fit.lowercase()) {
+            "contain", "fit", "inside" -> drawFit(canvas, source, dest)
+            else -> drawCover(canvas, source, dest)
+        }
+    }
+
+    /** Scale to fill the slot; crops overflow. */
     private fun drawCover(canvas: Canvas, source: Bitmap, dest: RectF) {
         val scale = max(dest.width() / source.width, dest.height() / source.height)
+        drawScaledBitmap(canvas, source, dest, scale, clip = true)
+    }
+
+    /** Scale to fit inside the slot; full image visible (letterbox/pillarbox). */
+    private fun drawFit(canvas: Canvas, source: Bitmap, dest: RectF) {
+        val scale = min(dest.width() / source.width, dest.height() / source.height)
+        drawScaledBitmap(canvas, source, dest, scale, clip = false)
+    }
+
+    private fun drawScaledBitmap(
+        canvas: Canvas,
+        source: Bitmap,
+        dest: RectF,
+        scale: Float,
+        clip: Boolean,
+    ) {
         val scaledW = source.width * scale
         val scaledH = source.height * scale
         val left = dest.centerX() - scaledW / 2f
         val top = dest.centerY() - scaledH / 2f
-        val save = canvas.save()
-        canvas.clipRect(dest)
+        val save = if (clip) canvas.save() else -1
+        if (clip) canvas.clipRect(dest)
         canvas.drawBitmap(source, null, RectF(left, top, left + scaledW, top + scaledH), null)
-        canvas.restoreToCount(save)
+        if (clip) canvas.restoreToCount(save)
     }
 
     private fun drawText(

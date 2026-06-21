@@ -19,6 +19,8 @@ object PngMetadata {
     const val KEY_PRICE_BEFORE = "PriceBefore"
     const val KEY_RAYON = "Rayon"
     const val KEY_CODEART = "Codeart"
+    const val KEY_PARENT_BARCODE = "ParentBarcode"
+    const val KEY_VARIANT_TYPE = "VariantType"
 
     private val PNG_SIGNATURE = byteArrayOf(
         0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
@@ -34,6 +36,7 @@ object PngMetadata {
         val priceNow: Double? = null,
         val priceBefore: Double? = null,
         val rayon: String? = null,
+        val parentBarcode: String? = null,
         val description: String? = null,
     )
 
@@ -80,6 +83,7 @@ object PngMetadata {
             priceNow = chunks[KEY_PRICE_NOW]?.let { parsePriceText(it) },
             priceBefore = chunks[KEY_PRICE_BEFORE]?.let { parsePriceText(it) },
             rayon = chunks[KEY_RAYON]?.trim()?.takeIf { it.isNotBlank() },
+            parentBarcode = chunks[KEY_PARENT_BARCODE]?.trim()?.takeIf { it.isNotBlank() },
             description = chunks[KEY_DESCRIPTION]?.trim()?.takeIf { it.isNotBlank() },
         )
     }
@@ -133,6 +137,8 @@ object PngMetadata {
         priceBefore: Double?,
         rayon: String?,
         codeart: String? = null,
+        parentBarcode: String? = null,
+        variantType: String? = null,
     ) {
         if (!file.isFile) return
         val details = buildList {
@@ -140,6 +146,7 @@ object PngMetadata {
             priceNow?.let { add("Price now: ${PriceFormatter.format(it)}") }
             priceBefore?.let { add("Price before: ${PriceFormatter.format(it)}") }
             add("Barcode: ${barcode.trim()}")
+            parentBarcode?.trim()?.takeIf { it.isNotBlank() }?.let { add("Parent barcode: $it") }
             codeart?.trim()?.takeIf { it.isNotBlank() }?.let { add("Code: $it") }
             rayon?.trim()?.takeIf { it.isNotBlank() }?.let { add("Rayon: $it") }
         }
@@ -151,6 +158,8 @@ object PngMetadata {
             priceBefore?.let { put(KEY_PRICE_BEFORE, PriceFormatter.format(it)) }
             codeart?.trim()?.takeIf { it.isNotBlank() }?.let { put(KEY_CODEART, it) }
             rayon?.trim()?.takeIf { it.isNotBlank() }?.let { put(KEY_RAYON, it) }
+            parentBarcode?.trim()?.takeIf { it.isNotBlank() }?.let { put(KEY_PARENT_BARCODE, it) }
+            variantType?.trim()?.takeIf { it.isNotBlank() }?.let { put(KEY_VARIANT_TYPE, it) }
         }
         writeTextChunks(file, chunks)
     }
@@ -164,6 +173,40 @@ object PngMetadata {
 
     fun stemWithoutBarcodeSuffix(stem: String): String =
         stem.replace(BARCODE_FILENAME_SUFFIX, "")
+
+    /** Human-readable sub-variant filename stem, e.g. "Pommes Golden" → "PommesGolden". */
+    fun subVariantDesignationStem(designation: String): String {
+        val display = NameNormalizer.toDisplayFileStem(designation)
+        return display
+            .replace(Regex("\\s+"), "")
+            .replace(Regex("[^A-Za-z0-9À-ÿ]"), "")
+            .take(48)
+            .ifBlank { "article" }
+    }
+
+    fun subVariantFileName(designationStem: String, altIndex: Int): String =
+        "${designationStem}$altIndex.png"
+
+    fun parseSubVariantAltIndex(fileNameStem: String, designationStem: String): Int? {
+        if (!fileNameStem.startsWith(designationStem)) return null
+        val suffix = fileNameStem.removePrefix(designationStem)
+        return suffix.toIntOrNull()?.takeIf { it > 0 }
+    }
+
+    /** Sub-barcode flavor PNG — identity lives in metadata, not filename. */
+    fun isSubVariantPng(file: File): Boolean = isSubVariantPng(file, emptySet())
+
+    fun isSubVariantPng(file: File, alternateImagePaths: Set<String>): Boolean {
+        if (!file.isFile || !file.extension.equals("png", true)) return false
+        if (file.absolutePath in alternateImagePaths) return true
+        val stem = file.nameWithoutExtension
+        if (stem.startsWith("sub_")) return true
+        if (BARCODE_FILENAME_ONLY.matches(stem)) return false
+        if (BARCODE_FILENAME_SUFFIX.containsMatchIn(stem)) return false
+        val chunks = readAllTextChunks(file)
+        if (chunks[KEY_VARIANT_TYPE]?.equals("sub", ignoreCase = true) == true) return true
+        return chunks[KEY_PARENT_BARCODE]?.isNotBlank() == true
+    }
 
     private fun readTextChunk(file: File, keyword: String): String? {
         RandomAccessFile(file, "r").use { raf ->

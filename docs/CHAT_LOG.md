@@ -869,3 +869,147 @@
 **User:** Still 1117 rows skipped; PIEDS DE VEAU not in Articles.
 
 **Assistant:** **v2.12.3** — 1118 Gestium rows have empty Code-barres but valid Code (13145 for PIEDS DE VEAU); old filter counted them as skipped. Identity resolved inside `parseRow`; cp1252 first; preview shows barcode-less import count.
+
+---
+
+## Session 103 — 2026-06-14
+
+**User:** VisioPRO UX — inline price on category list, decimal keyboard, scroll to price field, fixed Save top-right, fix order popup closing on scroll (losing unsaved order).
+
+**Assistant:** **v2.12.5** — `VisioProNumericPriceField` (decimal IME + bringIntoView); inline price on list rows; list editor **Enregistrer** in TopAppBar; order sheet `confirmValueChange` blocks drag-dismiss, live `updateOrderDraft`, **Terminé** / **Annuler** in header.
+
+---
+
+## Session 104 — 2026-06-14
+
+**User:** VisioPRO opened card — editable Arabic designation on print/social; swipe card right-to-left next, left-to-right previous.
+
+**Assistant:** **v2.12.6** — `manualDesignation` in VisioProStore; designation field with RTL input + live preview; horizontal swipe on card preview; auto-save on navigate/export.
+
+---
+
+## Session 105 — 2026-06-14
+
+**User:** VisioPRO print articles not loading codes from CSV.
+
+**Assistant:** **v2.12.7** — `VisioProPrintCode` resolves last 3 digits of Code-barres (or full Gestium Code for `CA:` rows); `codeart` on `ArticleWithImage`; fv_print renderer no longer uses designer `sampleCode` for real cards.
+
+---
+
+## Session 106 — 2026-06-14
+
+**User:** CSV reports after loading new CSV should show only selected rayons; unselected rayons don't concern the app user.
+
+**Assistant:** **v2.13.0** — Import preview, last-import card, import history, import detail, and Report import summaries now scope counts and change lists to **Rayons importants** (Settings). Full catalog still imports to DB; only user-facing reports are filtered.
+
+---
+
+## Session 107 — 2026-06-14
+
+**User:** Per-card designation size per preset; separate print vs social images; CSV price with manual override + tracking; price-change glow everywhere (selected rayons only).
+
+**Assistant:** **v2.14.0** — VisioPRO list rows get per-preset text-size sliders; photos split by channel; price resolver prefers manual when set else CSV; glow + "Prix modifié" badge on price changes filtered by Rayons importants app-wide.
+
+---
+
+## Session 108 — 2026-06-21
+
+**User:** VisioPRO list prices not loading from CSV; manual edits should be cached with trace; CSV import loader very slow/stuck.
+
+**Assistant:** **v2.14.3** — Prices load from linked catalog row in one batch query; user override only when explicitly committed (`manualPriceOverridden` + CSV baseline snapshot); import loads existing catalog once instead of three times; history counts capped to 12 recent imports when Rayons filter active.
+
+---
+
+## Session 109 — 2026-06-21
+
+**User:** CSV import still 15× slower; find troublemaker and restore stable speed.
+
+**Assistant:** **v2.14.4** — Root causes: writing every unchanged row individually (~20k updates), full image re-index (`deleteAll` + 20k matches) on every import, VisioPRO pool sync blocking import path, import history enrich competing with import. Fixed: only persist changed rows, batch saves, incremental image upsert, background pool sync, pause history counts during import.
+
+---
+
+## Session 110 — 2026-06-21
+
+**User:** Still very slow; wants old loader back — find the regression not loader tweaks.
+
+**Assistant:** **v2.14.5** — Real troublemaker: v2.12.2 `parseWithFallback` always parsed CSV 3× (was early-exit 1×). Also v2.12.2 added blocking VisioPRO pool sync on every import + v2.13 import history re-summarize. Reverted loader to original steps; fixed triple parse; removed pool sync from import path.
+
+---
+
+## Session 111 — 2026-06-21
+
+**User:** Scan Gestium CSV `21-06-26 14Hc.csv`; filter unwanted `???????` rows while keeping valid articles.
+
+**Assistant:** **v2.14.6** — 308 Librairie rows are Arabic titles exported as question marks (encoding mojibake). Added `CsvParser.isGarbledDesignation` to skip designation with 3+ `?` in a row or >45% question marks; valid French/Latin rows kept; preview shows garbled skip count.
+
+---
+
+## Session 112 — 2026-06-21
+
+**User:** "Creating import record" step used to take ~5s, now up to 2 minutes.
+
+**Assistant:** **v2.14.8** — Bottleneck was loading all articles with huge `rawData` blobs before diffing. Added lightweight `ArticleImportSnapshot` query, `ImportCatalogMaps`, streaming CSV parse, PNG index cache. Re-import (no new articles) skips image step. APK v2.14.8 (287).
+
+---
+
+## Session 113 — 2026-06-21
+
+**User:** Purge Gestium data; export VisioPRO presets with images; PNG export all sub-barcodes; all-in-one device transfer.
+
+**Assistant:** **v2.15.0** — Settings **Device transfer**: Purge Gestium catalog; Export/Import full `VisioAi_backup_*.zip`; Export VisioPRO presets per section; PNG export includes all sub-barcode variants.
+
+---
+
+## Session 114 — 2026-06-21
+
+**User:** Can sub-barcode flavor PNGs survive purge? Build in-app automation so the app knows where they belong after re-import.
+
+**Assistant:** **v2.15.2** — `sub_barcode_registry.json` archives flavor links before purge; CSV import auto-restores; Settings **Restore sub-barcode flavors**; PNG metadata tags parent barcode on new saves.
+
+---
+
+## Session 115 — 2026-06-21
+
+**User:** To share from print tabs uses rendered images not article PNGs — add checkmarks on social + print lists and export checked as individual images (not A4).
+
+**Assistant:** **v2.15.3** — VisioPRO category list checkboxes + **Exporter sélection** → one PNG per rendered card to DCIM/VisioPRO/Social or Print.
+
+---
+
+## Session 116 — 2026-06-21
+
+**User:** Sub-barcode PNGs should auto-detect from metadata (designation+n filename); Sync sub-PNGs for existing files; PNG database first.
+
+**Assistant:** **v2.15.5** — `{designation}{n}.png` + metadata tags; **Sync sub-PNGs** in Settings; auto-sync on CSV import; sub PNGs excluded from main image index.
+
+---
+
+## Session 117 — 2026-06-21
+
+**User:** Let all app tasks run in background (screen can lock during sync).
+
+**Assistant:** **v2.15.6** — `OasisBackgroundTaskService` foreground service for sync sub-PNGs, re-index, exports, backup, CSV import, purge, load PNGs; notification progress; sync scan optimized.
+
+---
+
+## Session 118 — 2026-06-21
+
+**User:** Briefing of app features and last development status as a detailed MD file.
+
+**Assistant:** Created **`docs/APP_BRIEFING.md`** — executive summary, feature modules, v2.15.6 status, workflows, gaps, doc map.
+
+---
+
+## Session 119 — 2026-06-22
+
+**User:** PARAY Learn V1 spec — teach trusted catalog products (CSV + barcode + PNG); separate Learn from AGENT recognition.
+
+**Assistant:** **v2.16.0** — PARAY bottom-nav tab; Learn queue + session (front confirm, auto L/R/B); `learn_index.json`; AGENT matcher multi-view integration. See `docs/PARAY_LEARN.md`.
+
+---
+
+## Session 120 — 2026-06-22
+
+**User:** PARAY Learn architecture — configurable thresholds (`frontConfirmationThreshold`, `sideCaptureThreshold`, `backCaptureThreshold`); no hardcoded confidence; don't build APK; push for tracker review.
+
+**Assistant:** `ParayLearnSettings` + `ParayLearnSettingsStore` → `learn_settings.json`; `ParayLearnEngine(settings)`; session reloads settings; docs updated; pushed (no APK).

@@ -739,5 +739,116 @@
 - [x] CSV archived to `imports/articles_feed_2026-05-31.csv`
 - [x] 23 unmatched PNGs removed from `IMAGE ASSETS` (2,896 remain)
 
+### 2026-06-22 — PARAY Learn configurable thresholds (arch, no APK)
+- [x] `ParayLearnSettings` — `frontConfirmationThreshold`, `sideCaptureThreshold`, `backCaptureThreshold`
+- [x] `ParayLearnSettingsStore` → `paray_home/memory/learn_settings.json`
+- [x] `ParayLearnEngine(settings)` — confidence values from settings only; operational frame counts in companion
+- [x] Session reloads settings via `ParayAgent.loadLearnSettings()` per product
+- [ ] Settings UI sliders — not built yet
+
+### 2026-06-22 — PARAY Learn V1 (v2.16.0)
+- [x] Bottom-nav **PARAY** tab — Learn / Memory / Knowledge / Statistics (Learn only; others placeholder)
+- [x] Learning queue — active articles + barcode + FOUND PNG
+- [x] Session: front PNG confirm → auto left/right/back capture via live camera
+- [x] `learn_index.json` + optional `learn_views/` — separate from identity (Room)
+- [x] `ParayCameraMatcher` uses learned multi-view signatures in AGENT recognition
+- [x] **BUILD SUCCESSFUL** — v2.16.0 (295)
+
+### 2026-06-21 — Background tasks foreground service (v2.15.6)
+- [x] `OasisBackgroundTaskService` + `OasisBackgroundTaskManager` — shared state, notification progress, partial wake lock
+- [x] Settings long tasks delegated: sync sub-PNGs, re-index, PNG export, backup, VisioPRO bundle, purge, sample, load PNGs
+- [x] CSV import runs in foreground service (Import screen confirm)
+- [x] Sub-PNG sync optimized — skip non-sub files fast; throttle progress; single chunk read per file
+- [x] **BUILD SUCCESSFUL** — v2.15.6 (294)
+
+### 2026-06-21 — Sub-PNG metadata sync (v2.15.5)
+- [x] Sub-barcode PNGs saved as `{designation}{n}.png` — barcode/parent in PNG metadata only
+- [x] **Sync sub-PNGs** — scan gallery, backfill legacy `sub_*.png`, link alternates for scanner/search/carts
+- [x] Sub-variant PNGs excluded from primary article image index
+- [x] Auto-sync after CSV import
+- [x] **BUILD SUCCESSFUL** — v2.15.5 (293)
+
+### 2026-06-21 — VisioPRO batch card export (v2.15.3)
+- [x] Checkbox per article on social + print category lists; select-all header checkbox
+- [x] **Exporter sélection** — renders each checked card and saves PNG (not A4 sheet)
+- [x] **BUILD SUCCESSFUL** — v2.15.3 (291)
+
+### 2026-06-21 — Sub-barcode flavor persistence (v2.15.2)
+- [x] `SubBarcodeRegistry` — `filesDir/sub_barcode_registry.json` maps sub-barcode → parent barcode + image path (survives purge)
+- [x] Purge archives DB alternates + scans `sub_*.png` before clearing catalog
+- [x] CSV import auto-runs `restoreLinkedFlavors()` — re-links alternates when parent barcode exists
+- [x] Settings **Restore sub-barcode flavors** (manual retry)
+- [x] New sub-barcode PNGs embed `ParentBarcode` + `VariantType=sub` in PNG metadata
+- [x] **BUILD SUCCESSFUL** — v2.15.2 (290)
+
+### 2026-06-21 — VisioPRO print photos → To share (v2.15.1)
+- [x] `VisioProPrintImageLinker` — copy print-tab JPEGs to product PNG gallery + `product_images` DB row
+- [x] One-time auto-scan on first VisioPRO tab open after install
+- [x] Manual **Lier photos Impression → To share** in VisioPRO Settings
+- [x] **Ajouter à To share** now links print photo before adding to cart
+- [x] **BUILD SUCCESSFUL** — `VisioAI-debug.apk` v2.15.1 (289)
+
+### 2026-06-21 — Device transfer + purge (v2.15.0)
+- [x] **Purge Gestium catalog** — clears articles, imports, carts, VisioPRO list links; keeps PNG files
+- [x] **Export full backup (ZIP)** — database, PNGs, VisioPRO, PARAY, Design exports, settings
+- [x] **Import full backup (ZIP)** — restore on another phone with barcode-based ID remapping
+- [x] **Export VisioPRO presets** — per-section folder + ZIP with articles, photos, catalog PNGs, designs
+- [x] **PNG export** — all gallery PNGs incl. sub-barcode variants (no skip)
+- [x] **BUILD SUCCESSFUL** — `VisioAI-debug.apk` v2.15.0 (288)
+
+### 2026-06-21 — CSV import snapshot + streaming parse (v2.14.8)
+- [x] **Root cause:** `getAllArticles()` loaded full `rawData` blobs for ~28k rows before "Creating import record" finished — up to ~2 min
+- [x] `ArticleImportSnapshot` + `getImportSnapshots()` — compare fields only, no `rawData`
+- [x] `ImportCatalogMaps` — HashMap indexing for barcode/codeart/normalized name
+- [x] `CsvParser.parse()` — streaming `BufferedReader` instead of `readText().lines()`
+- [x] `ImageMatcher` — in-memory PNG index cache (invalidates on folder change)
+- [x] **BUILD SUCCESSFUL** — `VisioAI-debug.apk` v2.14.8 (287)
+
+### 2026-06-21 — Gestium garbled designation filter (v2.14.6)
+- [x] Scan `21-06-26 14Hc.csv` — 308 Librairie rows with `???????` (Arabic mojibake)
+- [x] `CsvParser.isGarbledDesignation` — skip 3+ `?` runs or >45% question marks in designation
+- [x] Import preview shows garbled-row skip count separately
+- [x] **BUILD SUCCESSFUL** — `VisioAI-debug.apk` v2.14.6 (285)
+
+### 2026-06-21 — CSV import regression fix (v2.14.5)
+- [x] **Root cause:** `CsvParser.parseWithFallback` (v2.12.2) parsed entire Gestium CSV 3× per open — ~3× slower file load
+- [x] Restored early exit on first valid charset (cp1252 first)
+- [x] Removed `syncRayonPoolsAfterCsvImport` from import path (added v2.12.2, blocked import)
+- [x] Restored original import progress labels + full image re-index step
+- [x] Removed heavy `importHistoryCounts` re-summarize on Import screen open
+- [x] **BUILD SUCCESSFUL** — `VisioAI-debug.apk` v2.14.5 (284)
+
+### 2026-06-21 — CSV import performance restore (v2.14.4)
+- [x] Skip DB writes for unchanged CSV rows (~20k → only real changes)
+- [x] Batch `insertAll` in transaction instead of per-row insert/update
+- [x] Incremental image linking for changed articles only (no full `deleteAll` re-index)
+- [x] VisioPRO rayon pool sync moved to background after import completes
+- [x] Import history counts: skip during active import; batch-load rayons (no per-row enrich)
+- [x] **BUILD SUCCESSFUL** — `VisioAI-debug.apk` v2.14.4 (283)
+
+### 2026-06-21 — VisioPRO CSV prices + import speed (v2.14.3)
+- [x] List inline price fields pre-filled from linked catalog article (`catalogArticleId` → CSV price)
+- [x] Manual price override stored with trace (`manualPriceOverridden`, `csvPriceWhenOverridden`, `manualPriceChangedAt`)
+- [x] Stale `manualPrice` without override flag no longer blocks CSV display
+- [x] CSV import — one `getAllArticles()` for diff maps (was 3×); import history counts limited to 12 recent imports
+- [x] **BUILD SUCCESSFUL** — `VisioAI-debug.apk` v2.14.3 (282)
+
+### 2026-06-14 — VisioPRO cards, photos, price glow (v2.14.0)
+- [x] Per-preset **Taille txt** slider on each article row (social vs print sizes differ)
+- [x] Print-tab photos stored separately from social (`visio_pro_photos/social|print/`)
+- [x] CSV price default + manual override on print and social; price delta labels
+- [x] Price-change glow scoped to **Rayons importants** across catalog, carts, Design, VisioPRO, Report
+- [x] **BUILD SUCCESSFUL** — v2.14.0 (279)
+
+### 2026-06-14 — CSV reports scoped to Rayons importants (v2.13.0)
+- [x] Import preview — sample rows + row counts for selected rayons only; note that full catalog still imports
+- [x] Post-import summary, import history, import detail, Report import cards — scoped change counts
+- [x] `ImportDiffSummary.displayCounts`, `summarizeImportsForDisplay`, filtered `observeMeaningfulImportChangesEnrichedFiltered`
+- [x] **BUILD SUCCESSFUL** — `VisioAI-debug.apk` v2.13.0 (278)
+
+### 2026-06-14 — VisioPRO print codes from CSV (v2.12.7)
+- [x] `VisioProPrintCode` — barcode last-3 or Gestium `codeart` for `CA:` imports
+- [x] fv_print renderer uses per-article code (not studio sample)
+- [x] **BUILD SUCCESSFUL** — `VisioAI-debug.apk` v2.12.7 (275)
 
 

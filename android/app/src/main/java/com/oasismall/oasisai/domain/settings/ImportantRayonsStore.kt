@@ -6,9 +6,18 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
+import com.oasismall.oasisai.util.NameNormalizer
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+
+/** True when rayon filtering is off, or [rayon] is one of the user's important rayons. */
+fun ImportantRayonsConfig.includesRayon(rayon: String?): Boolean {
+    if (!configured || selectedRayons.isEmpty()) return true
+    if (rayon.isNullOrBlank()) return false
+    val normalized = NameNormalizer.normalize(rayon)
+    return selectedRayons.any { NameNormalizer.normalize(it) == normalized }
+}
 
 data class ImportantRayonsConfig(
     val configured: Boolean = false,
@@ -35,6 +44,12 @@ class ImportantRayonsStore(context: Context) {
             file.parentFile?.mkdirs()
             file.writeText(root.toString(2))
             _config.value = ImportantRayonsConfig(configured = true, selectedRayons = selectedRayons)
+        }
+    }
+
+    fun refreshFromDisk() {
+        synchronized(lock) {
+            _config.value = readConfigLocked()
         }
     }
 

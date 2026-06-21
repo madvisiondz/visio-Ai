@@ -28,6 +28,9 @@ class ParayHome(private val context: Context) {
     val visualIndexFile: File = File(memoryDir, "visual_index.json")
     val fingerprintIndexFile: File = File(memoryDir, "fingerprint_index.json")
     val barcodePatternsFile: File = File(memoryDir, "barcode_patterns.json")
+    val learnIndexFile: File = File(memoryDir, "learn_index.json")
+    val learnSettingsFile: File = File(memoryDir, "learn_settings.json")
+    val learnViewsDir: File = File(memoryDir, "learn_views").also { it.mkdirs() }
     val checkShootSessionFile: File = File(sessionsDir, "check_shoot_session.json")
     val learnEventsFile: File = File(logsDir, "learn_events.jsonl")
 

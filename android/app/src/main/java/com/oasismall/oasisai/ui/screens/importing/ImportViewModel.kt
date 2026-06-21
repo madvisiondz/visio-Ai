@@ -7,11 +7,12 @@ import androidx.lifecycle.viewModelScope
 import com.oasismall.oasisai.domain.CsvParseResult
 import com.oasismall.oasisai.domain.CsvParser
 import com.oasismall.oasisai.domain.ImportResult
-import com.oasismall.oasisai.domain.ImportService
+import com.oasismall.oasisai.domain.background.OasisBackgroundTaskManager
 import com.oasismall.oasisai.data.repository.ImportChangeUiRow
 import com.oasismall.oasisai.data.repository.OasisRepository
 import com.oasismall.oasisai.ui.components.CartSourceTags
 import com.oasismall.oasisai.data.model.CartType
+import com.oasismall.oasisai.domain.settings.ImportantRayonsConfig
 import com.oasismall.oasisai.util.TaskProgress
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,8 +20,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -28,6 +29,9 @@ data class ImportPreview(
     val fileName: String,
     val parseResult: CsvParseResult,
     val sampleRows: List<String>,
+    val scopedRowCount: Int,
+    val importantRayonsFiltered: Boolean = false,
+    val importantRayonsCount: Int = 0,
 )
 
 data class ImportUiState(
@@ -40,13 +44,46 @@ data class ImportUiState(
 
 class ImportViewModel(
     private val repository: OasisRepository,
-    private val importService: ImportService,
+    private val backgroundTasks: OasisBackgroundTaskManager,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ImportUiState())
     val uiState: StateFlow<ImportUiState> = _uiState.asStateFlow()
 
     val imports = repository.observeImports()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val importantRayonsConfig = repository.importantRayonsConfig
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ImportantRayonsConfig())
+
+    init {
+        viewModelScope.launch {
+            backgroundTasks.state.collect { task ->
+                if (task.kind != com.oasismall.oasisai.domain.background.OasisBackgroundTaskKind.CSV_IMPORT) return@collect
+                _uiState.update { ui ->
+                    when {
+                        task.running -> ui.copy(
+                            isLoading = true,
+                            progress = task.progress,
+                            error = null,
+                        )
+                        task.successMessage != null -> ui.copy(
+                            isLoading = false,
+                            preview = null,
+                            progress = null,
+                            lastResult = ImportResult(success = true),
+                            error = null,
+                        )
+                        task.errorMessage != null -> ui.copy(
+                            isLoading = false,
+                            progress = null,
+                            error = task.errorMessage,
+                        )
+                        else -> ui
+                    }
+                }
+            }
+        }
+    }
 
     fun previewFromUri(context: Context, uri: Uri) {
         viewModelScope.launch {
@@ -72,13 +109,32 @@ class ImportViewModel(
                         if (parseResult.rows.isEmpty()) {
                             throw IllegalArgumentException("No valid article rows found in file.")
                         }
+                        val rayonConfig = repository.getImportantRayonsConfig()
+                        val scoped = rayonConfig.configured && rayonConfig.selectedRayons.isNotEmpty()
+                        val scopedRowCount = if (scoped) {
+                            parseResult.rows.count { repository.matchesImportantRayon(it.rayon, rayonConfig) }
+                        } else {
+                            parseResult.rows.size
+                        }
+                        val sampleRows = if (scoped) {
+                            parseResult.rows.asSequence()
+                                .filter { repository.matchesImportantRayon(it.rayon, rayonConfig) }
+                                .take(10)
+                                .map { "${it.designation} — ${it.barcode} — ${it.price}" }
+                                .toList()
+                        } else {
+                            parseResult.rows.take(10).map {
+                                "${it.designation} — ${it.barcode} — ${it.price}"
+                            }
+                        }
                         _uiState.value = _uiState.value.copy(progress = TaskProgress("Preview ready", 100))
                         ImportPreview(
                             fileName = fileName,
                             parseResult = parseResult,
-                            sampleRows = parseResult.rows.take(10).map {
-                                "${it.designation} — ${it.barcode} — ${it.price}"
-                            },
+                            scopedRowCount = scopedRowCount,
+                            importantRayonsFiltered = scoped,
+                            importantRayonsCount = rayonConfig.selectedRayons.size,
+                            sampleRows = sampleRows,
                         )
                     } ?: throw IllegalArgumentException("Cannot open file")
                 }
@@ -98,28 +154,19 @@ class ImportViewModel(
         }
     }
 
-    fun confirmImport() {
+    fun confirmImport(context: Context) {
         val preview = _uiState.value.preview ?: return
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(
-                isLoading = true,
-                error = null,
-                progress = TaskProgress("Starting import", 0),
-            )
-            val result = withContext(Dispatchers.IO) {
-                importService.importFromParseResult(preview.parseResult, preview.fileName) { progress ->
-                    _uiState.value = _uiState.value.copy(isLoading = true, progress = progress)
-                }
-            }
-            _uiState.value = ImportUiState(
-                isLoading = false,
-                lastResult = result,
-                error = result.errorMessage?.let {
-                    "Debug: Import failed (${_uiState.value.progress?.label ?: "no step"}): $it"
-                },
-                progress = null,
-            )
+        if (backgroundTasks.isRunning()) {
+            _uiState.value = _uiState.value.copy(error = "Another background task is already running.")
+            return
         }
+        backgroundTasks.enqueueCsvImport(preview.fileName, preview.parseResult)
+        backgroundTasks.startIfPending(context)
+        _uiState.value = _uiState.value.copy(
+            isLoading = true,
+            error = null,
+            progress = TaskProgress("Starting CSV import", 0),
+        )
     }
 
     fun cancelPreview() {
@@ -131,39 +178,20 @@ class ImportViewModel(
     }
 
     fun importSample(context: Context) {
-        viewModelScope.launch {
-            _uiState.value = ImportUiState(
-                isLoading = true,
-                progress = TaskProgress("Loading sample data", 0),
-            )
-            val result = withContext(Dispatchers.IO) {
-                context.assets.open("sample_articles.csv").use { stream ->
-                    importService.importFromStream(stream, "sample_articles.csv") { progress ->
-                        _uiState.value = _uiState.value.copy(isLoading = true, progress = progress)
-                    }
-                }
-            }
-            _uiState.value = ImportUiState(
-                isLoading = false,
-                lastResult = result,
-                error = result.errorMessage?.let {
-                    "Debug: Sample import failed (${_uiState.value.progress?.label ?: "no step"}): $it"
-                },
-                progress = null,
-            )
-        }
+        if (backgroundTasks.isRunning()) return
+        backgroundTasks.enqueue(com.oasismall.oasisai.domain.background.OasisBackgroundTaskKind.LOAD_SAMPLE_DATA)
+        backgroundTasks.startIfPending(context)
     }
 
     fun clearMessage() {
         _uiState.value = _uiState.value.copy(error = null, lastResult = null, preview = null)
+        backgroundTasks.clearMessages()
     }
 
     fun observeChanges(importId: Long) = repository.observeImportChanges(importId)
 
-    /** Meaningful changes only (excludes ~26k UNCHANGED rows per large import). */
     fun observeChangesEnriched(importId: Long) =
-        repository.observeMeaningfulImportChanges(importId)
-            .mapLatest { repository.enrichImportChanges(it) }
+        repository.observeMeaningfulImportChangesEnrichedFiltered(importId)
             .flowOn(Dispatchers.IO)
 
     fun addToShareCart(articleId: Long) {

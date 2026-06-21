@@ -18,9 +18,7 @@ class ProductImagesExporter(
 ) {
     suspend fun export(onProgress: (TaskProgress) -> Unit): ProductImagesExportResult {
         val folderName = VisioDownloadStorage.productExportFolderName()
-        val sources = imageMatcher.getImagesDirectory().listFiles { f -> f.isFile && f.extension.lowercase() == "png" }
-            ?.sortedBy { it.name.lowercase() }
-            .orEmpty()
+        val sources = imageMatcher.collectAllPngFiles()
         if (sources.isEmpty()) {
             return ProductImagesExportResult(
                 folderName = folderName,
@@ -30,31 +28,23 @@ class ProductImagesExporter(
             )
         }
         var copied = 0
-        var skipped = 0
         sources.forEachIndexed { index, source ->
             val pct = ((index + 1) * 100) / sources.size
             onProgress(TaskProgress("Exporting ${source.name}", pct))
-            val targetName = source.name
-            val existing = VisioDownloadStorage.listFilesInFolder(context, folderName, "png")
-                .any { it.displayName == targetName }
-            if (existing) {
-                skipped++
-            } else {
-                VisioDownloadStorage.copyFileToFolder(
-                    context = context,
-                    folderName = folderName,
-                    displayName = targetName,
-                    mimeType = "image/png",
-                    source = source,
-                )
-                copied++
-            }
+            VisioDownloadStorage.copyFileToFolder(
+                context = context,
+                folderName = folderName,
+                displayName = source.name,
+                mimeType = "image/png",
+                source = source,
+            )
+            copied++
         }
         onProgress(TaskProgress("Export complete", 100))
         return ProductImagesExportResult(
             folderName = folderName,
             copied = copied,
-            skipped = skipped,
+            skipped = 0,
             displayPath = VisioDownloadStorage.displayPath(folderName),
         )
     }

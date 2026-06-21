@@ -3,4 +3,7 @@
     <string name="paray_import_notification_title">PARAY neural load</string>
     <string name="paray_import_channel_name">PARAY import</string>
     <string name="paray_import_channel_desc">Background loading of PARAY fingerprint index</string>
+    <string name="background_task_notification_title">Visio Ai working</string>
+    <string name="background_task_channel_name">Background tasks</string>
+    <string name="background_task_channel_desc">Long imports, exports, and image sync — keeps running when screen is off</string>
 </resources>

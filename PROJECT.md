@@ -54,6 +54,23 @@ OASIS MALL operates at scale with fragmented workflows:
 | 2026-06-19 | **VisioPRO**: in-app preset cards (agent-maintained catalog); CSV/manual prices; social + print export |
 | 2026-06-19 | **PSD pipeline**: `tools/psd` (psd-tools) + `tools/psd-node` (ag-psd) — inspect layers/bounds → JSON for template cloning |
 | 2026-06-19 | **PSD template pipeline**: Python psd-tools + Node ag-psd inspectors → `templates/psd-specs/*.json` for Design cloning |
+| 2026-06-22 | **Visio Ai v2.16.0**: **PARAY Learn V1** — bottom-nav PARAY tab; trusted-product queue; front PNG confirmation; auto left/right/back capture; `learn_index.json`; AGENT matcher uses multi-view knowledge |
+| 2026-06-22 | **PARAY Learn (arch)**: Configurable thresholds in `learn_settings.json` — `frontConfirmationThreshold`, `sideCaptureThreshold`, `backCaptureThreshold`; engine reads settings (no hardcoded confidence) |
+| 2026-06-21 | **Visio Ai v2.15.6**: Background foreground service for all long tasks — sync sub-PNGs, re-index, exports, backup, CSV import, purge, load PNGs; safe to lock screen; notification progress |
+| 2026-06-21 | **Visio Ai v2.15.5**: Sub-PNG metadata-first — `Designation1.png` naming; auto-detect from PNG tags; **Sync sub-PNGs**; excluded from main image index |
+| 2026-06-21 | **Visio Ai v2.15.4**: ZIP exports (backup + VisioPRO) — user picks save location via system picker; stream copy; cache cleanup |
+| 2026-06-21 | **Visio Ai v2.15.3**: VisioPRO — checkbox selection on social + print lists; **Exporter sélection** saves each rendered card as PNG (not A4) |
+| 2026-06-21 | **Visio Ai v2.15.2**: Sub-barcode flavor registry — survives Gestium purge; auto-restore after CSV import; PNG `ParentBarcode` metadata |
+| 2026-06-21 | **Visio Ai v2.15.1**: VisioPRO print-tab photos linked to catalog PNGs for To share (one-time scan + manual sync) |
+| 2026-06-21 | **Visio Ai v2.15.0**: Device transfer — purge Gestium catalog; full backup ZIP import/export; VisioPRO preset bundle; PNG export includes all sub-barcode variants |
+| 2026-06-21 | **Visio Ai v2.14.8**: CSV import speed — lightweight `ArticleImportSnapshot` (no `rawData` blobs); streaming CSV parse; PNG index cache; re-import should reach ~5s again |
+| 2026-06-21 | **Visio Ai v2.14.7**: CSV import speed — drop per-row `rawData` build (~28k rows); skip full image re-index on re-import (only link new articles) |
+| 2026-06-21 | **Visio Ai v2.14.3**: VisioPRO list prices from CSV via catalog link; manual override traced (`manualPriceOverridden` + CSV baseline); CSV import — single catalog load (was 3×) + faster import history counts |
+| 2026-06-14 | **Visio Ai v2.13.0**: CSV import reports scoped to **Rayons importants** — preview, last import, history, detail, Report summaries |
+| 2026-06-14 | **Visio Ai v2.12.9**: VisioPRO article card — adjustable **Taille désignation** slider per article (saved in memory) |
+| 2026-06-14 | **Visio Ai v2.12.8**: VisioPRO print preset photos use **contain** fit (full image visible, no crop) |
+| 2026-06-14 | **Visio Ai v2.12.7**: VisioPRO print codes from CSV — last 3 of Code-barres; Gestium Code for CA: rows; fix studio sampleCode overriding all labels |
+| 2026-06-14 | **Visio Ai v2.12.5**: VisioPRO inline prix sur liste catégorie · clavier décimal · scroll vers champ · Enregistrer fixe en haut · ordre popup non dismissible + brouillon live |
 | 2026-06-14 | **Visio Ai v2.12.3**: Fix 1118 Gestium rows skipped (empty Code-barres) — identity from Gestium Code inside parseRow; cp1252 first |
 | 2026-06-14 | **Visio Ai v2.12.1**: VisioPRO rayon pools **full resync on every CSV import**; import barcode-less Gestium rows via **codeart** (e.g. PIEDS DE VEAU); list editor reloads live pool |
 | 2026-06-14 | **Visio Ai v2.12.0**: VisioPRO lists auto-sync new CSV articles (pending in Settings); **Rayons importants** checklist filters stats + CSV report |
@@ -609,6 +626,19 @@ It:
 
 | Date | Change |
 |------|--------|
+| 2026-06-22 | **PARAY Learn thresholds (arch)**: `ParayLearnSettings` + `paray_home/memory/learn_settings.json` — `frontConfirmationThreshold`, `sideCaptureThreshold`, `backCaptureThreshold`; `ParayLearnEngine(settings)` |
+| 2026-06-22 | **Visio Ai v2.16.0**: PARAY Learn V1 — `paray` bottom nav; queue from articles+PNG+barcode; front confirm vs PNG; auto L/R/B capture; `learn_index.json`; AGENT `ParayCameraMatcher` multi-view boost |
+| 2026-06-21 | **Visio Ai v2.15.6**: `OasisBackgroundTaskService` — foreground + wake lock for sync sub-PNGs, re-index, PNG export, backup import/export, VisioPRO bundle, purge, sample data, load PNGs, CSV import; notification progress; screen-off safe |
+| 2026-06-21 | **Visio Ai v2.15.4**: Device transfer ZIP exports — **CreateDocument** picker (user chooses folder/file); no more silent Downloads/MediaStore; stale export cache cleaned on launch |
+| 2026-06-21 | **Visio Ai v2.15.3**: VisioPRO category list — checkboxes on social + print tabs; **Exporter sélection** → individual rendered PNGs to `DCIM/VisioPRO/Social` or `Print` |
+| 2026-06-21 | **Visio Ai v2.15.2**: Sub-barcode flavor registry (`sub_barcode_registry.json`) — archived before purge; auto-restore on CSV import; Settings **Restore sub-barcode flavors**; PNG metadata `ParentBarcode` + `VariantType=sub` |
+| 2026-06-21 | **Visio Ai v2.15.0**: Settings **Device transfer** — purge Gestium catalog; export/import full `VisioAi_backup_*.zip`; VisioPRO preset bundle per section; PNG export all variants |
+| 2026-06-21 | **Visio Ai v2.14.8**: CSV import — `getArticlesImportSnapshot()` (no `rawData`); streaming line parse; PNG index cache; re-import ~5s target restored |
+| 2026-06-21 | **Visio Ai v2.14.7**: CSV import — drop per-row `rawData` build; image linking only for new articles on re-import |
+| 2026-06-14 | **Visio Ai v2.13.0**: CSV import/report UI shows only **Rayons importants** when configured — preview sample rows, post-import counts, import history, detail list, Report import summaries (full catalog still imported) |
+| 2026-06-14 | **Visio Ai v2.12.8**: fv_print photo slot **`contain`** — scale to fit width or height without cropping |
+| 2026-06-14 | **Visio Ai v2.12.6**: VisioPRO article card — **Désignation (AR)** editor with live preview; swipe card RTL/LTR for next/prev in filtered list; persisted in `visio_pro_memory.json` |
+| 2026-06-14 | **Visio Ai v2.12.5**: VisioPRO — inline price on category list rows; decimal keyboard on all price fields; scroll-into-view; fixed **Enregistrer** top-right on list editor; order sheet blocks drag-dismiss, live order draft, **Terminé** top-right |
 | 2026-06-14 | **Visio Ai v2.12.0**: Settings **Rayons importants** — checklist scopes Articles chips, Settings stats, Catalog filters, CSV report; VisioPRO list editors show **Nouveau CSV** pending after import |
 | 2026-06-14 | **Visio Ai v2.11.1**: `ArticleCard` glow + **Price changed** chip from live `changeStatus`; To share row footer (printed / Design queue / Telegram sent) |
 | 2026-06-14 | **Visio Ai v2.11.0**: Design **Historique** — dated export folders (`exports/yyyy-MM-dd/shelf_HHmmss_pN.jpg`); batch detail with exclude/reprint/load queue/send to Design or To share; **catalogChangeGlow** on CSV-changed rows (Room v18 batch snapshots) |
