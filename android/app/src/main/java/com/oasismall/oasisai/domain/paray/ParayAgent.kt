@@ -24,6 +24,7 @@ import java.io.File
 class ParayAgent(
     private val context: Context,
     val home: ParayHome,
+    private val recognitionTrackerProvider: () -> ParayRecognitionTracker? = { null },
 ) {
     val name: String = ParayKnowledge.AGENT_NAME
 
@@ -32,9 +33,25 @@ class ParayAgent(
     private val barcodeMemory = ParayBarcodeMemory(home)
     val learnStore = ParayLearnStore(home)
     val learnSettingsStore = ParayLearnSettingsStore(home)
+    val brandKnowledgeStore = ParayBrandKnowledgeStore(home)
+    private val brandKnowledgeProvider = ParayBrandKnowledgeProvider(brandKnowledgeStore, learnStore)
+    private val packagingVariantLog = ParayPackagingVariantLog(home)
+    private val observerStore = ParayObserverStore(home)
+    private val knowledgeStore = ParayKnowledgeStore(home)
+    private val workflowStore = ParayWorkflowStore(home)
+    private val recognitionStore = ParayRecognitionStore(home)
     val sessionStore = ParaySessionStore(home)
-    private val cameraMatcher = ParayCameraMatcher(visualIndex, fingerprintStore, learnStore)
+    private val cameraMatcher = ParayCameraMatcher(
+        visualIndex,
+        fingerprintStore,
+        learnStore,
+        brandKnowledgeProvider,
+        onMatchResults = { matches ->
+            recognitionTrackerProvider()?.onCameraMatcherResults(matches)
+        },
+    )
     private val learnLog = home.learnEventsFile
+    @Volatile private var cachedLearnEventCount: Int? = null
 
     private val layoutFit = LayoutFitAgent(
         context = context,
@@ -51,6 +68,37 @@ class ParayAgent(
 
     fun learnQueue(repository: OasisRepository) = ParayLearnQueue(repository, learnStore)
 
+    fun learnPreload(repository: OasisRepository) = ParayLearnPreload(repository, this)
+
+    fun hasFingerprintForBarcode(barcode: String): Boolean =
+        fingerprintStore.getEmbedding(barcode) != null
+
+    fun extractPngFeatures(pngPath: String): VisualFeatureExtractor.Features? {
+        val bitmap = android.graphics.BitmapFactory.decodeFile(pngPath) ?: return null
+        val bounds = ProductContentBounds.detect(bitmap)
+        val content = if (bounds.isEmpty) {
+            com.oasismall.oasisai.domain.layoutagent.ContentBounds(0, 0, bitmap.width, bitmap.height)
+        } else {
+            bounds
+        }
+        val features = VisualFeatureExtractor.extract(bitmap, content)
+        bitmap.recycle()
+        return features
+    }
+
+    fun logPackagingVariant(event: ParayPackagingVariantEvent) {
+        packagingVariantLog.append(event)
+        recognitionTrackerProvider()?.recordPackagingDrift(event)
+        learnStore.get(event.articleId)?.let { existing ->
+            learnStore.put(
+                existing.copy(
+                    packagingVariantDetected = true,
+                    updatedAt = System.currentTimeMillis(),
+                ),
+            )
+        }
+    }
+
     suspend fun loadLearnSettings(): ParayLearnSettings = learnSettingsStore.get()
 
     fun learnEngine(settings: ParayLearnSettings = learnSettingsStore.current()) =
@@ -58,20 +106,34 @@ class ParayAgent(
 
     /** Persist completed learn record and merge into visual index for AGENT recognition. */
     fun saveLearnRecord(record: ParayLearnRecord) {
-        learnStore.put(record)
-        if (record.status != ParayLearnStatus.LEARNED) return
-        val best = listOfNotNull(
-            record.frontCapture,
-            record.leftCapture,
-            record.rightCapture,
-            record.backCapture,
-        ).maxByOrNull { it.confidence } ?: return
-        val (wordCount, charCount) = VisualFeatureExtractor.typographyOf(record.designation)
+        val enriched = record.copy(
+            updatedAt = System.currentTimeMillis(),
+            brandSignature = record.brand?.let { record.productSignature },
+            familySignature = record.family?.let { record.productSignature },
+        )
+        learnStore.put(enriched)
+        brandKnowledgeStore.upsertFromRecord(enriched)
+        if (enriched.status != ParayLearnStatus.LEARNED) return
+        val sideCaptures = listOfNotNull(
+            enriched.leftCapture,
+            enriched.rightCapture,
+            enriched.backCapture,
+        )
+        val best = sideCaptures.maxByOrNull { it.confidence }
+            ?: enriched.productSignature?.let {
+                ParayViewCapture(
+                    it.shapeAspect,
+                    it.fillRatio,
+                    it.dominantColors,
+                    1f,
+                )
+            } ?: return
+        val (wordCount, charCount) = VisualFeatureExtractor.typographyOf(enriched.designation)
         visualIndex.learn(
             ProductVisualSignature(
-                articleId = record.articleId,
-                barcode = record.barcode,
-                designation = record.designation,
+                articleId = enriched.articleId,
+                barcode = enriched.barcode,
+                designation = enriched.designation,
                 shapeAspect = best.shapeAspect,
                 fillRatio = best.fillRatio,
                 dominantColors = best.dominantColors,
@@ -79,16 +141,16 @@ class ParayAgent(
                 designationCharCount = charCount,
                 templateId = VisualFeatureExtractor.templateId(),
                 labelPalette = VisualFeatureExtractor.shelfLabelPalette(),
-                observationCount = record.learnedViewCount.coerceAtLeast(4),
-                lastLearnedAt = record.learnedAt ?: System.currentTimeMillis(),
-                imageFileName = File(record.pngFrontPath).name,
+                observationCount = enriched.learnedSideCount.coerceAtLeast(3),
+                lastLearnedAt = enriched.learnedAt ?: System.currentTimeMillis(),
+                imageFileName = File(enriched.pngFrontPath).name,
             ),
         )
         appendLearnEvent(
             ProductVisualSignature(
-                articleId = record.articleId,
-                barcode = record.barcode,
-                designation = record.designation,
+                articleId = enriched.articleId,
+                barcode = enriched.barcode,
+                designation = enriched.designation,
                 shapeAspect = best.shapeAspect,
                 fillRatio = best.fillRatio,
                 dominantColors = best.dominantColors,
@@ -96,9 +158,9 @@ class ParayAgent(
                 designationCharCount = charCount,
                 templateId = "paray_learn_v1",
                 labelPalette = VisualFeatureExtractor.shelfLabelPalette(),
-                observationCount = record.learnedViewCount,
-                lastLearnedAt = record.learnedAt ?: System.currentTimeMillis(),
-                imageFileName = File(record.pngFrontPath).name,
+                observationCount = enriched.learnedSideCount,
+                lastLearnedAt = enriched.learnedAt ?: System.currentTimeMillis(),
+                imageFileName = File(enriched.pngFrontPath).name,
             ),
         )
     }
@@ -107,8 +169,33 @@ class ParayAgent(
 
     fun fingerprintMeta(): FingerprintMeta? = fingerprintStore.getMeta()
 
-    fun learnEventCount(): Int =
-        runCatching { learnLog.readLines().count { it.isNotBlank() } }.getOrDefault(0)
+    fun learnEventCount(): Int {
+        cachedLearnEventCount?.let { return it }
+        return runCatching { learnLog.readLines().count { it.isNotBlank() } }
+            .getOrDefault(0)
+            .also { cachedLearnEventCount = it }
+    }
+
+    fun readHomeDisplayCache(): ParayHomeDisplayCache? = observerStore.readHomeDisplayCache()
+
+    fun readKnowledgeSummary(): ParayKnowledgeSummary = knowledgeStore.readSummary()
+
+    fun readWorkflowSummary(): ParayWorkflowSummary = workflowStore.readSummary()
+
+    fun readRecognitionSummary(): ParayRecognitionSummary = recognitionStore.readSummary()
+
+    fun writeHomeDisplayCache(cache: ParayHomeDisplayCache) {
+        observerStore.writeHomeDisplayCache(cache)
+    }
+
+    fun buildHomeDisplay(): ParayHomeDisplayCache = ParayHomeDisplayCache(
+        manifest = homeManifest(),
+        office = officeLink(),
+        neural = buildNeuralSnapshot(),
+        folders = homeFolders(),
+        barcodePatterns = learnedBarcodePatterns(),
+        cachedAt = System.currentTimeMillis(),
+    )
 
     fun mission(): String = ParayKnowledge.mission
 
@@ -255,5 +342,6 @@ class ParayAgent(
                     .put("templateId", sig.templateId),
             )
         learnLog.appendText(line.toString() + "\n")
+        cachedLearnEventCount = (cachedLearnEventCount ?: learnEventCount()) + 1
     }
 }

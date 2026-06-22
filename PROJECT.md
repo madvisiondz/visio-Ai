@@ -54,6 +54,22 @@ OASIS MALL operates at scale with fragmented workflows:
 | 2026-06-19 | **VisioPRO**: in-app preset cards (agent-maintained catalog); CSV/manual prices; social + print export |
 | 2026-06-19 | **PSD pipeline**: `tools/psd` (psd-tools) + `tools/psd-node` (ag-psd) — inspect layers/bounds → JSON for template cloning |
 | 2026-06-19 | **PSD template pipeline**: Python psd-tools + Node ag-psd inspectors → `templates/psd-specs/*.json` for Design cloning |
+| 2026-06-14 | **Visio Ai v2.22.0**: **PARAY Knowledge Fusion Phase 5** — PKP `.pkp.zip` export/import; incremental merge; `paray_home/fusion/`; PARAY Home Knowledge Fusion section; see `docs/PARAY_FUSION.md` |
+| 2026-06-14 | **Visio Ai v2.21.1**: **PARAY Living AI Presence V1** — activity LED + `ParayActivityMonitor`; Recognition dashboard on Home + Statistics |
+| 2026-06-14 | **Visio Ai v2.21.0**: **PARAY Recognition Phase 4** — `ParayRecognitionObserver`; `paray_home/recognition/`; AGENT blind-spot curiosity |
+| 2026-06-14 | **Visio Ai v2.20.4**: **PARAY Statistics tab** — learning/knowledge/workflow KPIs from cached JSON; coverage bar; learning trend |
+| 2026-06-14 | **Visio Ai v2.20.3**: **PARAY Knowledge tab** — browse `knowledge_summary.json` + `knowledge_articles.json`; brands/categories/families; recently learned |
+| 2026-06-14 | **Visio Ai v2.20.2**: **PARAY Memory tab** — inspect `learn_index.json`; search + filter; no Room |
+| 2026-06-14 | **Visio Ai v2.20.1**: **PARAY Learn settings UI** — sliders for front/side/back thresholds; persists to `learn_settings.json` |
+| 2026-06-14 | **Visio Ai v2.20.0**: **PARAY Home dashboard** — reads cached `observer_summary.json`, `knowledge_summary.json`, `workflow_summary.json` only; no live aggregation |
+| 2026-06-14 | **Visio Ai v2.19.0**: **PARAY Workflow Phase 3** — `ParayWorkflowObserver`; `paray_home/workflows/`; screen usage, transitions, feature counts; no personal content |
+| 2026-06-14 | **Visio Ai v2.18.0**: **PARAY Knowledge Phase 2** — `ParayKnowledgeObserver`; `paray_home/knowledge/`; import deltas → article/brand/category knowledge; cached summary for future PARAY Home |
+| 2026-06-14 | **Visio Ai v2.17.0**: **PARAY Observer Phase 1** — change-reactive curiosity engine; `paray_home/observer/`; PARAY Home instant cache + background refresh |
+| 2026-06-14 | **PARAY Learn B4 fix**: `BrandKnowledgeProvider` read-side hook wired into `ParayCameraMatcher` (0f boost V1; scores unchanged) |
+| 2026-06-14 | **PARAY Learn B3 fix**: Packaging variant detection log-only — removed UI hint from Learn session |
+| 2026-06-14 | **PARAY Learn B2 fix**: Eligibility rejects undecodable PNGs via bounds-only `BitmapFactory` check — corrupt files excluded from Ready queue |
+| 2026-06-14 | **PARAY Learn B1 fix**: Queue KPIs (learned/partial/pending/coverage) scoped to Ready population only — not global `learn_index` |
+| 2026-06-14 | **Visio Ai v2.16.1**: **PARAY Learn V1 final spec** — PNG canonical front (not learned side); preload; coverage KPI; eligibility engine; brand/family index; packaging variant log; status from L+R+B only |
 | 2026-06-22 | **Visio Ai v2.16.0**: **PARAY Learn V1** — bottom-nav PARAY tab; trusted-product queue; front PNG confirmation; auto left/right/back capture; `learn_index.json`; AGENT matcher uses multi-view knowledge |
 | 2026-06-22 | **PARAY Learn (arch)**: Configurable thresholds in `learn_settings.json` — `frontConfirmationThreshold`, `sideCaptureThreshold`, `backCaptureThreshold`; engine reads settings (no hardcoded confidence) |
 | 2026-06-21 | **Visio Ai v2.15.6**: Background foreground service for all long tasks — sync sub-PNGs, re-index, exports, backup, CSV import, purge, load PNGs; safe to lock screen; notification progress |
@@ -626,6 +642,16 @@ It:
 
 | Date | Change |
 |------|--------|
+| 2026-06-14 | **Visio Ai v2.22.0**: PARAY Knowledge Fusion Phase 5 — PKP `.pkp.zip`; `ParayKnowledgeFusionEngine` + `ParayFusionConflictResolver`; export/import on PARAY Home; `paray_home/fusion/`; incremental merge only; see `docs/PARAY_FUSION.md` |
+| 2026-06-14 | **Visio Ai v2.21.0**: PARAY Recognition Phase 4 — `ParayRecognitionObserver` + `paray_home/recognition/`; failures, low confidence, corrections, drift, unknown barcodes; see `docs/PARAY_RECOGNITION.md` |
+| 2026-06-14 | **Visio Ai v2.20.4**: PARAY Statistics tab — learn_index + knowledge_summary + workflow_summary KPIs; coverage bar; learning trend list |
+| 2026-06-14 | **Visio Ai v2.20.3**: PARAY Knowledge tab — global summary, brand/category/family rollups, recently learned; cached JSON only |
+| 2026-06-14 | **Visio Ai v2.20.2**: PARAY Memory tab — browse `learn_index.json`; search (barcode/designation/brand); filter All/Learned/Partial/Pending; side flags + last date; `ParayMemoryRepository` (no Room) |
+| 2026-06-14 | **Visio Ai v2.20.1**: PARAY Learn settings screen — front/side/back threshold sliders; immediate save to `learn_settings.json` |
+| 2026-06-14 | **Visio Ai v2.20.0**: PARAY Home intelligence dashboard — Observer / Knowledge / Workflow summary cards + quick actions; file-read only via `ParayHomeRepository` |
+| 2026-06-14 | **Visio Ai v2.19.0**: PARAY Workflow Phase 3 — `ParayWorkflowObserver` + `paray_home/workflows/`; navigation/feature patterns only; cached summary; see `docs/PARAY_WORKFLOW.md` |
+| 2026-06-14 | **Visio Ai v2.18.0**: PARAY Knowledge Phase 2 — `ParayKnowledgeObserver` + `paray_home/knowledge/`; article timelines; brand/category rollups; gaps + cached summary; change-only via `ParayObserver`; see `docs/PARAY_KNOWLEDGE.md` |
+| 2026-06-14 | **PARAY Learn V1 final spec (v2.16.1)**: Front = canonical PNG only; `ParayLearnPreload`; `ParayLearnEligibility`; coverage KPI; brand/family index; packaging variant log; status L+R+B; AGENT uses productSignature + sides |
 | 2026-06-22 | **PARAY Learn thresholds (arch)**: `ParayLearnSettings` + `paray_home/memory/learn_settings.json` — `frontConfirmationThreshold`, `sideCaptureThreshold`, `backCaptureThreshold`; `ParayLearnEngine(settings)` |
 | 2026-06-22 | **Visio Ai v2.16.0**: PARAY Learn V1 — `paray` bottom nav; queue from articles+PNG+barcode; front confirm vs PNG; auto L/R/B capture; `learn_index.json`; AGENT `ParayCameraMatcher` multi-view boost |
 | 2026-06-21 | **Visio Ai v2.15.6**: `OasisBackgroundTaskService` — foreground + wake lock for sync sub-PNGs, re-index, PNG export, backup import/export, VisioPRO bundle, purge, sample data, load PNGs, CSV import; notification progress; screen-off safe |

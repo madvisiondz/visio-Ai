@@ -22,6 +22,7 @@ import com.oasismall.oasisai.ui.screens.preselection.PreselectionViewModel
 import com.oasismall.oasisai.ui.screens.print.PrintViewModel
 import com.oasismall.oasisai.ui.screens.promo.PromoViewModel
 import com.oasismall.oasisai.ui.screens.design.DesignViewModel
+import com.oasismall.oasisai.ui.screens.parayhome.ParayHomeRepository
 import com.oasismall.oasisai.ui.screens.parayhome.ParayHomeViewModel
 import com.oasismall.oasisai.ui.screens.parayimport.ParayImportViewModel
 import com.oasismall.oasisai.ui.screens.phonesync.PhoneSyncViewModel
@@ -42,6 +43,8 @@ class OasisViewModelFactory(
 ) : ViewModelProvider.Factory {
 
     val repository get() = app.repository
+    val parayWorkflowTracker get() = app.parayWorkflowTracker
+    val parayActivityMonitor get() = app.parayActivityMonitor
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         return when {
@@ -58,11 +61,41 @@ class OasisViewModelFactory(
             modelClass.isAssignableFrom(ParayImportViewModel::class.java) ->
                 ParayImportViewModel(app.parayImportManager) as T
             modelClass.isAssignableFrom(ParayHomeViewModel::class.java) ->
-                ParayHomeViewModel(app.paray) as T
+                ParayHomeViewModel(
+                    ParayHomeRepository(app.parayHome),
+                    app.paray,
+                    app.parayKnowledgeFusionEngine,
+                ) as T
             modelClass.isAssignableFrom(com.oasismall.oasisai.ui.screens.paraylearn.ParayMainViewModel::class.java) ->
                 com.oasismall.oasisai.ui.screens.paraylearn.ParayMainViewModel(app.repository, app.paray) as T
+            modelClass.isAssignableFrom(com.oasismall.oasisai.ui.screens.paraylearn.ParayLearnSettingsViewModel::class.java) ->
+                com.oasismall.oasisai.ui.screens.paraylearn.ParayLearnSettingsViewModel(app.paray) as T
+            modelClass.isAssignableFrom(com.oasismall.oasisai.ui.screens.paraylearn.ParayMemoryViewModel::class.java) ->
+                com.oasismall.oasisai.ui.screens.paraylearn.ParayMemoryViewModel(
+                    com.oasismall.oasisai.ui.screens.paraylearn.ParayMemoryRepository(app.paray.learnStore),
+                ) as T
+            modelClass.isAssignableFrom(com.oasismall.oasisai.ui.screens.paraylearn.ParayKnowledgeViewModel::class.java) ->
+                com.oasismall.oasisai.ui.screens.paraylearn.ParayKnowledgeViewModel(
+                    com.oasismall.oasisai.ui.screens.paraylearn.ParayKnowledgeRepository(
+                        com.oasismall.oasisai.domain.paray.ParayKnowledgeStore(app.parayHome),
+                    ),
+                ) as T
+            modelClass.isAssignableFrom(com.oasismall.oasisai.ui.screens.paraylearn.ParayStatisticsViewModel::class.java) ->
+                com.oasismall.oasisai.ui.screens.paraylearn.ParayStatisticsViewModel(
+                    com.oasismall.oasisai.ui.screens.paraylearn.ParayStatisticsRepository(
+                        app.paray.learnStore,
+                        com.oasismall.oasisai.domain.paray.ParayKnowledgeStore(app.parayHome),
+                        com.oasismall.oasisai.domain.paray.ParayWorkflowStore(app.parayHome),
+                        com.oasismall.oasisai.domain.paray.ParayRecognitionStore(app.parayHome),
+                    ),
+                ) as T
             modelClass.isAssignableFrom(com.oasismall.oasisai.ui.screens.paraylearn.ParayLearnSessionViewModel::class.java) ->
-                com.oasismall.oasisai.ui.screens.paraylearn.ParayLearnSessionViewModel(app.repository, app.paray) as T
+                com.oasismall.oasisai.ui.screens.paraylearn.ParayLearnSessionViewModel(
+                    app.repository,
+                    app.paray,
+                    app.parayObserver,
+                    app.parayWorkflowTracker,
+                ) as T
             modelClass.isAssignableFrom(ImportViewModel::class.java) ->
                 ImportViewModel(app.repository, app.backgroundTaskManager) as T
             modelClass.isAssignableFrom(CatalogViewModel::class.java) ->
@@ -70,11 +103,11 @@ class OasisViewModelFactory(
             modelClass.isAssignableFrom(ArticleDetailViewModel::class.java) ->
                 ArticleDetailViewModel(app.repository) as T
             modelClass.isAssignableFrom(ScannerViewModel::class.java) ->
-                ScannerViewModel(app.repository) as T
+                ScannerViewModel(app.repository, app.parayWorkflowTracker, app.parayRecognitionTracker) as T
             modelClass.isAssignableFrom(PreselectionViewModel::class.java) ->
                 PreselectionViewModel(app.repository) as T
             modelClass.isAssignableFrom(PrintViewModel::class.java) ->
-                PrintViewModel(app.repository, app.printGenerator) as T
+                PrintViewModel(app.repository, app.printGenerator, app.parayWorkflowTracker) as T
             modelClass.isAssignableFrom(PrintHistoryViewModel::class.java) ->
                 PrintHistoryViewModel(app.repository) as T
             modelClass.isAssignableFrom(WorkHistoryViewModel::class.java) ->
@@ -92,6 +125,7 @@ class OasisViewModelFactory(
                     app.repository,
                     app.cameraBatchStore,
                     app.batchCameraQueueStore,
+                    app.parayWorkflowTracker,
                 ) as T
             modelClass.isAssignableFrom(CameraBatchImportViewModel::class.java) ->
                 CameraBatchImportViewModel(app.cameraBatchStore) as T
@@ -103,11 +137,13 @@ class OasisViewModelFactory(
                     app.backgroundRemovalService,
                     app.paray,
                     app.bulkCaptureStore,
+                    app.parayWorkflowTracker,
+                    app.parayRecognitionTracker,
                 ) as T
             modelClass.isAssignableFrom(PhoneSyncViewModel::class.java) ->
                 PhoneSyncViewModel(app.repository, app.imageMatcher) as T
             modelClass.isAssignableFrom(DesignViewModel::class.java) ->
-                DesignViewModel(app.repository, app.paray) as T
+                DesignViewModel(app.repository, app.paray, app.parayWorkflowTracker) as T
             modelClass.isAssignableFrom(VisioProViewModel::class.java) ->
                 VisioProViewModel(
                     app.repository,

@@ -36,6 +36,7 @@ data class DesignBatchDetailState(
 class DesignViewModel(
     private val repository: OasisRepository,
     private val paray: ParayAgent,
+    private val workflowTracker: com.oasismall.oasisai.domain.paray.ParayWorkflowTracker,
 ) : ViewModel() {
     val items = repository.observeCart(CartType.DESIGN)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -349,6 +350,9 @@ class DesignViewModel(
                     val batchId = repository.recordDesignShelfPrint(pageIndex, file.absolutePath, pagePreselections)
                     if (batchId > 0) {
                         repository.updatePrintBatchStatus(batchId, PrintBatchStatus.PRINTED.name)
+                        workflowTracker.recordFeature(
+                            com.oasismall.oasisai.domain.paray.ParayWorkflowFeature.DESIGN_EXPORT,
+                        )
                     }
                 }
                 _shelfPageIndex.value = pageIndex

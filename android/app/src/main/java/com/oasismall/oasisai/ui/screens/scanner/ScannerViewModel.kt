@@ -15,6 +15,8 @@ import kotlinx.coroutines.launch
 
 class ScannerViewModel(
     private val repository: OasisRepository,
+    private val workflowTracker: com.oasismall.oasisai.domain.paray.ParayWorkflowTracker,
+    private val recognitionTracker: com.oasismall.oasisai.domain.paray.ParayRecognitionTracker,
 ) : ViewModel() {
     private val _result = MutableStateFlow<ArticleWithImage?>(null)
     val result: StateFlow<ArticleWithImage?> = _result.asStateFlow()
@@ -64,6 +66,7 @@ class ScannerViewModel(
             _scannedBarcode.value = trimmed
             _linkedViaAlternate.value = false
             repository.logBarcodeSearch(trimmed, null)
+            recognitionTracker.recordUnknownBarcode(trimmed)
             return
         }
         _notFound.value = false
@@ -72,6 +75,7 @@ class ScannerViewModel(
         _linkedViaAlternate.value = resolved?.let { !it.primary } == true
         _panelMeta.value = repository.getArticlePanelMeta(article.id)
         repository.logBarcodeSearch(trimmed, article.id)
+        workflowTracker.recordFeature(com.oasismall.oasisai.domain.paray.ParayWorkflowFeature.BARCODE_SCAN)
     }
 
     fun reset() {

@@ -743,6 +743,27 @@ class OasisRepository(
         db.printBatchDao().getPromoBatches()
     suspend fun countMissingImages(): Int = db.productImageDao().countMissing()
 
+    suspend fun countActiveArticles(): Int = db.articleDao().countActive()
+
+    suspend fun countLinkedPngs(): Int = db.productImageDao().countFoundLinked()
+
+    suspend fun getArticleIdsLinkedSince(since: Long): List<Long> =
+        db.productImageDao().getArticleIdsLinkedSince(since)
+
+    suspend fun countDistinctBrands(): Int = db.articleDao().countDistinctBrands()
+
+    suspend fun countDistinctCategories(): Int = db.articleDao().countDistinctCategories()
+
+    suspend fun countDistinctFamilies(): Int = db.articleDao().countDistinctFamilies()
+
+    suspend fun countMissingBrand(): Int = db.articleDao().countMissingBrand()
+
+    suspend fun countMissingCategory(): Int = db.articleDao().countMissingCategory()
+
+    suspend fun countMissingFamily(): Int = db.articleDao().countMissingFamily()
+
+    suspend fun getLatestImport(): ImportEntity? = db.importDao().getLatest()
+
     suspend fun createImport(entity: ImportEntity): Long = db.importDao().insert(entity)
 
     suspend fun saveImportResults(

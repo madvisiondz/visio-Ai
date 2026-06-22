@@ -9,17 +9,14 @@ import com.oasismall.oasisai.domain.paray.ParayLearnQueueStats
 import com.oasismall.oasisai.domain.paray.ParayLearnRecord
 import com.oasismall.oasisai.domain.paray.ParayLearnSessionProduct
 import com.oasismall.oasisai.domain.paray.ParayLearnEngine
-import com.oasismall.oasisai.domain.paray.ParayLearnSettings
+import com.oasismall.oasisai.domain.paray.ParayPackagingVariantEvent
+import com.oasismall.oasisai.domain.paray.ParayVisualSimilarity
 import com.oasismall.oasisai.domain.paray.VisualFeatureExtractor
-import com.oasismall.oasisai.domain.layoutagent.ContentBounds
-import com.oasismall.oasisai.domain.layoutagent.ProductContentBounds
-import android.graphics.BitmapFactory
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.io.File
 
 data class ParayMainUiState(
     val selectedTab: Int = 0,
@@ -72,6 +69,7 @@ data class ParayLearnSessionUiState(
     val progressBack: Boolean = false,
     val cameraActive: Boolean = false,
     val loading: Boolean = true,
+    val preloadComplete: Boolean = false,
     val complete: Boolean = false,
     val mismatch: Boolean = false,
     val error: String? = null,
@@ -80,8 +78,11 @@ data class ParayLearnSessionUiState(
 class ParayLearnSessionViewModel(
     private val repository: OasisRepository,
     private val paray: ParayAgent,
+    private val parayObserver: com.oasismall.oasisai.domain.paray.ParayObserver,
+    private val workflowTracker: com.oasismall.oasisai.domain.paray.ParayWorkflowTracker,
 ) : ViewModel() {
     private val queue = paray.learnQueue(repository)
+    private val preload = paray.learnPreload(repository)
     private var learnSettings = paray.learnSettingsStore.current()
     private var engine = paray.learnEngine(learnSettings)
     private val _uiState = MutableStateFlow(ParayLearnSessionUiState())
@@ -91,10 +92,12 @@ class ParayLearnSessionViewModel(
     private var lastFrameFeatures: VisualFeatureExtractor.Features? = null
     private var stableFrameCount = 0
     private var mismatchFrameCount = 0
+    private var loggedVariantForArticle: Long? = null
 
     fun startNextProduct() {
         viewModelScope.launch {
             reloadEngine()
+            loggedVariantForArticle = null
             _uiState.update { it.copy(loading = true, error = null, complete = false, mismatch = false) }
             val next = queue.nextPending()
             if (next == null) {
@@ -110,45 +113,34 @@ class ParayLearnSessionViewModel(
     fun loadProduct(articleId: Long) {
         viewModelScope.launch {
             reloadEngine()
+            loggedVariantForArticle = null
             _uiState.update { it.copy(loading = true, error = null) }
-            val session = queue.sessionProduct(articleId)
-            if (session == null) {
+            val context = preload.load(articleId)
+            if (context == null) {
                 _uiState.update { it.copy(loading = false, error = "Product not ready for learning") }
                 return@launch
             }
-            val bitmap = BitmapFactory.decodeFile(session.pngPath)
-            if (bitmap == null) {
-                _uiState.update { it.copy(loading = false, error = "Cannot load PNG reference") }
-                return@launch
-            }
-            val bounds = ProductContentBounds.detect(bitmap)
-            val content = if (bounds.isEmpty) {
-                ContentBounds(0, 0, bitmap.width, bitmap.height)
-            } else {
-                bounds
-            }
-            pngFeatures = VisualFeatureExtractor.extract(bitmap, content)
-            bitmap.recycle()
 
-            val record = session.record ?: ParayLearnRecord(
-                articleId = session.articleId,
-                barcode = session.barcode,
-                designation = session.designation,
-                pngFrontPath = session.pngPath,
-            )
+            pngFeatures = context.pngFeatures
+            val record = context.record
             val phase = engine.initialPhase(record)
             resetFrameCounters()
             _uiState.update {
                 it.copy(
-                    product = session,
+                    product = context.product,
                     record = record,
                     phase = phase,
-                    instruction = if (phase == ParayLearnPhase.COMPLETE) "Already learned" else "Show product front — match PNG",
+                    instruction = when (phase) {
+                        ParayLearnPhase.COMPLETE -> "Already learned"
+                        ParayLearnPhase.FRONT_CONFIRM -> "Show Front Side — match official PNG"
+                        else -> "Front confirmed — continue learning"
+                    },
                     progressFront = record.frontConfirmed,
                     progressLeft = record.leftCapture != null,
                     progressRight = record.rightCapture != null,
                     progressBack = record.backCapture != null,
                     loading = false,
+                    preloadComplete = context.preloadComplete,
                     cameraActive = phase != ParayLearnPhase.COMPLETE,
                     complete = phase == ParayLearnPhase.COMPLETE,
                 )
@@ -184,13 +176,16 @@ class ParayLearnSessionViewModel(
                 if (result.frontSimilarity < learnSettings.frontMismatchCutoff()) {
                     mismatchFrameCount++
                 }
+                result.packagingVariantHint?.let { hint ->
+                    maybeLogPackagingVariant(record, result.frontSimilarity, hint)
+                }
                 applyFrameResult(result)
             }
             ParayLearnPhase.CAPTURE_LEFT,
             ParayLearnPhase.CAPTURE_RIGHT,
             ParayLearnPhase.CAPTURE_BACK,
             -> {
-                val prior = engine.priorSideFeatures(record)
+                val prior = engine.priorSideFeatures(record, png)
                 val result = engine.processSideCapture(
                     record = record,
                     phase = state.phase,
@@ -207,12 +202,13 @@ class ParayLearnSessionViewModel(
 
     fun retryFront() {
         mismatchFrameCount = 0
+        loggedVariantForArticle = null
         resetFrameCounters()
         _uiState.update {
             it.copy(
                 phase = ParayLearnPhase.FRONT_CONFIRM,
                 mismatch = false,
-                instruction = "Show product front — match PNG reference",
+                instruction = "Show Front Side — match official PNG",
                 cameraActive = true,
             )
         }
@@ -222,12 +218,40 @@ class ParayLearnSessionViewModel(
         startNextProduct()
     }
 
+    private fun maybeLogPackagingVariant(
+        record: ParayLearnRecord,
+        similarity: Float,
+        message: String,
+    ) {
+        if (loggedVariantForArticle == record.articleId) return
+        loggedVariantForArticle = record.articleId
+        paray.logPackagingVariant(
+            ParayPackagingVariantEvent(
+                articleId = record.articleId,
+                barcode = record.barcode,
+                designation = record.designation,
+                similarity = similarity,
+                threshold = learnSettings.frontConfirmationThreshold,
+                message = message,
+            ),
+        )
+    }
+
     private fun applyFrameResult(result: com.oasismall.oasisai.domain.paray.ParayLearnFrameResult) {
         val updated = result.updatedRecord
         if (updated != null) {
             paray.learnStore.put(updated)
             if (result.phase == ParayLearnPhase.COMPLETE) {
                 paray.saveLearnRecord(updated)
+                workflowTracker.recordFeature(
+                    com.oasismall.oasisai.domain.paray.ParayWorkflowFeature.PARAY_LEARN_SESSION,
+                )
+                viewModelScope.launch {
+                    parayObserver.onTrigger(
+                        com.oasismall.oasisai.domain.paray.ParayObserverTrigger.PARAY_LEARN_COMPLETED,
+                        com.oasismall.oasisai.domain.paray.ParayObserverContext(articleId = updated.articleId),
+                    )
+                }
             }
         }
         if (result.phase != _uiState.value.phase && result.phase != ParayLearnPhase.FRONT_CONFIRM) {

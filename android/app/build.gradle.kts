@@ -28,8 +28,8 @@ android {
         applicationId = "com.oasismall.visioai"
         minSdk = 26
         targetSdk = 34
-        versionCode = 295
-        versionName = "2.16.0"
+        versionCode = 307
+        versionName = "2.22.0"
 
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

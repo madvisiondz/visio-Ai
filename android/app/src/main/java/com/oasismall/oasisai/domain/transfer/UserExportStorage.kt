@@ -26,12 +26,15 @@ object UserExportStorage {
             when {
                 entry.isDirectory && (
                     entry.name.startsWith("device-backup-") ||
-                        entry.name.startsWith("VisioPRO_export_")
+                        entry.name.startsWith("VisioPRO_export_") ||
+                        entry.name.startsWith("pkp-export-") ||
+                        entry.name.startsWith("pkp-import-")
                     ) -> entry.deleteRecursively()
                 entry.isFile && entry.extension.equals("zip", ignoreCase = true) &&
                     (
                         entry.name.startsWith("VisioAi_backup_") ||
-                            entry.name.startsWith("VisioPRO_export_")
+                            entry.name.startsWith("VisioPRO_export_") ||
+                            entry.name.startsWith("PARAY_")
                         ) -> entry.delete()
             }
         }

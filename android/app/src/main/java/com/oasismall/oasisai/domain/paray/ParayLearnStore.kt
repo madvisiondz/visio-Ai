@@ -70,32 +70,80 @@ class ParayLearnStore(private val home: ParayHome) {
         )
     }
 
+    private fun signaturesToJson(s: ParayVisualSignatures?): JSONObject? {
+        if (s == null) return null
+        return JSONObject()
+            .put("shapeAspect", s.shapeAspect.toDouble())
+            .put("fillRatio", s.fillRatio.toDouble())
+            .put("dominantColors", JSONArray(s.dominantColors))
+            .put("source", s.source)
+            .put("capturedAt", s.capturedAt)
+    }
+
+    private fun signaturesFromJson(o: JSONObject?): ParayVisualSignatures? {
+        if (o == null) return null
+        val colors = buildList {
+            val arr = o.optJSONArray("dominantColors") ?: JSONArray()
+            for (i in 0 until arr.length()) add(arr.getInt(i))
+        }
+        return ParayVisualSignatures(
+            shapeAspect = o.optDouble("shapeAspect", 0.0).toFloat(),
+            fillRatio = o.optDouble("fillRatio", 0.0).toFloat(),
+            dominantColors = colors,
+            source = o.optString("source"),
+            capturedAt = o.optLong("capturedAt", System.currentTimeMillis()),
+        )
+    }
+
     private fun toJson(r: ParayLearnRecord): JSONObject = JSONObject()
         .put("articleId", r.articleId)
         .put("barcode", r.barcode)
         .put("designation", r.designation)
+        .put("brand", r.brand)
+        .put("category", r.category)
+        .put("family", r.family)
         .put("pngFrontPath", r.pngFrontPath)
         .put("frontConfirmed", r.frontConfirmed)
         .put("frontConfidence", r.frontConfidence.toDouble())
-        .put("frontCapture", captureToJson(r.frontCapture))
         .put("leftCapture", captureToJson(r.leftCapture))
         .put("rightCapture", captureToJson(r.rightCapture))
         .put("backCapture", captureToJson(r.backCapture))
+        .put("productSignature", signaturesToJson(r.productSignature))
+        .put("brandSignature", signaturesToJson(r.brandSignature))
+        .put("familySignature", signaturesToJson(r.familySignature))
+        .put("packagingVariantDetected", r.packagingVariantDetected)
+        .put("symmetricSidesEligible", r.symmetricSidesEligible)
         .put("learnedAt", r.learnedAt)
+        .put("createdAt", r.createdAt)
+        .put("updatedAt", r.updatedAt)
         .put("version", r.version)
 
     private fun fromJson(o: JSONObject): ParayLearnRecord = ParayLearnRecord(
         articleId = o.getLong("articleId"),
         barcode = o.getString("barcode"),
         designation = o.getString("designation"),
+        brand = o.optString("brand").takeIf { it.isNotBlank() },
+        category = o.optString("category").takeIf { it.isNotBlank() },
+        family = o.optString("family").takeIf { it.isNotBlank() },
         pngFrontPath = o.getString("pngFrontPath"),
         frontConfirmed = o.optBoolean("frontConfirmed", false),
         frontConfidence = o.optDouble("frontConfidence", 0.0).toFloat(),
-        frontCapture = captureFromJson(o.optJSONObject("frontCapture")),
         leftCapture = captureFromJson(o.optJSONObject("leftCapture")),
         rightCapture = captureFromJson(o.optJSONObject("rightCapture")),
         backCapture = captureFromJson(o.optJSONObject("backCapture")),
+        productSignature = signaturesFromJson(o.optJSONObject("productSignature")),
+        brandSignature = signaturesFromJson(o.optJSONObject("brandSignature")),
+        familySignature = signaturesFromJson(o.optJSONObject("familySignature")),
+        packagingVariantDetected = o.optBoolean("packagingVariantDetected", false),
+        symmetricSidesEligible = o.opt("symmetricSidesEligible")?.let {
+            when (it) {
+                is Boolean -> it
+                else -> o.optBoolean("symmetricSidesEligible")
+            }
+        },
         learnedAt = o.optLong("learnedAt").takeIf { it > 0L },
+        createdAt = o.optLong("createdAt", System.currentTimeMillis()),
+        updatedAt = o.optLong("updatedAt", System.currentTimeMillis()),
         version = o.optInt("version", 1),
     )
 }

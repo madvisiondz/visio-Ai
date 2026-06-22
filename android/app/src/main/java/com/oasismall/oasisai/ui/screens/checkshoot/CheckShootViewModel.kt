@@ -72,6 +72,8 @@ class CheckShootViewModel(
     private val bgService: BackgroundRemovalService,
     private val paray: ParayAgent,
     private val bulkStore: BulkCaptureStore,
+    private val workflowTracker: com.oasismall.oasisai.domain.paray.ParayWorkflowTracker,
+    private val recognitionTracker: com.oasismall.oasisai.domain.paray.ParayRecognitionTracker,
 ) : ViewModel() {
     private val advisor = paray.barcodeAdvisor(repository)
     private val prefs = context.getSharedPreferences(PREFS_AGENT, Context.MODE_PRIVATE)
@@ -233,7 +235,10 @@ class CheckShootViewModel(
             _scan.value = null
             _paraySuggest.value = null
         }
-        viewModelScope.launch { refreshScan(trimmed) }
+        viewModelScope.launch {
+            refreshScan(trimmed)
+            workflowTracker.recordFeature(com.oasismall.oasisai.domain.paray.ParayWorkflowFeature.BARCODE_SCAN)
+        }
     }
 
     fun toggleSubBcAcquisition() {
@@ -323,11 +328,20 @@ class CheckShootViewModel(
             suggestions = suggestions,
             loading = false,
         )
+        recognitionTracker.recordUnknownBarcode(scannedBarcode, com.oasismall.oasisai.domain.paray.ParayRecognitionTracker.SOURCE_AGENT)
     }
 
     fun selectParaySuggestion(suggestion: ParaySuggestion) {
         val barcode = _scan.value?.barcode ?: _paraySuggest.value?.scannedBarcode ?: return
+        val offeredId = _paraySuggest.value?.suggestions?.firstOrNull()?.articleId
         viewModelScope.launch {
+            recognitionTracker.recordManualCorrection(
+                scannedBarcode = barcode,
+                selectedArticleId = suggestion.articleId,
+                selectedDesignation = suggestion.designation,
+                offeredArticleId = offeredId,
+                source = suggestion.reason,
+            )
             advisor.confirmSuggestion(barcode, suggestion)
             refreshScan(barcode)
             _paraySuggest.value = null
@@ -340,7 +354,15 @@ class CheckShootViewModel(
 
     fun selectParayVisualMatch(match: ParayMatch) {
         val barcode = _scan.value?.barcode ?: _paraySuggest.value?.scannedBarcode ?: return
+        val offeredId = _paraySuggest.value?.visualMatches?.firstOrNull()?.articleId
         viewModelScope.launch {
+            recognitionTracker.recordManualCorrection(
+                scannedBarcode = barcode,
+                selectedArticleId = match.articleId,
+                selectedDesignation = match.designation,
+                offeredArticleId = offeredId,
+                source = "PARAY visual teach",
+            )
             advisor.confirmSuggestion(
                 barcode,
                 ParaySuggestion(
@@ -390,6 +412,13 @@ class CheckShootViewModel(
     fun selectParayDesignationMatch(article: ArticleWithImage) {
         val barcode = _paraySuggest.value?.scannedBarcode ?: _scan.value?.barcode ?: return
         viewModelScope.launch {
+            recognitionTracker.recordManualCorrection(
+                scannedBarcode = barcode,
+                selectedArticleId = article.id,
+                selectedDesignation = article.designation,
+                offeredArticleId = _paraySuggest.value?.suggestions?.firstOrNull()?.articleId,
+                source = "Designation search",
+            )
             advisor.confirmSuggestion(
                 barcode,
                 ParaySuggestion(
@@ -463,6 +492,7 @@ class CheckShootViewModel(
                 teachingVisual = false,
                 teachCapturePath = captureFile.absolutePath,
             )
+            recognitionTracker.observeVisualIdentification(barcode, matches)
             if (matches.isEmpty()) {
                 _message.value = "PARAY could not recognize this pack yet — import fingerprints or print shelf labels first."
             }
@@ -527,6 +557,13 @@ class CheckShootViewModel(
     fun selectSuffixMatch(article: ArticleWithImage) {
         val barcode = _scan.value?.barcode ?: return
         viewModelScope.launch {
+            recognitionTracker.recordManualCorrection(
+                scannedBarcode = barcode,
+                selectedArticleId = article.id,
+                selectedDesignation = article.designation,
+                offeredArticleId = null,
+                source = "Manual suffix link",
+            )
             advisor.confirmSuggestion(
                 barcode,
                 ParaySuggestion(

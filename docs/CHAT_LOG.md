@@ -1013,3 +1013,129 @@
 **User:** PARAY Learn architecture — configurable thresholds (`frontConfirmationThreshold`, `sideCaptureThreshold`, `backCaptureThreshold`); no hardcoded confidence; don't build APK; push for tracker review.
 
 **Assistant:** `ParayLearnSettings` + `ParayLearnSettingsStore` → `learn_settings.json`; `ParayLearnEngine(settings)`; session reloads settings; docs updated; pushed (no APK).
+
+---
+
+## Session 121 — 2026-06-14
+
+**User:** PARAY Learn V1 **final specification** — PNG canonical front; preload; coverage KPI; packaging variant architecture; brand/family knowledge; status from L+R+B only; separate Learn from AGENT.
+
+**Assistant:** **v2.16.1** — aligned domain + UI to final spec: `ParayLearnEligibility`, `ParayLearnPreload`, extended `learn_index.json`, `brand_family_index.json`, `packaging_variants.jsonl`; front confirmation no longer stored as learned side; coverage on Learn tab; compile verified (no APK). Canonical doc: `docs/PARAY_LEARN.md`.
+
+---
+
+## Session 122 — 2026-06-14
+
+**User:** PARAY Learn V1 stabilization fix B1 — scope queue KPIs to Ready population only.
+
+**Assistant:** `ParayLearnQueue.buildStats()` — learned/partial/pending/coverage from Ready ∩ learn status; no storage or workflow changes.
+
+---
+
+## Session 123 — 2026-06-14
+
+**User:** PARAY Learn V1 stabilization fix B2 — reject undecodable PNGs at eligibility.
+
+**Assistant:** `ParayLearnEligibility.isDecodablePng()` — bounds-only BitmapFactory check; corrupt PNGs excluded from Ready queue.
+
+---
+
+## Session 124 — 2026-06-14
+
+**User:** PARAY Learn V1 stabilization fix B3 — packaging variant log-only, no UI.
+
+**Assistant:** Removed packaging variant hint from `ParayLearnScreens` / session UI state; `maybeLogPackagingVariant()` + `packaging_variants.jsonl` unchanged.
+
+---
+
+## Session 125 — 2026-06-14
+
+**User:** PARAY Learn V1 stabilization fix B4 — brand/family read-side integration hook for AGENT.
+
+**Assistant:** `BrandKnowledgeProvider` + `ParayBrandKnowledgeProvider`; `ParayCameraMatcher` calls read hook with 0f boost; no score/storage format changes.
+
+---
+
+## Session 126 — 2026-06-14
+
+**User:** PARAY V1 Evolution Phase 1 — lightweight ParayObserver curiosity engine + PARAY Home performance.
+
+**Assistant:** **v2.17.0** — `ParayObserver` + `paray_home/observer/`; change-only observations; PARAY Home cached display + async refresh. See `docs/PARAY_OBSERVER.md`.
+
+---
+
+## Session 127 — 2026-06-14
+
+**User:** PARAY V1 Evolution Phase 2 — product catalog knowledge via observation (not image learning).
+
+**Assistant:** **v2.18.0** — `ParayKnowledgeObserver` + `paray_home/knowledge/`; article timelines; brand/category rollups; knowledge gaps; import history; cached `knowledge_summary.json`. Wired from `ParayObserver` on change only. See `docs/PARAY_KNOWLEDGE.md`.
+
+---
+
+## Session 128 — 2026-06-14
+
+**User:** PARAY V1 Evolution Phase 3 — user workflow curiosity (patterns only, no personal data).
+
+**Assistant:** **v2.19.0** — `ParayWorkflowObserver` + `paray_home/workflows/`; screen usage, transitions, feature counts; NavController + feature hooks. See `docs/PARAY_WORKFLOW.md`.
+
+---
+
+## Session 129 — 2026-06-14
+
+**User:** Implement PARAY Home Dashboard UI — read cached summaries only.
+
+**Assistant:** **v2.20.0** — `ParayHomeRepository` + dashboard screen; `observer_summary.json`; extended knowledge/workflow summaries.
+
+---
+
+## Session 130 — 2026-06-14
+
+**User:** Implement PARAY Learn Settings UI — threshold sliders in Settings.
+
+**Assistant:** **v2.20.1** — `ParayLearnSettingsScreen` + ViewModel; Settings → PARAY Learn settings; immediate save to `learn_settings.json`.
+
+---
+
+## Session 131 — 2026-06-14
+
+**User:** Implement PARAY Memory Tab — inspect `learn_index.json`; search + filter; no Room.
+
+**Assistant:** **v2.20.2** — `ParayMemoryRepository`, `ParayMemoryScreen`, `ParayMemoryViewModel`; Memory tab on PARAY screen; refresh on tab select.
+
+---
+
+## Session 132 — 2026-06-14
+
+**User:** Implement PARAY Knowledge Tab — expose catalog knowledge from cached JSON.
+
+**Assistant:** **v2.20.3** — `ParayKnowledgeRepository`, `ParayKnowledgeScreen`, `ParayKnowledgeViewModel`; summary + rollups + recently learned; no SQL.
+
+---
+
+## Session 133 — 2026-06-14
+
+**User:** Implement PARAY Statistics Tab — learning/intelligence KPIs from cached JSON.
+
+**Assistant:** **v2.20.4** — `ParayStatisticsRepository`, `ParayStatisticsScreen`, `ParayStatisticsViewModel`; progress cards, coverage bar, learning trend; all four PARAY tabs complete.
+
+---
+
+## Session 134 — 2026-06-14
+
+**User:** PARAY Recognition Curiosity Phase 4 — observe recognition weaknesses.
+
+**Assistant:** **v2.21.0** — `ParayRecognitionObserver`, `paray_home/recognition/`; AGENT + Scanner hooks; see `docs/PARAY_RECOGNITION.md`.
+
+---
+
+## Session 135 — 2026-06-14
+
+**User:** PARAY Phase 4 full spec — Recognition Curiosity + Living AI Presence V1 (LED, dashboards).
+
+---
+
+## Session 136 — 2026-06-14
+
+**User:** PARAY Phase 5 — Knowledge Fusion System (offline shared intelligence via PKP).
+
+**Assistant:** **v2.22.0** — `ParayKnowledgeFusionEngine`, PKP `.pkp.zip`, PARAY Home Export/Import/Fusion History, `paray_home/fusion/`; see `docs/PARAY_FUSION.md`.

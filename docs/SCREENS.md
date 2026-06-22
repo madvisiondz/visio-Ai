@@ -10,8 +10,12 @@
 | VisioPRO category | `visio_pro/{category}` | Done | **Full article list** + search · checkbox selection · **Exporter sélection** (PNG per card) · inline prix · tap row → bottom sheet · **Désignation AR** + swipe card for prev/next |
 | VisioPRO list editor | `visio_pro_list/{category}` | Done | **Enregistrer** fixed top-right · order sheet no drag-dismiss · live order draft |
 | Home / Articles | `home` | Done | **Rayon filter** (Gestium **Rayon** column — Boucherie, Boissons, Confiserie, …) · search scoped to filter · smart search |
-| PARAY Learn | `paray` → `paray_learn_session` | Done | Bottom nav **PARAY** — Learn queue from trusted products; front PNG confirm; auto L/R/B capture; Memory/Knowledge/Stats placeholders |
-| PARAY home | `paray_home` | Done | PARAY's own UI + `paray_home/` folder; office links to Design / AGENT / import |
+| PARAY Memory tab | `paray` tab 2 | Done | Browse `learn_index.json`; search/filter; side progress (v2.20.2) |
+| PARAY Knowledge tab | `paray` tab 3 | Done | Cached `knowledge_summary.json` + `knowledge_articles.json`; rollups + recently learned (v2.20.3) |
+| PARAY Statistics tab | `paray` tab 4 | Done | Learning/knowledge/workflow KPIs from cached JSON; coverage bar + trend (v2.20.4) |
+| PARAY Learn | `paray` → `paray_learn_session` | Done | Learn queue + coverage KPI; preload; front PNG confirm; auto L/R/B |
+| PARAY Learn settings | `paray_learn_settings` | Done | Front/side/back threshold sliders → `learn_settings.json` (v2.20.1) |
+| PARAY home | `paray_home` | Done | Intelligence dashboard + **Knowledge Fusion** export/import (PKP v1, v2.22.0) |
 | PARAY neural load | `paray_import` | Done | Fingerprint import progress, neural profile, memory growth; foreground service (background-safe) |
 | Settings | `settings` | Done | Shows **app version**; long tasks run in **foreground service** (notification, screen-off safe); **Device transfer** (purge w/ flavor archive, **Sync sub-PNGs**, full ZIP backup, VisioPRO export); **Rayons importants**; **Listes VisioPRO**; IMAGE ASSETS load, **PhotoRoom folder** picker, Export PNG database, re-index, Report |
 | Gallery link (placeholder) | `gallery_link` | Planned | Pick PNGs → scan → rename workflow |

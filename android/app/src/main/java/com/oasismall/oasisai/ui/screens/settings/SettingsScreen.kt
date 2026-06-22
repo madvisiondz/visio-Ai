@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Storefront
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Assessment
@@ -76,6 +77,7 @@ fun SettingsScreen(
     onNavigateReport: () -> Unit = {},
     onNavigateParayImport: () -> Unit = {},
     onNavigateParayHome: () -> Unit = {},
+    onNavigateParayLearnSettings: () -> Unit = {},
     onNavigateVisioProSettings: () -> Unit = {},
     onNavigateImportantRayons: () -> Unit = {},
 ) {
@@ -302,6 +304,15 @@ fun SettingsScreen(
                             parayFingerprintPicker.launch(arrayOf("application/json", "text/*", "*/*"))
                         }
                     },
+                )
+            }
+            item {
+                SettingsRow(
+                    title = "PARAY Learn settings",
+                    subtitle = "Front confirmation and side/back capture thresholds",
+                    icon = Icons.Default.Tune,
+                    enabled = !busy,
+                    onClick = onNavigateParayLearnSettings,
                 )
             }
 

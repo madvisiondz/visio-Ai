@@ -41,8 +41,8 @@ com.oasismall.oasisai/
 │   ├── background/          # OasisBackgroundTaskService — long tasks survive screen off (v2.15.6)
 │   ├── transfer/            # Device backup ZIP, Gestium purge, VisioPRO bundle export
 │   ├── design/ShelfA4Renderer.kt  # In-app shelf 12-up A4 JPEG
-│   ├── paray/               # Visual agent — Learn V1, camera ID, fingerprints
-│   │                        # learn_settings.json + learn_index.json (visual ≠ Room identity)
+│   ├── paray/               # Visual agent — Learn V1, Observer, camera ID, fingerprints
+│   │                        # memory/ + observer/ (observation ≠ learn/visual indexes)
 │   ├── layoutagent/         # Layout fit submodule (used by PARAY)
 │   └── PromoService.kt      # Expiry alerts
 ├── ui/
@@ -94,5 +94,11 @@ Shelf labels: **Design** screen → `ShelfA4Renderer` → landscape A4 JPEG (12-
 Phone-to-phone PNG sync: **Phone sync** (hotspot LAN, port 8776) — see `docs/PHONE_SYNC.md`.
 
 - **AGENT** tab: **Smart** (PARAY + catalog + SUB-BC) or **Bulk** (barcode-only mall captures → `bulk_images/` + `bulk_captures`).
+- **PARAY home** (`paray_home/`): memory (learn/visual), **observer**, **knowledge**, **workflows**, **recognition**, **fusion** (PKP lineage, v2.22.0), sessions, logs.
+- **PARAY tab → Memory** (v2.20.2): `ParayMemoryRepository` reads `learn_index.json` only — UI never queries Room for learning status.
+- **PARAY tab → Knowledge** (v2.20.3): `ParayKnowledgeRepository` reads `knowledge_summary.json` + `knowledge_articles.json` — rollups derived in memory, no SQL.
+- **PARAY tab → Statistics** (v2.20.4): `ParayStatisticsRepository` reads `learn_index.json`, `knowledge_summary.json`, `workflow_summary.json` — instant KPI dashboard, no live aggregation.
+- **PARAY Recognition** (v2.21.0): `ParayRecognitionObserver` → `paray_home/recognition/` on AGENT/Scanner/Learn drift events; cached `recognition_summary.json`.
+- **PARAY Knowledge Fusion** (v2.22.0): `ParayKnowledgeFusionEngine` — PKP `.pkp.zip` device ↔ device merge; `paray_home/fusion/`; see `docs/PARAY_FUSION.md`.
 - Bottom nav **Batch txt** for designation-list routing to To share / To shoot / **Camera batch queue** (not in CSV).
 

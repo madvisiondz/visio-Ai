@@ -653,6 +653,54 @@ interface ArticleDao {
     @Query("SELECT COUNT(*) FROM articles WHERE isActive = 1")
     suspend fun countActive(): Int
 
+    @Query(
+        """
+        SELECT COUNT(DISTINCT brand) FROM articles
+        WHERE isActive = 1 AND brand IS NOT NULL AND TRIM(brand) != ''
+        """,
+    )
+    suspend fun countDistinctBrands(): Int
+
+    @Query(
+        """
+        SELECT COUNT(DISTINCT category) FROM articles
+        WHERE isActive = 1 AND category IS NOT NULL AND TRIM(category) != ''
+        """,
+    )
+    suspend fun countDistinctCategories(): Int
+
+    @Query(
+        """
+        SELECT COUNT(DISTINCT famille) FROM articles
+        WHERE isActive = 1 AND famille IS NOT NULL AND TRIM(famille) != ''
+        """,
+    )
+    suspend fun countDistinctFamilies(): Int
+
+    @Query(
+        """
+        SELECT COUNT(*) FROM articles
+        WHERE isActive = 1 AND (brand IS NULL OR TRIM(brand) = '')
+        """,
+    )
+    suspend fun countMissingBrand(): Int
+
+    @Query(
+        """
+        SELECT COUNT(*) FROM articles
+        WHERE isActive = 1 AND (category IS NULL OR TRIM(category) = '')
+        """,
+    )
+    suspend fun countMissingCategory(): Int
+
+    @Query(
+        """
+        SELECT COUNT(*) FROM articles
+        WHERE isActive = 1 AND (famille IS NULL OR TRIM(famille) = '')
+        """,
+    )
+    suspend fun countMissingFamily(): Int
+
     @Query("SELECT COUNT(*) FROM articles WHERE needsTicketUpdate = 1 AND isActive = 1")
     suspend fun countNeedsTicket(): Int
 
@@ -802,6 +850,25 @@ interface ProductImageDao {
         """,
     )
     suspend fun countMissing(): Int
+
+    @Query(
+        """
+        SELECT COUNT(*) FROM product_images
+        WHERE imageStatus = 'FOUND'
+          AND imagePath IS NOT NULL AND TRIM(imagePath) != ''
+        """,
+    )
+    suspend fun countFoundLinked(): Int
+
+    @Query(
+        """
+        SELECT articleId FROM product_images
+        WHERE imageStatus = 'FOUND'
+          AND imagePath IS NOT NULL AND TRIM(imagePath) != ''
+          AND createdAt > :since
+        """,
+    )
+    suspend fun getArticleIdsLinkedSince(since: Long): List<Long>
 
     @Query(
         """

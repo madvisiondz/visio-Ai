@@ -18,6 +18,7 @@ class ImportService(
     private val repository: OasisRepository,
     private val imageMatcher: ImageMatcher,
     private val subBarcodeFlavorService: com.oasismall.oasisai.domain.flavors.SubBarcodeFlavorService,
+    private val onParayObserver: (suspend (com.oasismall.oasisai.domain.paray.ParayObserverTrigger, com.oasismall.oasisai.domain.paray.ParayObserverContext) -> Unit)? = null,
 ) {
     suspend fun importFromStream(
         inputStream: InputStream,
@@ -258,7 +259,7 @@ class ImportService(
             }
 
             onProgress?.invoke(TaskProgress("Import complete", 100))
-            ImportResult(
+            val result = ImportResult(
                 success = true,
                 importId = importId,
                 summary = ImportDiffSummary(
@@ -278,6 +279,14 @@ class ImportService(
                     scopedRemovedCount = scopedRemovedCount,
                 ),
             )
+            onParayObserver?.invoke(
+                com.oasismall.oasisai.domain.paray.ParayObserverTrigger.CSV_IMPORT_COMPLETED,
+                com.oasismall.oasisai.domain.paray.ParayObserverContext(
+                    importId = importId,
+                    importSummary = result.summary,
+                ),
+            )
+            result
         } catch (e: Exception) {
             ImportResult(false, errorMessage = e.message ?: "Import failed")
         }

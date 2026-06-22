@@ -2,17 +2,19 @@ package com.oasismall.oasisai.domain.paray
 
 /**
  * Frame-by-frame learning session state machine for PARAY Learn V1.
- * All confidence thresholds come from [ParayLearnSettings] — nothing hardcoded here.
+ * All confidence thresholds come from [ParayLearnSettings].
+ * Front confirmation validates against canonical PNG — not stored as a learned side.
  */
 class ParayLearnEngine(
     private val settings: ParayLearnSettings,
 ) {
     fun initialPhase(record: ParayLearnRecord?): ParayLearnPhase = when {
         record?.status == ParayLearnStatus.LEARNED -> ParayLearnPhase.COMPLETE
-        record?.frontConfirmed == true && record.leftCapture == null -> ParayLearnPhase.CAPTURE_LEFT
-        record?.frontConfirmed == true && record.rightCapture == null -> ParayLearnPhase.CAPTURE_RIGHT
-        record?.frontConfirmed == true && record.backCapture == null -> ParayLearnPhase.CAPTURE_BACK
-        else -> ParayLearnPhase.FRONT_CONFIRM
+        record?.frontConfirmed != true -> ParayLearnPhase.FRONT_CONFIRM
+        record.leftCapture == null -> ParayLearnPhase.CAPTURE_LEFT
+        record.rightCapture == null -> ParayLearnPhase.CAPTURE_RIGHT
+        record.backCapture == null -> ParayLearnPhase.CAPTURE_BACK
+        else -> ParayLearnPhase.COMPLETE
     }
 
     fun processFrontConfirm(
@@ -31,12 +33,7 @@ class ParayLearnEngine(
             val confirmed = record.copy(
                 frontConfirmed = true,
                 frontConfidence = similarity,
-                frontCapture = ParayViewCapture(
-                    shapeAspect = frameFeatures.shapeAspect,
-                    fillRatio = frameFeatures.fillRatio,
-                    dominantColors = frameFeatures.dominantColors,
-                    confidence = similarity,
-                ),
+                updatedAt = System.currentTimeMillis(),
             )
             return ParayLearnFrameResult(
                 phase = ParayLearnPhase.CAPTURE_LEFT,
@@ -51,24 +48,36 @@ class ParayLearnEngine(
             )
         }
 
+        val variantEvent = ParayPackagingVariantDetector.detectPersistentDrift(
+            articleId = record.articleId,
+            barcode = record.barcode,
+            designation = record.designation,
+            similarity = similarity,
+            settings = settings,
+            mismatchFrames = mismatchFrames,
+        )
+        val variantHint = variantEvent?.message
+
         if (mismatchFrames >= MISMATCH_FRAME_LIMIT && similarity < settings.frontMismatchCutoff()) {
             return ParayLearnFrameResult(
                 phase = ParayLearnPhase.MISMATCH,
                 instruction = "Front mismatch — please verify product",
                 frontSimilarity = similarity,
                 stableFrames = stableFrames,
+                packagingVariantHint = variantHint,
             )
         }
 
         return ParayLearnFrameResult(
             phase = ParayLearnPhase.FRONT_CONFIRM,
-            instruction = "Show product front — match PNG reference (${(similarity * 100).toInt()}%)",
+            instruction = "Show Front Side — match official PNG (${(similarity * 100).toInt()}%)",
             frontSimilarity = similarity,
             stableFrames = stableFrames,
             progressFront = false,
             progressLeft = progress.progressLeft,
             progressRight = progress.progressRight,
             progressBack = progress.progressBack,
+            packagingVariantHint = variantHint,
         )
     }
 
@@ -102,7 +111,7 @@ class ParayLearnEngine(
                 phase = phase,
                 instruction = sideInstruction(phase),
                 stableFrames = stableFrames,
-                progressFront = true,
+                progressFront = record.frontConfirmed,
                 progressLeft = record.leftCapture != null,
                 progressRight = record.rightCapture != null,
                 progressBack = record.backCapture != null,
@@ -114,15 +123,17 @@ class ParayLearnEngine(
             shapeAspect = frameFeatures.shapeAspect,
             fillRatio = frameFeatures.fillRatio,
             dominantColors = frameFeatures.dominantColors,
-            confidence = sideScore,
+            confidence = 1f - sideScore,
         )
 
+        val now = System.currentTimeMillis()
         val updated = when (phase) {
-            ParayLearnPhase.CAPTURE_LEFT -> record.copy(leftCapture = capture)
-            ParayLearnPhase.CAPTURE_RIGHT -> record.copy(rightCapture = capture)
+            ParayLearnPhase.CAPTURE_LEFT -> record.copy(leftCapture = capture, updatedAt = now)
+            ParayLearnPhase.CAPTURE_RIGHT -> record.copy(rightCapture = capture, updatedAt = now)
             ParayLearnPhase.CAPTURE_BACK -> record.copy(
                 backCapture = capture,
-                learnedAt = System.currentTimeMillis(),
+                learnedAt = now,
+                updatedAt = now,
             )
             else -> record
         }
@@ -137,31 +148,34 @@ class ParayLearnEngine(
         return ParayLearnFrameResult(
             phase = nextPhase,
             instruction = when (nextPhase) {
-                ParayLearnPhase.CAPTURE_RIGHT -> "Left captured — show Right side"
-                ParayLearnPhase.CAPTURE_BACK -> "Right captured — show Back side"
-                ParayLearnPhase.COMPLETE -> "Learning complete"
+                ParayLearnPhase.CAPTURE_RIGHT -> "Left captured ✓ — show Right side"
+                ParayLearnPhase.CAPTURE_BACK -> "Right captured ✓ — show Back side"
+                ParayLearnPhase.COMPLETE -> "Back captured ✓ — learning complete"
                 else -> sideInstruction(nextPhase)
             },
             stableFrames = stableFrames,
             updatedRecord = updated,
-            progressFront = true,
+            progressFront = updated.frontConfirmed,
             progressLeft = updated.leftCapture != null,
             progressRight = updated.rightCapture != null,
             progressBack = updated.backCapture != null,
         )
     }
 
-    fun priorSideFeatures(record: ParayLearnRecord): List<VisualFeatureExtractor.Features> =
-        buildList {
-            record.frontCapture?.toFeatures()?.let { add(it) }
-            record.leftCapture?.toFeatures()?.let { add(it) }
-            record.rightCapture?.toFeatures()?.let { add(it) }
-        }
+    /** Prior views for distinctness — canonical PNG front + captured sides. */
+    fun priorSideFeatures(
+        record: ParayLearnRecord,
+        pngFeatures: VisualFeatureExtractor.Features,
+    ): List<VisualFeatureExtractor.Features> = buildList {
+        add(pngFeatures)
+        record.leftCapture?.toFeatures()?.let { add(it) }
+        record.rightCapture?.toFeatures()?.let { add(it) }
+    }
 
     private fun sideInstruction(phase: ParayLearnPhase): String = when (phase) {
-        ParayLearnPhase.CAPTURE_LEFT -> "Show Left side"
-        ParayLearnPhase.CAPTURE_RIGHT -> "Show Right side"
-        ParayLearnPhase.CAPTURE_BACK -> "Show Back side"
+        ParayLearnPhase.CAPTURE_LEFT -> "Show Left Side"
+        ParayLearnPhase.CAPTURE_RIGHT -> "Show Right Side"
+        ParayLearnPhase.CAPTURE_BACK -> "Show Back Side"
         else -> "Hold product steady"
     }
 
@@ -178,7 +192,6 @@ class ParayLearnEngine(
     )
 
     companion object {
-        /** Operational — not confidence thresholds (see [ParayLearnSettings]). */
         const val STABLE_FRAMES_REQUIRED = 4
         const val MISMATCH_FRAME_LIMIT = 45
         const val FRAME_STABILITY_SIMILARITY = 0.92f

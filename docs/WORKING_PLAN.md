@@ -27,6 +27,7 @@
 ## Phase 3 — Polish (in progress)
 
 - [x] **v2.16.0** PARAY Learn V1 — trusted-product queue, front confirm, multi-view capture, AGENT matcher boost
+- [x] **v2.16.1** Final spec alignment — see `docs/PARAY_LEARN.md`
 - [x] **v2.15.6** Background foreground service — all Settings long tasks + CSV import survive screen lock
 - [x] **v2.15.2** Sub-barcode flavor registry — survives Gestium purge; auto-restore on CSV import
 - [x] **v2.15.0** Device transfer — purge, full backup ZIP, VisioPRO bundle, PNG export all variants
@@ -81,12 +82,31 @@
 6. Print History → verify batch
 7. Import a second CSV with changed prices (when ready)
 
-## Phase 4c — PARAY Learn (in progress)
+## Phase 4c — PARAY Learn ✅ (V1)
 
 - [x] **v2.16.0** PARAY tab + Learn queue + session (front confirm, L/R/B capture)
+- [x] **v2.16.1** Final spec — preload, eligibility, coverage KPI, front not learned, brand/family index, packaging variant log
 - [x] Configurable thresholds architecture — `learn_settings.json`, engine reads settings
-- [ ] Settings UI sliders for front / side / back thresholds
-- [ ] Memory / Knowledge / Statistics tabs
+- [x] **v2.20.1** Settings UI sliders for front / side / back thresholds
+- [x] **v2.20.0** PARAY Home dashboard — cached summary files only
+- [x] **v2.20.2** Memory tab — browse `learn_index.json`; search + filter
+- [x] **v2.20.3** Knowledge tab — cached catalog knowledge JSON
+- [x] **v2.20.4** Statistics tab — cached learning/knowledge/workflow KPIs
+
+## Phase 4f — PARAY Knowledge Fusion ✅ (V1)
+
+- [x] **v2.22.0** PKP export/import on PARAY Home; incremental merge engine; `docs/PARAY_FUSION.md`
+
+## Phase 4e — PARAY Recognition curiosity ✅ (V1)
+
+- [x] **v2.21.0** `ParayRecognitionObserver` — recognition blind spots; `paray_home/recognition/`
+
+## Phase 4d — PARAY Observer + Knowledge + Workflow ✅ (V1)
+
+- [x] **v2.17.0** `ParayObserver` — change-only curiosity; `paray_home/observer/`
+- [x] **v2.18.0** `ParayKnowledgeObserver` — catalog knowledge; `paray_home/knowledge/`
+- [x] **v2.19.0** `ParayWorkflowObserver` — usage patterns; `paray_home/workflows/`; no personal data
+- [x] **v2.20.0** PARAY Home dashboard — cached summaries only (`ParayHomeRepository`)
 
 ## Phase 4b — VisioPRO ✅ (v2.6.3)
 

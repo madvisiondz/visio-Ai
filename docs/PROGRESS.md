@@ -2,6 +2,65 @@
 
 > What has been built. Update at end of each work session.
 
+## 2026-06-14 — Visio Ai v2.22.0 PARAY Knowledge Fusion Phase 5
+
+- [x] PKP format (`.pkp.zip`) — memory, knowledge, workflows, recognition, observer JSON only
+- [x] `ParayKnowledgeFusionEngine` + `ParayFusionConflictResolver` — incremental merge on `Dispatchers.IO`
+- [x] `paray_home/fusion/` — `fusion_history.json`, `fusion_state.json`, `fusion_conflicts.json`, `deviceKnowledgeId`
+- [x] PARAY Home — Export / Import / Fusion History + import preview (Merge / Cancel)
+- [x] **compileDebugKotlin SUCCESS** — APK **2.22.0** (code 307)
+
+---
+
+## 2026-06-14 — Visio Ai v2.21.1 PARAY Living AI Presence V1
+
+- [x] `ParayActivityMonitor` + `ParayActivityLed` on PARAY Home and PARAY tab screens
+- [x] Recognition Curiosity card on PARAY Home; Recognition Intelligence on Statistics tab
+- [x] Event model aligned to spec (`timestamp`, `source`, `metadata`)
+- [x] APK **2.21.1** (code 306)
+
+---
+
+## 2026-06-14 — Visio Ai v2.21.0 PARAY Recognition Phase 4
+
+- [x] `ParayRecognitionObserver` + `paray_home/recognition/` (events, unknown products, failure patterns, summary)
+- [x] Observe: recognition failures, low confidence, manual corrections, packaging drift, unknown barcodes
+- [x] Hooks: AGENT (`CheckShootViewModel`), Scanner, Learn packaging drift via `ParayAgent`
+- [x] APK **2.21.0** (code 305)
+
+---
+
+## 2026-06-14 — Visio Ai v2.20.4 PARAY Statistics tab
+
+- [x] **Statistics tab** — `ParayStatisticsRepository` reads `learn_index.json`, `knowledge_summary.json`, `workflow_summary.json` only
+- [x] Learning KPI cards + coverage bar; knowledge brand/category/family counts; workflow screen/feature + AGENT/Design counts
+- [x] Learning trend list from learn_index timestamps
+- [x] Refresh when Statistics tab selected
+- [x] APK **2.20.4** (code 304)
+
+---
+
+## 2026-06-14 — Visio Ai v2.20.3 PARAY Knowledge tab
+
+- [x] **Knowledge tab** — `ParayKnowledgeRepository` reads `knowledge_summary.json` + `knowledge_articles.json` only (no Room)
+- [x] Global summary: known articles, brands, categories, families
+- [x] Brand / category / family sections with product counts (derived from articles cache)
+- [x] Recently learned products (LEARNED status + timeline)
+- [x] Refresh when Knowledge tab selected
+- [x] APK **2.20.3** (code 303)
+
+---
+
+## 2026-06-14 — Visio Ai v2.20.2 PARAY Memory tab
+
+- [x] **Memory tab** — `ParayMemoryRepository` reads `paray_home/memory/learn_index.json` only (no Room)
+- [x] Per article: PNG, barcode, designation, brand, category, family, status, front/L/R/B flags, last learning date
+- [x] Filter: All / Learned / Partial / Pending; search: barcode, designation, brand
+- [x] Refresh when Memory tab selected (after learn sessions)
+- [x] APK **2.20.2** (code 302)
+
+---
+
 ## 2026-06-14 — Visio Ai v2.12.3 Fix 1118 barcode-less CSV rows skipped
 
 - [x] Gestium rows with empty Code-barres but valid **Code** column no longer counted as skipped (e.g. PIEDS DE VEAU)
@@ -738,6 +797,57 @@
 - [x] Embedded Barcode, Codeart, PriceNow, Rayon, Designation in PNG tEXt (2,896 / 2,919)
 - [x] CSV archived to `imports/articles_feed_2026-05-31.csv`
 - [x] 23 unmatched PNGs removed from `IMAGE ASSETS` (2,896 remain)
+
+### 2026-06-14 — PARAY Home dashboard (v2.20.0)
+- [x] `ParayHomeRepository` — reads `observer_summary.json`, `knowledge_summary.json`, `workflow_summary.json` on IO
+- [x] Dashboard UI — Observer, Knowledge, Workflow sections + quick actions
+- [x] `observer_summary.json` written by `ParayObserver` each run; fallback from legacy observer files
+
+### 2026-06-14 — PARAY Workflow Phase 3 (v2.19.0)
+- [x] `ParayWorkflowObserver` + `ParayWorkflowTracker` — nav transitions, screen time, feature counts
+- [x] `paray_home/workflows/` — events, patterns, screen usage, cached summary
+- [x] Privacy: no user text, barcodes, images, or camera content stored
+- [x] Hooks: NavHost, import, PNG load, AGENT/scanner, camera batch, design export, PDF, PARAY Learn
+
+### 2026-06-14 — PARAY Knowledge Phase 2 (v2.18.0)
+- [x] `ParayKnowledgeObserver` — import deltas, PNG link window, learn events → knowledge files
+- [x] `paray_home/knowledge/` — articles, brands, categories, summary, state
+- [x] Cached KPIs + gaps (observe only — no actions/notifications)
+- [x] `ParayAgent.readKnowledgeSummary()` for future PARAY Home UI
+- [x] Wired from `ParayObserver` when change detected
+
+### 2026-06-14 — PARAY Observer Phase 1 (v2.17.0)
+- [x] `ParayObserver` — change-reactive curiosity; `paray_home/observer/` storage
+- [x] Triggers: app startup, CSV import, PNG re-index/load, PARAY Learn complete
+- [x] PARAY Home — instant `home_display_cache.json` + IO background refresh
+- [x] **compileDebugKotlin SUCCESSFUL** — v2.17.0 (297)
+
+### 2026-06-14 — PARAY Learn B4 stabilization (brand/family read hook)
+- [x] `BrandKnowledgeProvider` + `ParayBrandKnowledgeProvider` — AGENT matcher read path from `brand_family_index.json`
+- [x] `ParayCameraMatcher.brandKnowledgeReadBoost()` — V1 returns 0f; recognition scores unchanged
+- [x] **compileDebugKotlin SUCCESSFUL**
+
+### 2026-06-14 — PARAY Learn B3 stabilization (packaging variant log-only)
+- [x] Removed `packagingVariantHint` from Learn session UI; background logging via `ParayPackagingVariantLog` unchanged
+- [x] **compileDebugKotlin SUCCESSFUL**
+
+### 2026-06-14 — PARAY Learn B2 stabilization (PNG decode eligibility)
+- [x] `ParayLearnEligibility` — bounds-only `BitmapFactory.decodeFile` rejects corrupt/undecodable PNGs before Ready queue
+- [x] **compileDebugKotlin SUCCESSFUL**
+
+### 2026-06-14 — PARAY Learn B1 stabilization (queue stats scoping)
+- [x] `ParayLearnQueue.buildStats()` — learned/partial/pending/coverage derived from Ready population only (not global `learn_index`)
+- [x] **compileDebugKotlin SUCCESSFUL**
+
+### 2026-06-14 — PARAY Learn V1 final spec (v2.16.1)
+- [x] Front confirmation validates canonical PNG — **not** stored as learned side
+- [x] `ParayLearnPreload` — PNG, fingerprint, brand/category/family before camera
+- [x] `ParayLearnEligibility` + coverage KPI on Learn tab
+- [x] Status model: NOT_LEARNED / PARTIALLY_LEARNED / LEARNED from left+right+back only
+- [x] Extended `learn_index.json` — brand, signatures, timestamps, packaging variant flag
+- [x] `brand_family_index.json` + `logs/packaging_variants.jsonl` (log-only V1)
+- [x] `ParayCameraMatcher` — PNG product signature + learned sides (no frontCapture)
+- [x] **compileDebugKotlin SUCCESSFUL** — v2.16.1 (296); APK not built (per request)
 
 ### 2026-06-22 — PARAY Learn configurable thresholds (arch, no APK)
 - [x] `ParayLearnSettings` — `frontConfirmationThreshold`, `sideCaptureThreshold`, `backCaptureThreshold`

@@ -43,18 +43,59 @@ Settings / Import confirm
 
 Kinds: sync sub-PNGs, re-index, PNG export, full backup import/export, VisioPRO bundle, purge Gestium, sample data, load ready PNGs, CSV import.
 
-## PARAY Learn V1 (v2.16.0)
+## PARAY Observer Phase 1 (v2.17.0)
+
+```
+Trigger (startup / import / re-index / learn complete)
+  → ParayObserver.onTrigger()
+  → SQL COUNT fingerprint vs observer_state.json
+  → unchanged? sleep
+  → changed? delta observation → observer_events.jsonl + observer_knowledge.json
+```
+
+See `docs/PARAY_OBSERVER.md`.
+
+## PARAY Knowledge Phase 2 (v2.18.0)
+
+```
+ParayObserver detects change
+  → ParayKnowledgeObserver.onCatalogChange()
+  → CSV: import_changes for that import only
+  → PNG: product_images linked since last refresh
+  → Learn: single article from learn_index
+  → knowledge_articles.json + brand/category rollups
+  → knowledge_summary.json (cached KPIs — UI reads file, never recomputes live)
+```
+
+See `docs/PARAY_KNOWLEDGE.md`.
+
+## PARAY Workflow Phase 3 (v2.19.0)
+
+```
+NavController destination change / feature hook
+  → ParayWorkflowTracker
+  → screen_usage.json + workflow_patterns.json
+  → workflow_summary.json (cached — no live recompute on screen open)
+```
+
+Workflow patterns only — never user text, barcodes, images, or camera frames. See `docs/PARAY_WORKFLOW.md`.
+
+## PARAY Learn V1 (v2.16.0 → v2.16.1)
 
 ```
 PARAY tab → Learn → Start learning
-    → queue: articles + barcode + FOUND PNG
-    → session: PNG front confirm (camera vs reference)
-    → auto capture Left → Right → Back
+    → ParayLearnEligibility.filterReady(articles + barcode + FOUND PNG)
+    → stats: ready, learned, partial, pending, coverage %
+    → ParayLearnPreload.load(articleId)
+        PNG features, fingerprint?, brand, category, family, existing record
+    → session: front confirm (PNG vs camera) — front NOT stored as learned side
+    → auto capture Left → Right → Back (settings-driven thresholds)
     → learn_index.json (visual knowledge, separate from Room)
-    → on LEARNED: merge into visual_index.json for AGENT matcher
+    → on LEARNED: visual_index.json + brand_family_index.json
+    → packaging drift → logs/packaging_variants.jsonl (V1 log-only)
 ```
 
-AGENT recognition unchanged — `ParayCameraMatcher` boosts scores using learned multi-view records.
+AGENT recognition unchanged — `ParayCameraMatcher` boosts scores using PNG product signature + learned sides.
 
 ### Learn settings (configurable thresholds)
 
@@ -65,6 +106,74 @@ paray_home/memory/learn_settings.json
   backCaptureThreshold
     → ParayLearnSettingsStore
     → ParayLearnEngine(settings)   // no hardcoded confidence in engine
+```
+
+### PARAY Memory tab (v2.20.2)
+
+```
+PARAY tab → Memory
+    → ParayMemoryRepository.loadAll()
+        → ParayLearnStore.allRecords()  // learn_index.json only — no Room
+    → filter: All | Learned | Partial | Pending
+    → search: barcode | designation | brand
+    → display: PNG, metadata, status, front/L/R/B flags, last learning date
+    → refresh when tab selected (after learn sessions)
+```
+
+### PARAY Knowledge tab (v2.20.3)
+
+```
+PARAY tab → Knowledge
+    → ParayKnowledgeRepository.load()
+        → knowledge_summary.json  (global KPIs)
+        → knowledge_articles.json (per-article cache; group rollups in memory)
+    → display: summary, brands, categories, families, recently learned
+    → no Room / SQL aggregations
+    → refresh when tab selected
+```
+
+### PARAY Statistics tab (v2.20.4)
+
+```
+PARAY tab → Statistics
+    → ParayStatisticsRepository.load()
+        → learn_index.json          (learned/partial counts; learning trend)
+        → knowledge_summary.json    (coverage %, ready pool, brand/category/family totals)
+        → workflow_summary.json     (top screen/feature, AGENT + Design export counts)
+    → progress cards + coverage bar + learning trend list
+    → no Room / SQL aggregations
+    → refresh when tab selected
+```
+
+### PARAY Recognition curiosity (v2.21.0)
+
+```
+AGENT / Scanner / Learn packaging drift
+    → ParayRecognitionTracker
+        → ParayRecognitionObserver.record()
+            → recognition_events.jsonl
+            → unknown_products.json
+            → failure_patterns.json
+            → recognition_summary.json (cached rollups)
+    → observation only — no prompts, no automatic actions
+```
+
+### PARAY Knowledge Fusion (v2.22.0)
+
+```
+PARAY Home → Export Knowledge
+    → ParayKnowledgePackageExporter
+        → staging dir (memory/knowledge/workflows/recognition/observer JSON)
+        → package_manifest.json (PKP v1, deviceKnowledgeId)
+        → PARAY_yyyy_MM_dd.pkp.zip → user-picked URI
+
+PARAY Home → Import Knowledge
+    → unzip → ParayKnowledgePackageValidator
+    → ParayKnowledgeFusionEngine.previewFusion() → summary dialog
+    → Merge → ParayKnowledgeFusionEngine.executeFusion() on Dispatchers.IO
+        → ParayFusionConflictResolver (richer learn, higher visual quality, accumulate stats)
+        → fusion_history.json + fusion_conflicts.json
+    → never overwrites blindly; never deletes local knowledge
 ```
 
 Settings UI to edit values — planned, not built.

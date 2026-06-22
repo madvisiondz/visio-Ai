@@ -11,6 +11,8 @@ class ParayCameraMatcher(
     private val index: ParayVisualIndex,
     private val fingerprintStore: ParayFingerprintStore,
     private val learnStore: ParayLearnStore,
+    private val brandKnowledge: BrandKnowledgeProvider = BrandKnowledgeProvider.None,
+    private val onMatchResults: ((List<ParayMatch>) -> Unit)? = null,
 ) {
     fun identify(bitmap: Bitmap, topK: Int = 5): List<ParayMatch> {
         val bounds = ProductContentBounds.detect(bitmap)
@@ -28,7 +30,7 @@ class ParayCameraMatcher(
 
         val articleIds = (records.map { it.articleId } + learned.keys).distinct()
 
-        return articleIds
+        val results = articleIds
             .mapNotNull { articleId ->
                 val sig = records.firstOrNull { it.articleId == articleId }
                 val learn = learned[articleId]
@@ -37,6 +39,7 @@ class ParayCameraMatcher(
                 embeddings[sig?.barcode ?: learn?.barcode]?.let {
                     score = (score * 0.55f + 0.45f).coerceIn(0f, 1f)
                 }
+                score = (score + brandKnowledgeReadBoost(articleId)).coerceIn(0f, 1f)
                 val barcode = sig?.barcode ?: learn?.barcode ?: return@mapNotNull null
                 val designation = sig?.designation ?: learn?.designation ?: return@mapNotNull null
                 ParayMatch(
@@ -49,11 +52,27 @@ class ParayCameraMatcher(
             .filter { it.confidence >= 0.30f }
             .sortedByDescending { it.confidence }
             .take(topK)
+        onMatchResults?.invoke(results)
+        return results
+    }
+
+    /** V1 read-side hook — loads brand/family knowledge; scoring boost is 0f until V2. */
+    private fun brandKnowledgeReadBoost(articleId: Long): Float {
+        brandKnowledge.getBrandKnowledge(articleId)
+        return 0f
     }
 
     private fun learnedViewScore(probe: VisualFeatureExtractor.Features, record: ParayLearnRecord): Float {
         val views = buildList {
-            record.frontCapture?.toFeatures()?.let { add(it) }
+            record.productSignature?.let {
+                add(
+                    VisualFeatureExtractor.Features(
+                        it.shapeAspect,
+                        it.fillRatio,
+                        it.dominantColors,
+                    ),
+                )
+            }
             record.leftCapture?.toFeatures()?.let { add(it) }
             record.rightCapture?.toFeatures()?.let { add(it) }
             record.backCapture?.toFeatures()?.let { add(it) }

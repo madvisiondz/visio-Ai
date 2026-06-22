@@ -18,9 +18,9 @@ data class ParayLearnSettings(
     val backCaptureThreshold: Float,
 ) {
     fun validated(): ParayLearnSettings = copy(
-        frontConfirmationThreshold = frontConfirmationThreshold.coerceIn(RANGE),
-        sideCaptureThreshold = sideCaptureThreshold.coerceIn(RANGE),
-        backCaptureThreshold = backCaptureThreshold.coerceIn(RANGE),
+        frontConfirmationThreshold = frontConfirmationThreshold.coerceIn(MIN_THRESHOLD, MAX_THRESHOLD),
+        sideCaptureThreshold = sideCaptureThreshold.coerceIn(MIN_THRESHOLD, MAX_THRESHOLD),
+        backCaptureThreshold = backCaptureThreshold.coerceIn(MIN_THRESHOLD, MAX_THRESHOLD),
     )
 
     /** Front mismatch when similarity stays below this fraction of the confirmation threshold. */
@@ -32,7 +32,8 @@ data class ParayLearnSettings(
     fun maxPriorSimilarityForBack(): Float = 1f - backCaptureThreshold
 
     companion object {
-        private const val RANGE = 0.01f..0.99f
+        private const val MIN_THRESHOLD = 0.01f
+        private const val MAX_THRESHOLD = 0.99f
         private const val FRONT_MISMATCH_RATIO = 0.45f
 
         /** Initial values written when no settings file exists — tune via settings UI later. */

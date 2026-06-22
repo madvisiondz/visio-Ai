@@ -38,6 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import com.oasismall.oasisai.ui.components.paray.ParayPresenceLed
 import java.io.File
 
 private val tabs = listOf("Learn", "Memory", "Knowledge", "Statistics")
@@ -46,16 +47,28 @@ private val tabs = listOf("Learn", "Memory", "Knowledge", "Statistics")
 @Composable
 fun ParayMainScreen(
     viewModel: ParayMainViewModel,
+    memoryViewModel: ParayMemoryViewModel,
+    knowledgeViewModel: ParayKnowledgeViewModel,
+    statisticsViewModel: ParayStatisticsViewModel,
     onStartLearning: () -> Unit,
     onNavigateParayHome: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    androidx.compose.runtime.LaunchedEffect(uiState.selectedTab) {
+        when (uiState.selectedTab) {
+            1 -> memoryViewModel.refresh()
+            2 -> knowledgeViewModel.refresh()
+            3 -> statisticsViewModel.refresh()
+        }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("PARAY") },
                 actions = {
+                    ParayPresenceLed()
                     OutlinedButton(onClick = onNavigateParayHome, modifier = Modifier.padding(end = 8.dp)) {
                         Text("Home")
                     }
@@ -81,6 +94,9 @@ fun ParayMainScreen(
                     onRefresh = viewModel::refresh,
                     onStartLearning = onStartLearning,
                 )
+                1 -> ParayMemoryScreen(viewModel = memoryViewModel)
+                2 -> ParayKnowledgeScreen(viewModel = knowledgeViewModel)
+                3 -> ParayStatisticsScreen(viewModel = statisticsViewModel)
                 else -> ParayPlaceholderTab(tabs[uiState.selectedTab])
             }
         }
@@ -127,13 +143,14 @@ private fun ParayLearnTab(
                     RequirementRow("PNG exists", true)
                     RequirementRow("Barcode exists", true)
                     Spacer(Modifier.height(8.dp))
-                    Text("Remaining: ${stats.readyCount} products", fontWeight = FontWeight.SemiBold)
-                    Text("Learned: ${stats.learnedCount} products")
-                    Text("Pending: ${stats.pendingCount} products")
+                    Text("Ready for learning: ${stats.readyCount}", fontWeight = FontWeight.SemiBold)
+                    Text("Learned: ${stats.learnedCount}")
+                    Text("Partially learned: ${stats.partiallyLearnedCount}")
+                    Text("Pending: ${stats.pendingCount}")
                     Text(
-                        "Partially learned: ${stats.partiallyLearnedCount}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        "Coverage: ${"%.1f".format(stats.coveragePercent)}%",
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
                     )
                 }
             }
@@ -229,7 +246,17 @@ fun ParayLearnSessionScreen(
                         Column(Modifier.weight(1f)) {
                             Text(product.designation, fontWeight = FontWeight.Bold)
                             Text("Barcode: ${product.barcode}", style = MaterialTheme.typography.bodySmall)
-                            Text("PNG: Available", style = MaterialTheme.typography.bodySmall)
+                            product.brand?.takeIf { it.isNotBlank() }?.let {
+                                Text("Brand: $it", style = MaterialTheme.typography.bodySmall)
+                            }
+                            product.category?.takeIf { it.isNotBlank() }?.let {
+                                Text("Category: $it", style = MaterialTheme.typography.bodySmall)
+                            }
+                            Text(
+                                "Status: ${product.learningStatus.name.replace('_', ' ')}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
                         }
                     }
                 }

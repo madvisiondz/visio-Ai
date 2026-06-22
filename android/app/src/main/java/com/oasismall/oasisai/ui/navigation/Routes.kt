@@ -79,6 +79,7 @@ sealed class OasisRoute(val route: String) {
     data object ParayHome : OasisRoute("paray_home")
     data object ParayMain : OasisRoute("paray")
     data object ParayLearnSession : OasisRoute("paray_learn_session")
+    data object ParayLearnSettings : OasisRoute("paray_learn_settings")
     data object VisioProHome : OasisRoute("visio_pro_home")
     data object VisioProCategory : OasisRoute("visio_pro/{category}") {
         fun create(category: String) = "visio_pro/$category"

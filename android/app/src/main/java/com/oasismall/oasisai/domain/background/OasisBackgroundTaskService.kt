@@ -85,6 +85,9 @@ class OasisBackgroundTaskService : Service() {
                             manager.markSuccess(
                                 "Re-indexed ${articles.size} articles ($modelCount Oasis-model PNGs). $missing still missing images.",
                             )
+                            app.parayObserver.onTrigger(
+                                com.oasismall.oasisai.domain.paray.ParayObserverTrigger.PNG_REINDEX_COMPLETED,
+                            )
                         }
                     }
                     OasisBackgroundTaskKind.EXPORT_PNG_DATABASE -> {
@@ -156,6 +159,12 @@ class OasisBackgroundTaskService : Service() {
                         }
                         manager.markSuccess(
                             "Loaded ${loadResult.copied} PNG(s).$reindexNote",
+                        )
+                        app.parayObserver.onTrigger(
+                            com.oasismall.oasisai.domain.paray.ParayObserverTrigger.PNG_LOAD_COMPLETED,
+                        )
+                        app.parayWorkflowTracker.recordFeature(
+                            com.oasismall.oasisai.domain.paray.ParayWorkflowFeature.PNG_IMPORT,
                         )
                     }
                 }

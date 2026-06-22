@@ -30,7 +30,35 @@ class ParayHome(private val context: Context) {
     val barcodePatternsFile: File = File(memoryDir, "barcode_patterns.json")
     val learnIndexFile: File = File(memoryDir, "learn_index.json")
     val learnSettingsFile: File = File(memoryDir, "learn_settings.json")
+    val brandFamilyIndexFile: File = File(memoryDir, "brand_family_index.json")
     val learnViewsDir: File = File(memoryDir, "learn_views").also { it.mkdirs() }
+    val packagingVariantLogFile: File = File(logsDir, "packaging_variants.jsonl")
+    val observerDir: File = File(root, "observer").also { it.mkdirs() }
+    val observerStateFile: File = File(observerDir, "observer_state.json")
+    val observerEventsFile: File = File(observerDir, "observer_events.jsonl")
+    val observerKnowledgeFile: File = File(observerDir, "observer_knowledge.json")
+    val observerSummaryFile: File = File(observerDir, "observer_summary.json")
+    val knowledgeDir: File = File(root, "knowledge").also { it.mkdirs() }
+    val knowledgeStateFile: File = File(knowledgeDir, "knowledge_state.json")
+    val knowledgeArticlesFile: File = File(knowledgeDir, "knowledge_articles.json")
+    val knowledgeBrandsFile: File = File(knowledgeDir, "knowledge_brands.json")
+    val knowledgeCategoriesFile: File = File(knowledgeDir, "knowledge_categories.json")
+    val knowledgeSummaryFile: File = File(knowledgeDir, "knowledge_summary.json")
+    val workflowsDir: File = File(root, "workflows").also { it.mkdirs() }
+    val workflowEventsFile: File = File(workflowsDir, "workflow_events.jsonl")
+    val workflowPatternsFile: File = File(workflowsDir, "workflow_patterns.json")
+    val workflowSummaryFile: File = File(workflowsDir, "workflow_summary.json")
+    val workflowScreenUsageFile: File = File(workflowsDir, "screen_usage.json")
+    val recognitionDir: File = File(root, "recognition").also { it.mkdirs() }
+    val recognitionEventsFile: File = File(recognitionDir, "recognition_events.jsonl")
+    val recognitionUnknownProductsFile: File = File(recognitionDir, "unknown_products.json")
+    val recognitionFailurePatternsFile: File = File(recognitionDir, "failure_patterns.json")
+    val recognitionSummaryFile: File = File(recognitionDir, "recognition_summary.json")
+    val fusionDir: File = File(root, "fusion").also { it.mkdirs() }
+    val fusionHistoryFile: File = File(fusionDir, "fusion_history.json")
+    val fusionStateFile: File = File(fusionDir, "fusion_state.json")
+    val fusionConflictsFile: File = File(fusionDir, "fusion_conflicts.json")
+    val homeDisplayCacheFile: File = File(root, "home_display_cache.json")
     val checkShootSessionFile: File = File(sessionsDir, "check_shoot_session.json")
     val learnEventsFile: File = File(logsDir, "learn_events.jsonl")
 
@@ -90,6 +118,11 @@ class ParayHome(private val context: Context) {
 
     fun folderSummary(): List<ParayFolderEntry> = listOf(
         ParayFolderEntry("memory", memoryDir, fileCount(memoryDir)),
+        ParayFolderEntry("knowledge", knowledgeDir, fileCount(knowledgeDir)),
+        ParayFolderEntry("workflows", workflowsDir, fileCount(workflowsDir)),
+        ParayFolderEntry("recognition", recognitionDir, fileCount(recognitionDir)),
+        ParayFolderEntry("fusion", fusionDir, fileCount(fusionDir)),
+        ParayFolderEntry("observer", observerDir, fileCount(observerDir)),
         ParayFolderEntry("sessions", sessionsDir, fileCount(sessionsDir)),
         ParayFolderEntry("logs", logsDir, fileCount(logsDir)),
     )

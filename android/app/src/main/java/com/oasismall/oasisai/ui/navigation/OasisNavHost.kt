@@ -5,8 +5,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavController
 import com.oasismall.oasisai.domain.settings.ImportantRayonsConfig
 import com.oasismall.oasisai.ui.components.LocalImportantRayonsConfig
 import androidx.compose.ui.Modifier
@@ -69,6 +71,11 @@ import com.oasismall.oasisai.ui.screens.parayhome.ParayHomeScreen
 import com.oasismall.oasisai.ui.screens.parayhome.ParayHomeViewModel
 import com.oasismall.oasisai.ui.screens.paraylearn.ParayLearnSessionScreen
 import com.oasismall.oasisai.ui.screens.paraylearn.ParayLearnSessionViewModel
+import com.oasismall.oasisai.ui.screens.paraylearn.ParayLearnSettingsScreen
+import com.oasismall.oasisai.ui.screens.paraylearn.ParayLearnSettingsViewModel
+import com.oasismall.oasisai.ui.screens.paraylearn.ParayKnowledgeViewModel
+import com.oasismall.oasisai.ui.screens.paraylearn.ParayMemoryViewModel
+import com.oasismall.oasisai.ui.screens.paraylearn.ParayStatisticsViewModel
 import com.oasismall.oasisai.ui.screens.paraylearn.ParayMainScreen
 import com.oasismall.oasisai.ui.screens.paraylearn.ParayMainViewModel
 import com.oasismall.oasisai.ui.screens.parayimport.ParayImportScreen
@@ -92,6 +99,7 @@ import com.oasismall.oasisai.ui.screens.settings.ImportantRayonsScreen
 import com.oasismall.oasisai.ui.screens.settings.ImportantRayonsViewModel
 import com.oasismall.oasisai.ui.screens.visiopro.settings.VisioProSettingsScreen
 import com.oasismall.oasisai.ui.screens.visiopro.settings.VisioProSettingsViewModel
+import com.oasismall.oasisai.ui.components.paray.LocalParayActivityMonitor
 
 @Composable
 fun OasisNavHost(factory: OasisViewModelFactory) {
@@ -102,7 +110,18 @@ fun OasisNavHost(factory: OasisViewModelFactory) {
     val rayonsConfig by factory.repository.importantRayonsConfig
         .collectAsStateWithLifecycle(initialValue = ImportantRayonsConfig())
 
-    CompositionLocalProvider(LocalImportantRayonsConfig provides rayonsConfig) {
+    DisposableEffect(navController) {
+        val listener = NavController.OnDestinationChangedListener { _, destination, _ ->
+            factory.parayWorkflowTracker.onDestinationChanged(destination.route)
+        }
+        navController.addOnDestinationChangedListener(listener)
+        onDispose { navController.removeOnDestinationChangedListener(listener) }
+    }
+
+    CompositionLocalProvider(
+        LocalImportantRayonsConfig provides rayonsConfig,
+        LocalParayActivityMonitor provides factory.parayActivityMonitor,
+    ) {
     Scaffold(
         bottomBar = {
             if (showBottomBar) {
@@ -145,6 +164,9 @@ fun OasisNavHost(factory: OasisViewModelFactory) {
                     onNavigateReport = { navController.navigate(OasisRoute.Report.route) },
                     onNavigateParayImport = { navController.navigate(OasisRoute.ParayImport.route) },
                     onNavigateParayHome = { navController.navigate(OasisRoute.ParayHome.route) },
+                    onNavigateParayLearnSettings = {
+                        navController.navigate(OasisRoute.ParayLearnSettings.route)
+                    },
                     onNavigateVisioProSettings = { navController.navigate(OasisRoute.VisioProSettings.route) },
                     onNavigateImportantRayons = { navController.navigate(OasisRoute.ImportantRayons.route) },
                 )
@@ -152,6 +174,13 @@ fun OasisNavHost(factory: OasisViewModelFactory) {
             composable(OasisRoute.ImportantRayons.route) {
                 val vm: ImportantRayonsViewModel = viewModel(factory = factory)
                 ImportantRayonsScreen(
+                    viewModel = vm,
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable(OasisRoute.ParayLearnSettings.route) {
+                val vm: ParayLearnSettingsViewModel = viewModel(factory = factory)
+                ParayLearnSettingsScreen(
                     viewModel = vm,
                     onBack = { navController.popBackStack() },
                 )
@@ -249,13 +278,33 @@ fun OasisNavHost(factory: OasisViewModelFactory) {
                         navController.navigate(OasisRoute.ParayImport.route)
                     }
                 }
+                val fusionExportPicker = rememberLauncherForActivityResult(
+                    ActivityResultContracts.CreateDocument("application/zip"),
+                ) { uri ->
+                    if (uri != null) vm.exportKnowledge(context, uri)
+                }
+                val fusionImportPicker = rememberLauncherForActivityResult(
+                    ActivityResultContracts.OpenDocument(),
+                ) { uri ->
+                    if (uri != null) vm.importKnowledge(context, uri)
+                }
                 ParayHomeScreen(
                     viewModel = vm,
                     onBackToOasis = { navController.popBackStack() },
-                    onGoDesign = { navController.navigate(OasisRoute.Design.route) },
-                    onGoScanShoot = { navController.navigate(OasisRoute.CheckShoot.create()) },
+                    onOpenLearn = { navController.navigate(OasisRoute.ParayMain.route) },
+                    onOpenAgent = { navController.navigate(OasisRoute.CheckShoot.create()) },
+                    onOpenDesign = { navController.navigate(OasisRoute.Design.route) },
                     onImportFingerprints = {
                         importPicker.launch(arrayOf("application/json", "text/*", "*/*"))
+                    },
+                    onOpenSettings = { navController.navigate(OasisRoute.Settings.route) },
+                    onExportKnowledge = {
+                        vm.recordOfficeVisit("fusion_export")
+                        fusionExportPicker.launch(vm.defaultExportFileName())
+                    },
+                    onImportKnowledge = {
+                        vm.recordOfficeVisit("fusion_import")
+                        fusionImportPicker.launch(arrayOf("application/zip", "application/octet-stream", "*/*"))
                     },
                 )
             }
@@ -268,8 +317,14 @@ fun OasisNavHost(factory: OasisViewModelFactory) {
             }
             composable(OasisRoute.ParayMain.route) {
                 val vm: ParayMainViewModel = viewModel(factory = factory)
+                val memoryVm: ParayMemoryViewModel = viewModel(factory = factory)
+                val knowledgeVm: ParayKnowledgeViewModel = viewModel(factory = factory)
+                val statisticsVm: ParayStatisticsViewModel = viewModel(factory = factory)
                 ParayMainScreen(
                     viewModel = vm,
+                    memoryViewModel = memoryVm,
+                    knowledgeViewModel = knowledgeVm,
+                    statisticsViewModel = statisticsVm,
                     onStartLearning = { navController.navigate(OasisRoute.ParayLearnSession.route) },
                     onNavigateParayHome = { navController.navigate(OasisRoute.ParayHome.route) },
                 )
