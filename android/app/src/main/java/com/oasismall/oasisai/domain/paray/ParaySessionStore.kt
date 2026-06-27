@@ -1,5 +1,7 @@
 package com.oasismall.oasisai.domain.paray
 
+import com.oasismall.oasisai.util.writeTextAtomic
+
 import org.json.JSONObject
 import java.io.File
 
@@ -8,7 +10,7 @@ class ParaySessionStore(home: ParayHome) {
     private val file = home.checkShootSessionFile
 
     fun save(session: CheckShootPersistedSession) {
-        file.writeText(
+        file.writeTextAtomic(
             JSONObject()
                 .put("locked", session.locked)
                 .put("barcode", session.barcode)

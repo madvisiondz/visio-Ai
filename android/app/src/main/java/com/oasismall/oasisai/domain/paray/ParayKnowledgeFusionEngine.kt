@@ -1,5 +1,7 @@
 package com.oasismall.oasisai.domain.paray
 
+import com.oasismall.oasisai.util.writeTextAtomic
+
 import com.oasismall.oasisai.domain.transfer.ZipArchive
 import com.oasismall.oasisai.util.TaskProgress
 import org.json.JSONObject
@@ -200,7 +202,7 @@ class ParayKnowledgeFusionEngine(
                 }
             }
         }
-        if (!dryRun) home.learnIndexFile.writeText(merged.toString())
+        if (!dryRun) home.learnIndexFile.writeTextAtomic(merged.toString())
     }
 
     private fun mergeVisualIndex(
@@ -225,7 +227,7 @@ class ParayKnowledgeFusionEngine(
                 }
             }
         }
-        if (!dryRun) home.visualIndexFile.writeText(merged.toString())
+        if (!dryRun) home.visualIndexFile.writeTextAtomic(merged.toString())
     }
 
     private fun mergeBrandFamilyIndex(
@@ -250,7 +252,7 @@ class ParayKnowledgeFusionEngine(
                 }
             }
         }
-        if (!dryRun) home.brandFamilyIndexFile.writeText(merged.toString())
+        if (!dryRun) home.brandFamilyIndexFile.writeTextAtomic(merged.toString())
     }
 
     private fun mergeKnowledgeArticles(
@@ -301,7 +303,7 @@ class ParayKnowledgeFusionEngine(
                 }
             }
         }
-        if (!dryRun) localFile.writeText(merged.toString())
+        if (!dryRun) localFile.writeTextAtomic(merged.toString())
     }
 
     private fun mergeWorkflowPatterns(
@@ -355,7 +357,7 @@ class ParayKnowledgeFusionEngine(
             }
         }
         if (!dryRun) merged.put("features", outFeatures)
-        if (!dryRun) home.workflowPatternsFile.writeText(merged.toString())
+        if (!dryRun) home.workflowPatternsFile.writeTextAtomic(merged.toString())
     }
 
     private fun mergeFailurePatterns(
@@ -381,7 +383,7 @@ class ParayKnowledgeFusionEngine(
                 }
             }
         }
-        if (!dryRun) home.recognitionFailurePatternsFile.writeText(merged.toString())
+        if (!dryRun) home.recognitionFailurePatternsFile.writeTextAtomic(merged.toString())
     }
 
     private fun mergeSummaryFile(packageRoot: File, relativePath: String, localFile: File, fields: List<String>) {
@@ -389,7 +391,7 @@ class ParayKnowledgeFusionEngine(
         val local = readJson(localFile)
         val merged = if (local.length() == 0) imported else ParayFusionConflictResolver.mergeSummaryNumeric(local, imported, fields)
         localFile.parentFile?.mkdirs()
-        localFile.writeText(merged.toString(2))
+        localFile.writeTextAtomic(merged.toString(2))
     }
 
     private fun mergeObserverKnowledge(packageRoot: File) {
@@ -408,7 +410,7 @@ class ParayKnowledgeFusionEngine(
                 }
             }
         }
-        home.observerKnowledgeFile.writeText(merged.toString(2))
+        home.observerKnowledgeFile.writeTextAtomic(merged.toString(2))
     }
 
     private fun readJson(file: File): JSONObject =

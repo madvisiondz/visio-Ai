@@ -39,6 +39,9 @@ import com.oasismall.oasisai.util.BarcodeSuffixMatcher
 import com.oasismall.oasisai.util.NameNormalizer
 import com.oasismall.oasisai.util.SearchQuery
 import androidx.room.withTransaction
+import androidx.paging.Pager
+import androidx.paging.PagingConfig
+import androidx.paging.PagingData
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -167,6 +170,15 @@ class OasisRepository(
         }.filterByImportantRayon { it.rayon }
     }
 
+    fun pagerArticlesByRayon(rayon: String): Flow<PagingData<ArticleWithImage>> = Pager(
+        config = PagingConfig(
+            pageSize = 40,
+            initialLoadSize = 40,
+            enablePlaceholders = false,
+        ),
+        pagingSourceFactory = { db.articleDao().pagingWithImagesByRayon(rayon) },
+    ).flow
+
     private suspend fun buildSearchResults(
         articles: List<ArticleWithImage>,
         search: SearchQuery.SmartSearch,
@@ -230,6 +242,18 @@ class OasisRepository(
             .filter { SearchQuery.matches(it, search) }
             .sortedWith(compareBy({ SearchQuery.score(it, search) }, { it.designation }))
             .take(limit)
+    }
+
+    /** PARAY ticket mode — articles whose catalog price is near OCR price. */
+    suspend fun searchArticlesNearPrice(
+        targetPrice: Double,
+        tolerance: Double,
+        limit: Int = 35,
+    ): List<ArticleWithImage> {
+        if (targetPrice <= 0) return emptyList()
+        val min = (targetPrice - tolerance).coerceAtLeast(0.0)
+        val max = targetPrice + tolerance
+        return db.articleDao().searchNearPrice(targetPrice, min, max, limit)
     }
 
     /** VisioPRO — CSV price by barcode suffix (3 digits), exact designation, then keyword search. */
@@ -514,6 +538,10 @@ class OasisRepository(
 
     suspend fun getAllAlternateBarcodes(): List<ArticleAlternateBarcodeEntity> =
         db.articleAlternateBarcodeDao().getAll()
+
+    suspend fun getAlternateSubBarcodeSet(): Set<String> = withContext(Dispatchers.IO) {
+        db.articleAlternateBarcodeDao().getAllBarcodes().map { it.trim() }.toSet()
+    }
 
     /** True when barcode is the primary Gestium CSV barcode (not only an alternate link). */
     suspend fun isPrimaryGestiumBarcode(barcode: String): Boolean =
@@ -1191,6 +1219,7 @@ class OasisRepository(
             codeart = article?.codeart,
             lastPriceChangedAt = db.articlePriceHistoryDao().getLatestForArticle(articleId)?.changedAt,
             lastPrintedAt = db.printBatchDao().getLatestPrintAtForArticle(articleId),
+            lastPrintedPrice = db.printBatchDao().getLatestPriceSnapshotForArticle(articleId),
             subBarcodes = getAlternateBarcodesForArticle(articleId),
         )
     }
@@ -1453,6 +1482,7 @@ data class ArticlePanelMeta(
     val codeart: String? = null,
     val lastPriceChangedAt: Long? = null,
     val lastPrintedAt: Long? = null,
+    val lastPrintedPrice: Double? = null,
     val subBarcodes: List<SubBarcodeInfo> = emptyList(),
 )
 

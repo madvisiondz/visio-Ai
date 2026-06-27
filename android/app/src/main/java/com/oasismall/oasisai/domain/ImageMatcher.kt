@@ -405,10 +405,6 @@ class ImageMatcher(
         imagesDir.listFiles()
             ?.filter { it.isFile && it.extension.equals("png", true) }
             ?.forEach { file ->
-                val details = runCatching { PngMetadata.readArticleDetails(file) }.getOrDefault(
-                    PngMetadata.PngArticleDetails(),
-                )
-                if (details.parentBarcode != null && details.parentBarcode != parentBarcode) return@forEach
                 PngMetadata.parseSubVariantAltIndex(file.nameWithoutExtension, designationStem)?.let {
                     used.add(it)
                 }

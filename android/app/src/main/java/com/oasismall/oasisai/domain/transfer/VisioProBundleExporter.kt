@@ -28,6 +28,10 @@ class VisioProBundleExporter(
     private val catalogConfigStore: VisioProCatalogConfigStore,
     private val visioProStore: VisioProStore,
 ) {
+    companion object {
+        const val FORMAT_VERSION = 1
+    }
+
     suspend fun export(
         outputUri: Uri,
         onProgress: ((TaskProgress) -> Unit)? = null,
@@ -120,7 +124,7 @@ class VisioProBundleExporter(
 
             File(workDir, "manifest.json").writeText(
                 JSONObject()
-                    .put("formatVersion", 1)
+                    .put("formatVersion", FORMAT_VERSION)
                     .put("exportedAt", System.currentTimeMillis())
                     .put("categories", JSONArray(categories.map { it.name }))
                     .toString(2),

@@ -1,5 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <!-- Mall LAN server often uses HTTP. Use HTTPS in production when possible. -->
-    <base-config cleartextTrafficPermitted="true" />
+    <!-- Mall LAN phone sync uses HTTP to raw IPv4 (:8776); Android applies base-config to IP literals. -->
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <!-- Cloud APIs must use HTTPS even when base permits cleartext (mall LAN). -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">supabase.co</domain>
+    </domain-config>
+
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">localhost</domain>
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">10.0.2.2</domain>
+    </domain-config>
 </network-security-config>

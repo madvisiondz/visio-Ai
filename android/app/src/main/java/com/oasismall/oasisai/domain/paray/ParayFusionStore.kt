@@ -1,5 +1,7 @@
 package com.oasismall.oasisai.domain.paray
 
+import com.oasismall.oasisai.util.writeTextAtomic
+
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
@@ -26,7 +28,7 @@ class ParayFusionStore(private val home: ParayHome) {
 
     fun writeState(state: ParayFusionState) {
         stateFile.parentFile?.mkdirs()
-        stateFile.writeText(
+        stateFile.writeTextAtomic(
             JSONObject()
                 .put("deviceKnowledgeId", state.deviceKnowledgeId)
                 .put("lastExportAt", state.lastExportAt)
@@ -89,7 +91,7 @@ class ParayFusionStore(private val home: ParayHome) {
             )
         }
         historyFile.parentFile?.mkdirs()
-        historyFile.writeText(arr.toString(2))
+        historyFile.writeTextAtomic(arr.toString(2))
     }
 
     fun appendConflicts(conflicts: List<ParayFusionConflict>) {
@@ -107,7 +109,7 @@ class ParayFusionStore(private val home: ParayHome) {
             )
         }
         conflictsFile.parentFile?.mkdirs()
-        conflictsFile.writeText(arr.toString(2))
+        conflictsFile.writeTextAtomic(arr.toString(2))
     }
 
     fun readConflicts(): List<ParayFusionConflict> {

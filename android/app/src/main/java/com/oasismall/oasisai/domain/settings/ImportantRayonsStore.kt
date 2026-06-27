@@ -1,5 +1,7 @@
 package com.oasismall.oasisai.domain.settings
 
+import com.oasismall.oasisai.util.writeTextAtomic
+
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -42,7 +44,7 @@ class ImportantRayonsStore(context: Context) {
             root.put("configured", true)
             root.put("rayons", JSONArray(selectedRayons.sorted()))
             file.parentFile?.mkdirs()
-            file.writeText(root.toString(2))
+            file.writeTextAtomic(root.toString(2))
             _config.value = ImportantRayonsConfig(configured = true, selectedRayons = selectedRayons)
         }
     }

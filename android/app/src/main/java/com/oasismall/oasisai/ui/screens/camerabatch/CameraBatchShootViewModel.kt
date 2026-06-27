@@ -204,6 +204,27 @@ class CameraBatchShootViewModel(
         _subBarcodeConfirm.value = null
     }
 
+    fun linkSubBarcodeOnly() {
+        val pending = _subBarcodeConfirm.value ?: return
+        val parent = _parentArticle.value ?: return
+        _subBarcodeConfirm.value = null
+        viewModelScope.launch {
+            val err = repository.linkSubBarcodeToMainArticle(
+                articleId = parent.id,
+                mainBarcode = parent.barcode,
+                subBarcode = pending.scannedBarcode,
+                imagePath = parent.imagePath,
+            )
+            if (err != null) {
+                _message.value = err
+            } else {
+                val meta = repository.getArticlePanelMeta(parent.id)
+                _message.value = "Linked ${pending.scannedBarcode} — same look, alternate barcode"
+                _locked.value = _locked.value?.copy(subBarcodes = meta.subBarcodes)
+            }
+        }
+    }
+
     private suspend fun lockForSubBarcodeShoot(subBarcode: String) {
         val parent = _parentArticle.value ?: _pendingLinkParentId.value?.let { repository.getArticleWithImageById(it) }
             ?: return

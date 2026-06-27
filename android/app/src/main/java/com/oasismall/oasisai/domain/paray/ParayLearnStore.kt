@@ -1,5 +1,7 @@
 package com.oasismall.oasisai.domain.paray
 
+import com.oasismall.oasisai.util.writeTextAtomic
+
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -8,21 +10,43 @@ import java.io.File
 class ParayLearnStore(private val home: ParayHome) {
     private val indexFile = home.learnIndexFile
 
+    @Volatile
+    private var cachedRecords: List<ParayLearnRecord>? = null
+
+    @Volatile
+    private var cachedIndexMtime: Long = -1L
+
+    fun invalidateCache() {
+        cachedRecords = null
+        cachedIndexMtime = -1L
+    }
+
     fun get(articleId: Long): ParayLearnRecord? =
-        readRoot().optJSONObject(articleId.toString())?.let { fromJson(it) }
+        recordsByArticleId()[articleId]
 
     fun put(record: ParayLearnRecord) {
         val root = readRoot()
         root.put(record.articleId.toString(), toJson(record))
-        indexFile.writeText(root.toString())
+        indexFile.writeTextAtomic(root.toString())
+        invalidateCache()
     }
 
     fun allRecords(): List<ParayLearnRecord> {
+        val mtime = indexFile.takeIf { it.exists() }?.lastModified() ?: 0L
+        cachedRecords?.let { cached ->
+            if (mtime == cachedIndexMtime) return cached
+        }
         val root = readRoot()
-        return root.keys().asSequence().mapNotNull { key ->
+        val loaded = root.keys().asSequence().mapNotNull { key ->
             root.optJSONObject(key)?.let { fromJson(it) }
         }.toList()
+        cachedRecords = loaded
+        cachedIndexMtime = mtime
+        return loaded
     }
+
+    fun recordsByArticleId(): Map<Long, ParayLearnRecord> =
+        allRecords().associateBy { it.articleId }
 
     fun countByStatus(status: ParayLearnStatus): Int =
         allRecords().count { it.status == status }

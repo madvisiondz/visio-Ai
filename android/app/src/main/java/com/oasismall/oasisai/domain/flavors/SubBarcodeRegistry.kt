@@ -1,5 +1,7 @@
 package com.oasismall.oasisai.domain.flavors
 
+import com.oasismall.oasisai.util.writeTextAtomic
+
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -86,7 +88,7 @@ class SubBarcodeRegistry(context: Context) {
             put("entries", arr)
         }
         file.parentFile?.mkdirs()
-        file.writeText(root.toString(2))
+        file.writeTextAtomic(root.toString(2))
     }
 
     companion object {

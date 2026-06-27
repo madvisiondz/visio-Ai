@@ -7,6 +7,8 @@ enum class ParayRecognitionEventType {
     MANUAL_CORRECTION,
     PACKAGING_DRIFT,
     UNKNOWN_BARCODE,
+    TICKET_VERIFY_SCAN,
+    TICKET_VERIFIED,
 }
 
 /** Lightweight observation — no images, frames, user text, or personal data. */

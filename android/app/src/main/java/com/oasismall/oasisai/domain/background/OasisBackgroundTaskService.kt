@@ -99,8 +99,9 @@ class OasisBackgroundTaskService : Service() {
                     OasisBackgroundTaskKind.EXPORT_FULL_BACKUP -> {
                         val outputUri = uri ?: error("No save location chosen")
                         val result = app.deviceBackupExporter.exportFullBackup(outputUri) { report(manager, it) }
+                        val encNote = if (result.encrypted) " (AES-256 encrypted)" else ""
                         manager.markSuccess(
-                            "Backup saved as ${result.zipFileName} — ${result.articleCount} articles, ${result.fileCount} files.",
+                            "Backup saved as ${result.zipFileName}$encNote — ${result.articleCount} articles, ${result.fileCount} files.",
                         )
                     }
                     OasisBackgroundTaskKind.IMPORT_FULL_BACKUP -> {
@@ -115,6 +116,13 @@ class OasisBackgroundTaskService : Service() {
                         val result = app.visioProBundleExporter.export(outputUri) { report(manager, it) }
                         manager.markSuccess(
                             "VisioPRO saved as ${result.zipFileName} (${result.categoryCount} sections, ${result.imageCount} images).",
+                        )
+                    }
+                    OasisBackgroundTaskKind.IMPORT_VISIOPRO_BUNDLE -> {
+                        val inputUri = uri ?: error("No VisioPRO bundle chosen")
+                        val result = app.visioProBundleImporter.importFromUri(inputUri) { report(manager, it) }
+                        manager.markSuccess(
+                            "VisioPRO restored — ${result.categoryCount} sections, ${result.imageCount} files.",
                         )
                     }
                     OasisBackgroundTaskKind.PURGE_GESTIUM -> {

@@ -1,5 +1,7 @@
 package com.oasismall.oasisai.domain.paray
 
+import com.oasismall.oasisai.util.writeTextAtomic
+
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -53,7 +55,7 @@ class ParayKnowledgeStore(private val home: ParayHome) {
                     .put("observedAt", record.observedAt),
             )
         }
-        stateFile.writeText(
+        stateFile.writeTextAtomic(
             JSONObject()
                 .put("lastProcessedImportId", state.lastProcessedImportId)
                 .put("lastSummaryRefresh", state.lastSummaryRefresh)
@@ -77,7 +79,7 @@ class ParayKnowledgeStore(private val home: ParayHome) {
         articlesFile.parentFile?.mkdirs()
         val root = JSONObject()
         articles.forEach { (id, article) -> root.put(id.toString(), articleToJson(article)) }
-        articlesFile.writeText(root.toString())
+        articlesFile.writeTextAtomic(root.toString())
     }
 
     fun readBrandSummaries(): MutableMap<String, ParayBrandKnowledgeSummary> =
@@ -151,7 +153,7 @@ class ParayKnowledgeStore(private val home: ParayHome) {
 
     fun writeSummary(summary: ParayKnowledgeSummary) {
         summaryFile.parentFile?.mkdirs()
-        summaryFile.writeText(
+        summaryFile.writeTextAtomic(
             JSONObject()
                 .put("totalArticles", summary.totalArticles)
                 .put("totalBrands", summary.totalBrands)
@@ -260,7 +262,7 @@ class ParayKnowledgeStore(private val home: ParayHome) {
         file.parentFile?.mkdirs()
         val root = JSONObject()
         items.forEach { (key, value) -> root.put(key, toJson(value)) }
-        file.writeText(root.toString())
+        file.writeTextAtomic(root.toString())
     }
 
     companion object {

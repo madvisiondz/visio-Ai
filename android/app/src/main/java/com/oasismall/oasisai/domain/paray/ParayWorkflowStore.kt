@@ -1,5 +1,7 @@
 package com.oasismall.oasisai.domain.paray
 
+import com.oasismall.oasisai.util.writeTextAtomic
+
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -55,7 +57,7 @@ class ParayWorkflowStore(private val home: ParayHome) {
                     .put("averageDurationMs", entry.averageDurationMs),
             )
         }
-        screenUsageFile.writeText(
+        screenUsageFile.writeTextAtomic(
             JSONObject()
                 .put("screens", root)
                 .put("updatedAt", System.currentTimeMillis())
@@ -147,7 +149,7 @@ class ParayWorkflowStore(private val home: ParayHome) {
         state.features.forEach { (feature, count) ->
             features.put(feature.name, count)
         }
-        patternsFile.writeText(
+        patternsFile.writeTextAtomic(
             JSONObject()
                 .put("transitions", transitions)
                 .put("sequences", sequences)
@@ -213,7 +215,7 @@ class ParayWorkflowStore(private val home: ParayHome) {
                 .put("screen", it.screen)
                 .put("averageDurationMs", it.averageDurationMs)
         }
-        summaryFile.writeText(
+        summaryFile.writeTextAtomic(
             JSONObject()
                 .put("topScreens", topScreens)
                 .put("topFeatures", topFeatures)
@@ -315,7 +317,7 @@ class ParayWorkflowStore(private val home: ParayHome) {
         if (!eventsFile.exists()) return
         val lines = eventsFile.readLines()
         if (lines.size <= MAX_EVENT_LINES) return
-        eventsFile.writeText(lines.takeLast(MAX_EVENT_LINES).joinToString("\n") + "\n")
+        eventsFile.writeTextAtomic(lines.takeLast(MAX_EVENT_LINES).joinToString("\n") + "\n")
     }
 
     private fun confidenceFromString(value: String): ParayWorkflowConfidence =

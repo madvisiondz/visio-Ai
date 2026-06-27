@@ -1,5 +1,7 @@
 package com.oasismall.oasisai.domain.paray
 
+import com.oasismall.oasisai.util.writeTextAtomic
+
 import android.content.Context
 import org.json.JSONObject
 import java.io.File
@@ -49,6 +51,7 @@ class ParayHome(private val context: Context) {
     val workflowPatternsFile: File = File(workflowsDir, "workflow_patterns.json")
     val workflowSummaryFile: File = File(workflowsDir, "workflow_summary.json")
     val workflowScreenUsageFile: File = File(workflowsDir, "screen_usage.json")
+    val ticketEventsFile: File = File(workflowsDir, "ticket_events.jsonl")
     val recognitionDir: File = File(root, "recognition").also { it.mkdirs() }
     val recognitionEventsFile: File = File(recognitionDir, "recognition_events.jsonl")
     val recognitionUnknownProductsFile: File = File(recognitionDir, "unknown_products.json")
@@ -93,7 +96,7 @@ class ParayHome(private val context: Context) {
             lastVisitAt = System.currentTimeMillis(),
             lastWorkplace = lastWorkplace ?: existing.lastWorkplace,
         )
-        officeLinkFile.writeText(
+        officeLinkFile.writeTextAtomic(
             JSONObject()
                 .put("oasisApp", updated.oasisApp)
                 .put("lastVisitAt", updated.lastVisitAt)
@@ -128,7 +131,7 @@ class ParayHome(private val context: Context) {
     )
 
     private fun writeManifest(m: ParayManifest) {
-        manifestFile.writeText(
+        manifestFile.writeTextAtomic(
             JSONObject()
                 .put("agentName", m.agentName)
                 .put("version", m.version)

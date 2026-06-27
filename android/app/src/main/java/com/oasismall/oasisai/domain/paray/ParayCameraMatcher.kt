@@ -23,7 +23,7 @@ class ParayCameraMatcher(
         }
         val probe = VisualFeatureExtractor.extract(bitmap, content)
         val records = index.allSignatures()
-        val learned = learnStore.allRecords().associateBy { it.articleId }
+        val learned = learnStore.recordsByArticleId()
         val embeddings = fingerprintStore.allEmbeddings().associate { it.first to it.second }
 
         if (records.isEmpty() && learned.isEmpty()) return emptyList()

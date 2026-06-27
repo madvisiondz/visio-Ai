@@ -1,11 +1,13 @@
 package com.oasismall.oasisai.ui.screens.cart
 
 import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.oasismall.oasisai.data.db.dao.PreselectionWithArticle
 import com.oasismall.oasisai.data.model.CartType
 import com.oasismall.oasisai.data.repository.OasisRepository
+import com.oasismall.oasisai.domain.GalleryPngAssignService
 import com.oasismall.oasisai.util.ExportShareHelper
 import com.oasismall.oasisai.util.PngShareHelper
 import com.oasismall.oasisai.util.PriceFormatter
@@ -21,6 +23,7 @@ import kotlinx.coroutines.launch
 class CartViewModel(
     val cartType: CartType,
     private val repository: OasisRepository,
+    private val galleryPngAssign: GalleryPngAssignService,
 ) : ViewModel() {
     val items = repository.observeCart(cartType)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -56,6 +59,17 @@ class CartViewModel(
     fun clear() {
         _selectedPreselectionIds.value = emptySet()
         viewModelScope.launch { repository.clearCart(cartType) }
+    }
+
+    fun assignPng(uri: Uri, articleId: Long, variantBarcode: String?) {
+        viewModelScope.launch {
+            val sub = variantBarcode?.trim()?.takeIf { it.isNotBlank() }
+            galleryPngAssign.assignPngToArticle(uri, articleId, sub, cartType)
+                .fold(
+                    onSuccess = { _message.value = it },
+                    onFailure = { e -> _message.value = e.message ?: "Could not assign PNG" },
+                )
+        }
     }
 
     fun markSelectedSent() {

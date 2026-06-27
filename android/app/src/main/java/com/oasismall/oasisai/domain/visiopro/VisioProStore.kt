@@ -1,5 +1,7 @@
 package com.oasismall.oasisai.domain.visiopro
 
+import com.oasismall.oasisai.util.writeTextAtomic
+
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -191,7 +193,7 @@ class VisioProStore(context: Context) {
 
     private fun writeRoot(root: JSONObject) {
         file.parentFile?.mkdirs()
-        file.writeText(root.toString(2))
+        file.writeTextAtomic(root.toString(2))
     }
 
     private fun readPrintQueue(root: JSONObject): List<String> {

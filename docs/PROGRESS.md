@@ -2,6 +2,192 @@
 
 > What has been built. Update at end of each work session.
 
+## 2026-06-14 — Visio Ai v2.32.1 Ticket camera + crop fix
+
+- [x] **YUV stride fix** — `CameraFrameUtils.yuv420888ToNv21` copies luma/chroma with row/pixel stride (fixes vertical stripe / stretched crop preview)
+- [x] **Best back camera** — `bestBackCameraSelector()` picks largest sensor + standard focal length (not ultrawide/macro)
+- [x] **High-res Ticket mode** — up to 4K analysis + JPEG quality 95; faster buffer interval (150ms)
+- [x] **Warm-block guard** — reject narrow vertical blobs; edge-density penalty on desk grain false positives
+- [x] **Crop preview UI** — aspect-ratio locked preview in progress panel
+- [x] APK **2.32.1** (329) → `VisioAI-debug.apk`
+
+---
+
+## 2026-06-14 — Visio Ai v2.31.0 Ticket tap-to-capture
+
+- [x] **Tap to shoot** — tap camera screen captures photo instantly (replaces hold-to-snap)
+- [x] **Rayon filter removed** — no picker, no soft rayon boost; matches any aisle
+- [x] **Fusion weights** — designation 50%, price 30%, catalog PNG 20%
+- [x] Simple status bar + shutter button overlay
+- [x] APK **2.31.0** (325)
+
+---
+
+## 2026-06-14 — Visio Ai v2.30.0 PARAY Vision stabilization
+
+- [x] **Ring buffer** — `TicketCameraBuffer` keeps 6 recent frames; `takeBestSnap()` picks sharpest + yellow signal
+- [x] **Frame quality** — `ParayTicketFrameQuality` Laplacian sharpness + yellow presence; live meter on hold overlay
+- [x] **Recovery** — boosted contrast/saturation pass (`boostForRecovery`); alternate-frame retry in ViewModel
+- [x] **Match tiers** — Confirmed / High / Probable (`ParayTicketMatchTier`); badge on card + progress panel
+- [x] **Anti-flip** — `ParayTicketSnapStabilizer` debounces rapid article switches on weak matches
+- [x] **Haptics** — `TicketSnapHaptics` on hold complete, match tier, failure
+- [x] **PARAY Vision UX** — freeze-frame preview, branded overlay, tier on `TicketVerifyBanner`
+- [x] APK **2.30.0** (324)
+
+---
+
+## 2026-06-14 — Visio Ai v2.29.0 Ticket snap production optimization
+
+- [x] **Parallel pipeline** — OCR on yellow crop + PARAY visual identify run concurrently
+- [x] **Single visual pass** — `visualHints` map reused in fuzzy scoring (removed per-candidate `identifyFromCamera`)
+- [x] **Fast OCR** — enhanced pass first; fallback only if confidence < 88%
+- [x] **Memory** — camera buffer downscaled to 1280px; stale frame rejection; preview capped at 280px
+- [x] **Yellow detect** — center ROI first, full-frame fallback; coarser sample step
+- [x] **Catalog PNG decode** — `inSampleSize` for image similarity (no full-res loads)
+- [x] **Cancellable** — snap job cancelled on unlock/mode switch; UI step throttle 45ms
+- [x] **Metrics** — `ParayTicketSnapMetrics` logged to `Oasis/Paray`; warn if > 4s
+- [x] APK **2.29.0** (323)
+
+---
+
+## 2026-06-14 — Visio Ai v2.28.0 Ticket hold-to-snap
+
+- [x] Replaced continuous live OCR with **hold-to-snap** — user holds on camera ~0.75s → single frame capture
+- [x] `ParayTicketReader.processSnap()` — step callbacks: capture → yellow crop → OCR → PNG crop → fuzzy match
+- [x] `TicketSnapProgressPanel` — shows each step + crop previews + match %
+- [x] `TicketCameraBuffer` — latest frame only (no background OCR load)
+- [x] APK **2.28.0** (322)
+
+---
+
+## 2026-06-14 — Visio Ai v2.27.1 Ticket OCR pipeline fix
+
+- [x] **Critical fix** — rotate camera bitmap to upright *before* yellow-block detect + OCR (was passing sensor rotation to cropped region → ML Kit read garbage)
+- [x] **High-end OCR** — 720px upscale, contrast boost, dual-pass ML Kit; price regex + line-height parsing for magenta price
+- [x] **Catalog** — `searchArticlesNearPrice()` for 290 DA-style matches; Levenshtein token fuzzy (FLECHA ↔ FLECHE)
+- [x] **Live overlay** — ticket mode shows read status on camera; debug builds show `Logcat: Oasis/Paray`
+- [x] Camera 1080p analysis frames @ 850ms; APK **2.27.1** (321)
+
+---
+
+## 2026-06-14 — Visio Ai v2.27.0 Ticket fuzzy fusion
+
+- [x] **`ParayTicketFuzzyMatcher`** — designation (42%) + price (32%) + ticket PNG (26%); rayon is soft preference only (+5% boost, never blocks)
+- [x] Product crop left of yellow block (`ParayShelfYellowDetector.productRectLeftOf`) — handles small/foggy printed PNG on shelf tickets
+- [x] Candidate pool: designation search, token search, price proximity, PARAY visual index on crop
+- [x] Article card shows **PARAY X%** + breakdown (text · price · PNG); rayon picker labeled “matches any rayon”
+- [x] APK **2.27.0** (320)
+
+---
+
+## 2026-06-27 — Visio Ai v2.26.2 Ticket mode UX polish
+
+- [x] Fixed AGENT header — `Column` layout (mode chips + rayon bar no longer overlap in `Box`)
+- [x] Scrollable rayon picker — `ModalBottomSheet` + search + `LazyColumn`
+- [x] Stable ticket walk status — single-flight OCR, delayed spinner, camera pauses while picker open
+- [x] APK **2.26.2** (319)
+
+---
+
+## 2026-06-27 — Visio Ai v2.26.1 Ticket camera OCR
+
+- [x] **Live ticket read** — yellow block detection (#FFE500) + ML Kit OCR on designation/price
+- [x] `ParayTicketReader` / `ParayShelfYellowDetector` / `ParayTicketOcr` — PARAY-owned; catalog match by designation or barcode
+- [x] AGENT Ticket mode: walk aisle with camera → card opens like barcode scan; optional **Pick rayon** filter
+- [x] APK **2.26.1** (318)
+
+---
+
+## 2026-06-27 — Visio Ai v2.26.0 Rayon + AGENT Ticket verify
+
+- [x] `ArticleRayonLine` on `ArticleCard`, `ArticleActionPanel`, import change cards, camera batch match picker
+- [x] AGENT **Ticket** mode (`AgentCaptureMode.TICKET`) — scan shelf barcode → auto-lock → PARAY verdict
+- [x] `ParayTicketAdvisor` + `ParayTicketStore` — catalog vs last print snapshot; audit log in `paray_home/workflows/ticket_events.jsonl`
+- [x] Recognition events `TICKET_VERIFY_SCAN` / `TICKET_VERIFIED`; workflow feature `TICKET_VERIFY`
+- [x] APK **2.26.0** (317)
+
+---
+
+## 2026-06-27 — Visio Ai v2.25.1 CSV import performance
+
+- [x] Removed automatic `syncSubPngsFromMetadata` from CSV import (was ~5 min with flavor PNGs)
+- [x] Sub-barcode barcodes excluded from “removed from catalog” detection
+- [x] `SubBarcodeFlavorService` optimized (cached alt indices, skip already-linked, no upfront cache wipe)
+- [x] Removed dead `ScanResultPanel`; clearer import preview progress labels
+- [x] APK **2.25.1** (315)
+
+---
+
+## 2026-06-27 — Visio Ai v2.25.0 UX & options standardization
+
+- [x] `ArticleActionMenu` + `ArticleCompactActionRow` — shared presets for Home, Cart, AGENT, Scanner, Detail
+- [x] AGENT: smart barcode trust (catalog = 2 reads, same-article misread ignored); scan continues while card preview open
+- [x] AGENT: long-press 1s to lock; swipe ←/→ to unlock; auto-unlock after cart actions; removed "Dismiss — keep scanning"
+- [x] `VisioProBundleImporter` + Settings **Import VisioPRO presets** (format v1, export-compatible)
+- [x] APK **2.25.0** (314)
+
+---
+
+## 2026-06-27 — Visio Ai v2.24.0 Phase C polish
+
+- [x] Hilt — `@HiltAndroidApp`, `OasisDatabaseModule` (DB, repository, registries, backup security)
+- [x] `AtomicJsonWriter` — all PARAY/registries/settings JSON persistence
+- [x] `network_security_config.xml` — Supabase HTTPS-only; mall LAN cleartext for phone sync
+- [x] Optional backup AES-256-GCM encryption (Settings toggle + password)
+- [x] `LocalCrashReporter` + release log hook (Crashlytics deferred)
+- [x] Unit tests: `AtomicJsonWriterTest`, `BackupCryptoTest`
+- [x] APK **2.24.0** (313)
+
+---
+
+## 2026-06-27 — Visio Ai v2.23.1 Phase B scale & performance
+
+- [x] Home rayon browse — Paging 3 (40/page, gallery-first sort)
+- [x] PARAY learn index memory cache; PhotoRoom index single-flight + 24h TTL
+- [x] Design render single-flight
+- [x] APK **2.23.1** (312)
+
+---
+
+## 2026-06-27 — Visio Ai v2.23.0 Phase A production hardening
+
+- [x] `fallbackToDestructiveMigration(false)` — DB never silently wiped on upgrade
+- [x] `OasisDatabaseMigrations.kt` + Room schema export (`schemas/.../18.json`)
+- [x] Migration instrumented tests (16→17 rayon backfill, 17→18 print snapshots)
+- [x] Release R8 + ProGuard rules; optional release signing in `local.properties`
+- [x] Debug APK suffix `.debug` for side-by-side install
+- [x] Timber + `OasisLog` (Import, Share, Database, …)
+- [x] Unit tests: `PngShareHelperTest`, `ImportCatalogMapsTest`
+- [x] `testDebugUnitTest` + `assembleRelease` SUCCESS — APK **2.23.0** (311)
+
+---
+
+## 2026-06-14 — Visio Ai v2.22.3 Telegram spaced filenames (real fix)
+
+- [x] Telegram reads FileProvider DISPLAY_NAME from `.oasis` cache file — spaced designation + index on cache filename
+- [x] Fallback: spaced designation from PNG metadata when DB value is compact
+- [x] APK **2.22.3** (code 310)
+
+---
+
+## 2026-06-14 — Visio Ai v2.22.2 Telegram sub-barcode share fix
+
+- [x] **PngShareHelper** — unique export filename per variant PNG (`PommesGolden1.png`, …); was overwriting cache with same `DESIGNATION.png`
+- [x] **compileDebugKotlin SUCCESS** — APK **2.22.2** (code 309)
+
+---
+
+## 2026-06-14 — Visio Ai v2.22.1 PNG assign + import perf + sub-barcode flow
+
+- [x] Fast PNG metadata append (no full-file rewrite on fresh imports)
+- [x] PhotoRoom import perf fixes (skip IDAT reads, IO matching, no rescan per import)
+- [x] **Add PNG image** on article detail, AGENT, To shoot, To share, Articles search cards
+- [x] Sub-barcode flow: scan → **Shoot flavor photo** OR **Link barcode only**
+- [x] `GalleryPngAssignService` — pick PNG → gallery + cart
+- [x] **compileDebugKotlin SUCCESS** — APK **2.22.1** (code 308)
+
+---
+
 ## 2026-06-14 — Visio Ai v2.22.0 PARAY Knowledge Fusion Phase 5
 
 - [x] PKP format (`.pkp.zip`) — memory, knowledge, workflows, recognition, observer JSON only

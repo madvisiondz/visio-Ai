@@ -5,4 +5,6 @@ enum class AgentCaptureMode {
     SMART,
     /** Mall bulk shoot: barcode only, replace or skip, bulk_captures DB. */
     BULK,
+    /** Shelf ticket walk: live camera reads yellow ticket designation + barcode → catalog card. */
+    TICKET,
 }

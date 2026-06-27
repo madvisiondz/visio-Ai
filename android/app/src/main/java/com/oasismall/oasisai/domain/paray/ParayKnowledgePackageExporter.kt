@@ -1,5 +1,7 @@
 package com.oasismall.oasisai.domain.paray
 
+import com.oasismall.oasisai.util.writeTextAtomic
+
 import com.oasismall.oasisai.BuildConfig
 import com.oasismall.oasisai.domain.transfer.ZipArchive
 import com.oasismall.oasisai.util.TaskProgress
@@ -71,7 +73,7 @@ class ParayKnowledgePackageExporter(
                 source.copyTo(dest, overwrite = true)
                 knowledgeCount += countJsonKeys(dest)
             } else {
-                dest.writeText("{}")
+                dest.writeTextAtomic("{}")
             }
         }
 
@@ -84,7 +86,7 @@ class ParayKnowledgePackageExporter(
             deviceKnowledgeId = deviceId,
             exportType = ParayKnowledgePackage.EXPORT_TYPE,
         )
-        File(workDir, ParayKnowledgePackage.MANIFEST_FILE).writeText(manifestToJson(manifest).toString(2))
+        File(workDir, ParayKnowledgePackage.MANIFEST_FILE).writeTextAtomic(manifestToJson(manifest).toString(2))
 
         onProgress?.invoke(TaskProgress("Building PKP package", 60))
         val zipFile = File(cacheDir, fileName)

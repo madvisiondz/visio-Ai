@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
@@ -22,13 +23,21 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import com.oasismall.oasisai.ui.components.ArticleActionContext
+import com.oasismall.oasisai.ui.components.ArticleActionHandlers
+import com.oasismall.oasisai.ui.components.ArticleCard
+import com.oasismall.oasisai.ui.components.ArticleCompactActionRow
+import com.oasismall.oasisai.ui.components.rememberAssignPngPicker
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemKey
 import com.oasismall.oasisai.data.db.dao.ArticleWithImage
-import com.oasismall.oasisai.ui.components.ArticleCard
-import com.oasismall.oasisai.ui.components.OpenCameraBatchButton
 import com.oasismall.oasisai.util.hasAppGalleryImage
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -42,10 +51,18 @@ fun HomeScreen(
     val selectedRayon by viewModel.selectedRayon.collectAsStateWithLifecycle()
     val rayons by viewModel.rayons.collectAsStateWithLifecycle()
     val result by viewModel.searchResult.collectAsStateWithLifecycle()
+    val rayonPaging = viewModel.rayonArticles.collectAsLazyPagingItems()
     val shareCount by viewModel.shareCartCount.collectAsStateWithLifecycle()
     val shootCount by viewModel.photoshootCartCount.collectAsStateWithLifecycle()
+    val homeMessage by viewModel.message.collectAsStateWithLifecycle()
+    var assignArticleId by remember { mutableLongStateOf(0L) }
+    val launchAssignPng = rememberAssignPngPicker { uri ->
+        if (assignArticleId > 0L) viewModel.assignPng(uri, assignArticleId)
+    }
 
-    val showResults = query.isNotBlank() || selectedRayon != null
+    val useRayonPaging = selectedRayon != null && query.isBlank()
+    val useSearchResults = query.isNotBlank()
+    val showResults = useRayonPaging || useSearchResults
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("Articles") }) },
@@ -108,9 +125,9 @@ fun HomeScreen(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                     style = MaterialTheme.typography.labelMedium,
                 )
-            } else if (selectedRayon != null && query.isBlank()) {
+            } else if (useRayonPaging) {
                 Text(
-                    "${result.total} article(s) · $selectedRayon — saisissez un nom pour affiner",
+                    "Parcourir $selectedRayon — photos en premier, défilez pour charger la suite",
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                     style = MaterialTheme.typography.labelMedium,
                 )
@@ -121,7 +138,43 @@ fun HomeScreen(
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                if (showResults) {
+                if (useRayonPaging) {
+                    if (rayonPaging.loadState.refresh is androidx.paging.LoadState.Loading) {
+                        item {
+                            CircularProgressIndicator(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                            )
+                        }
+                    }
+                    items(
+                        count = rayonPaging.itemCount,
+                        key = rayonPaging.itemKey { "rayon_${it.id}_${it.barcode}" },
+                    ) { index ->
+                        val article = rayonPaging[index] ?: return@items
+                        HomeArticleRow(
+                            article = article,
+                            canShare = article.hasAppGalleryImage(),
+                            onArticleClick = onArticleClick,
+                            onShare = { viewModel.addToShareCart(article.id, article.barcode) },
+                            onShoot = { viewModel.addToPhotoshootCart(article.id, article.barcode) },
+                            onOpenCameraBatch = onOpenCameraBatch,
+                            onAssignPng = {
+                                assignArticleId = article.id
+                                launchAssignPng()
+                            },
+                        )
+                    }
+                    if (rayonPaging.loadState.append.endOfPaginationReached && rayonPaging.itemCount == 0) {
+                        item {
+                            Text(
+                                "Aucun article dans ce rayon.",
+                                modifier = Modifier.padding(vertical = 16.dp),
+                            )
+                        }
+                    }
+                } else if (useSearchResults) {
                     item {
                         Text(
                             "${result.total} résultat(s)",
@@ -138,6 +191,10 @@ fun HomeScreen(
                                 onArticleClick = onArticleClick,
                                 onShare = { viewModel.addToShareCart(article.id, article.barcode) },
                                 onOpenCameraBatch = onOpenCameraBatch,
+                                onAssignPng = {
+                                    assignArticleId = article.id
+                                    launchAssignPng()
+                                },
                             )
                         }
                     }
@@ -151,18 +208,18 @@ fun HomeScreen(
                                 onShare = { viewModel.addToShareCart(article.id, article.barcode) },
                                 onShoot = { viewModel.addToPhotoshootCart(article.id, article.barcode) },
                                 onOpenCameraBatch = onOpenCameraBatch,
+                                onAssignPng = {
+                                    assignArticleId = article.id
+                                    launchAssignPng()
+                                },
                             )
                         }
                     }
                     if (result.total == 0) {
                         item {
                             Text(
-                                if (query.isNotBlank()) {
-                                    "Aucun article pour « $query »" +
-                                        (selectedRayon?.let { " dans $it" } ?: "")
-                                } else {
-                                    "Aucun article dans ce rayon."
-                                },
+                                "Aucun article pour « $query »" +
+                                    (selectedRayon?.let { " dans $it" } ?: ""),
                                 modifier = Modifier.padding(vertical = 16.dp),
                             )
                         }
@@ -197,24 +254,20 @@ private fun HomeArticleRow(
     onShare: () -> Unit,
     onOpenCameraBatch: (Long?) -> Unit,
     onShoot: (() -> Unit)? = null,
+    onAssignPng: (() -> Unit)? = null,
 ) {
-    val shareEnabled = canShare && article.hasAppGalleryImage()
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         ArticleCard(article = article, onClick = { onArticleClick(article.id) })
-        if (onShoot != null && !article.hasAppGalleryImage()) {
-            Button(onClick = onShoot, modifier = Modifier.fillMaxWidth()) {
-                Text("Ajouter à To shoot")
-            }
-        }
-        OpenCameraBatchButton(onClick = onOpenCameraBatch, articleId = article.id)
-        Button(
-            onClick = onShare,
-            enabled = shareEnabled,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(
-                if (shareEnabled) "Ajouter à To share" else "To share (sans image — AGENT)",
-            )
-        }
+        ArticleCompactActionRow(
+            article = article,
+            context = ArticleActionContext.HOME_LIST,
+            canShare = canShare,
+            handlers = ArticleActionHandlers(
+                onAssignPng = onAssignPng,
+                onOpenCameraBatch = onOpenCameraBatch,
+                onAddToShare = onShare,
+                onAddToShoot = onShoot,
+            ),
+        )
     }
 }

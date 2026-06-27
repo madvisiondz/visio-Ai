@@ -4,9 +4,11 @@ import android.content.Context
 import android.net.Uri
 import com.oasismall.oasisai.BuildConfig
 import com.oasismall.oasisai.data.repository.OasisRepository
+import com.oasismall.oasisai.domain.settings.BackupSecurityStore
 import com.oasismall.oasisai.domain.visiopro.VisioProCatalogConfigStore
 import com.oasismall.oasisai.domain.visiopro.VisioProCategory
 import com.oasismall.oasisai.util.TaskProgress
+import com.oasismall.oasisai.util.writeTextAtomic
 import org.json.JSONObject
 import java.io.File
 import java.text.SimpleDateFormat
@@ -18,12 +20,14 @@ data class DeviceBackupExportResult(
     val zipFileName: String,
     val fileCount: Int,
     val articleCount: Int,
+    val encrypted: Boolean = false,
 )
 
 class DeviceBackupExporter(
     private val context: Context,
     private val repository: OasisRepository,
     private val visioProCatalogConfigStore: VisioProCatalogConfigStore,
+    private val backupSecurityStore: BackupSecurityStore,
 ) {
     suspend fun exportFullBackup(
         outputUri: Uri,
@@ -43,7 +47,7 @@ class DeviceBackupExporter(
         onProgress?.invoke(TaskProgress("Exporting database", 5))
         val tables = repository.exportDatabaseTables()
         val databaseJson = BackupEntityJson.writeDatabase(tables, filesDir)
-        File(workDir, "database.json").writeText(databaseJson.toString(2))
+        File(workDir, "database.json").writeTextAtomic(databaseJson.toString(2))
 
         onProgress?.invoke(TaskProgress("Exporting settings", 15))
         val settingsDir = File(workDir, "settings").apply { mkdirs() }
@@ -72,7 +76,7 @@ class DeviceBackupExporter(
             put("pngCount", File(filesRoot, "product_images").listFiles()?.count { it.extension.equals("png", true) } ?: 0)
             put("fileDirs", JSONArrayString(BACKUP_FILE_DIRS))
         }
-        File(workDir, "manifest.json").writeText(manifest.toString(2))
+        File(workDir, "manifest.json").writeTextAtomic(manifest.toString(2))
 
         onProgress?.invoke(TaskProgress("Creating ZIP archive", 70))
         ZipArchive.zipDirectory(workDir, zipCache) { progress ->
@@ -81,8 +85,21 @@ class DeviceBackupExporter(
         }
         workDir.deleteRecursively()
 
+        val outputZip = if (backupSecurityStore.isEncryptionEnabled()) {
+            val password = backupSecurityStore.getPassword()?.toCharArray()
+                ?: error("Backup encryption is enabled but no password is set in Settings")
+            onProgress?.invoke(TaskProgress("Encrypting backup", 94))
+            val encrypted = File(context.cacheDir, "$zipName.enc")
+            BackupCrypto.encrypt(zipCache, encrypted, password)
+            password.fill('\u0000')
+            zipCache.delete()
+            encrypted
+        } else {
+            zipCache
+        }
+
         onProgress?.invoke(TaskProgress("Saving to chosen location", 96))
-        UserExportStorage.copyFileToUri(context, zipCache, outputUri)
+        UserExportStorage.copyFileToUri(context, outputZip, outputUri)
 
         onProgress?.invoke(TaskProgress("Backup complete", 100))
         return DeviceBackupExportResult(
@@ -90,10 +107,12 @@ class DeviceBackupExporter(
             zipFileName = zipName,
             fileCount = copiedFiles,
             articleCount = tables.articles.size,
+            encrypted = backupSecurityStore.isEncryptionEnabled(),
         )
         } finally {
             workDir.deleteRecursively()
             zipCache.delete()
+            File(context.cacheDir, "$zipName.enc").delete()
         }
     }
 
@@ -116,7 +135,7 @@ class DeviceBackupExporter(
                 )
             }
         }
-        File(settingsDir, "visio_pro_catalog_barcodes.json").writeText(root.toString(2))
+        File(settingsDir, "visio_pro_catalog_barcodes.json").writeTextAtomic(root.toString(2))
     }
 
     companion object {

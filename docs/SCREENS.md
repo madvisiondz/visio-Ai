@@ -9,7 +9,7 @@
 | VisioPRO list settings | `visio_pro_settings` → `visio_pro_list/{category}` | Done | Full rayon pool after each CSV import · pending badge · resume refresh |
 | VisioPRO category | `visio_pro/{category}` | Done | **Full article list** + search · checkbox selection · **Exporter sélection** (PNG per card) · inline prix · tap row → bottom sheet · **Désignation AR** + swipe card for prev/next |
 | VisioPRO list editor | `visio_pro_list/{category}` | Done | **Enregistrer** fixed top-right · order sheet no drag-dismiss · live order draft |
-| Home / Articles | `home` | Done | **Rayon filter** (Gestium **Rayon** column — Boucherie, Boissons, Confiserie, …) · search scoped to filter · smart search |
+| Home / Articles | `home` | Done | **Rayon filter** (Gestium **Rayon** column — Boucherie, Boissons, Confiserie, …) · search scoped to filter · smart search · **Add PNG image** per result row |
 | PARAY Memory tab | `paray` tab 2 | Done | Browse `learn_index.json`; search/filter; side progress (v2.20.2) |
 | PARAY Knowledge tab | `paray` tab 3 | Done | Cached `knowledge_summary.json` + `knowledge_articles.json`; rollups + recently learned (v2.20.3) |
 | PARAY Statistics tab | `paray` tab 4 | Done | Learning/knowledge/workflow KPIs from cached JSON; coverage bar + trend (v2.20.4) |
@@ -22,15 +22,15 @@
 | Import Center | `import` | Done | From Settings; CSV picker, preview (scoped to **Rayons importants** when set), Confirm/Cancel — **import runs in background**; last import + history show scoped change counts |
 | Import Detail | `import/{importId}` | Done | Per-import change log filtered to **Rayons importants**; thumbnail + cart actions |
 | Article Catalog | `catalog` | Done | Search, filters, add to pre-selection |
-| Article Detail | `article/{articleId}` | Done | Scrollable panel; **Add sub-barcode & batch shoot** (confirm flow); tap sub-barcode chip to remove |
+| Article Detail | `article/{articleId}` | Done | Scrollable panel; **Add PNG image**; **Add sub-barcode** (scan → shoot flavor OR link barcode only); tap sub-barcode chip to remove |
 | Background removal | `background_removal/{articleId}` | Done | U2NetP offline cutout; crop/threshold; before/after; Accept links to article |
 | Barcode Scanner | `scanner` | Done | Settings; camera + **manual barcode entry** |
 | Batch txt | `batch_txt` | Done | Paste designation list → **To share** / **To shoot** / **Camera batch queue** (tap line to capture) |
 | Camera batch shoot | `camera_batch_shoot?queueItemId=` | Done | Sub-barcode: **confirm** → **shoot?** → save → PhotoRoom → import links sub-bc; removable chips |
 | PhotoRoom import | `camera_batch_import` | Done | Pending list; Import / **Remove** per card; import all matched |
-| To shoot cart | `photoshoot_cart` | Done | **Bottom nav**; **Open camera batch** per article; Open AGENT; origin colors |
-| AGENT | `check_shoot` | Done | SUB-BC: confirm → shoot? → batch camera; tap sub-barcode chip to remove |
-| To share cart | `share_cart` | Done | Per-row footer: **Printed**, **Design** queue/done, **Telegram** sent; CSV price-change glow; Add all/selected to Design + Share as files |
+| To shoot cart | `photoshoot_cart` | Done | **Bottom nav**; **Open camera batch** per article; **Add PNG image** per row; Open AGENT; origin colors |
+| AGENT | `check_shoot` | Done | **Smart** / **Ticket** / **Bulk**; Ticket = **tap-to-capture** + crop/OCR/PNG fusion (50/30/20) |
+| To share cart | `share_cart` | Done | Per-row footer: **Printed**, **Design** queue/done, **Telegram** sent; **Add PNG image** per row (incl. sub-barcode variants); CSV price-change glow; Add all/selected to Design + Share as files |
 | Design | `design` | Done | **Bottom nav** (brush); tabs **À imprimer** / **Historique**; print exports under `exports/yyyy-MM-dd/`; batch detail reprint + glow on CSV changes |
 | Report | `report` | Done | **Settings → Report**; CSV changes + import summaries scoped to **Rayons importants**; Design shelf prints |
 | Work History | `history` | Done | **Settings → Work history**; records searched/scanned/cart/linked/sent actions |

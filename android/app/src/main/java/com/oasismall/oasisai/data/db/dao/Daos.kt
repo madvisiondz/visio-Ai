@@ -1,5 +1,6 @@
 package com.oasismall.oasisai.data.db.dao
 
+import androidx.paging.PagingSource
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
@@ -224,6 +225,27 @@ interface ArticleDao {
 
     @Query(
         """
+        SELECT a.id, a.barcode, a.codeart, a.designation, a.normalizedName, a.price, a.previousPrice,
+               a.reference, a.category, a.rayon, a.brand, a.stock, a.unit, a.changeStatus,
+               a.isActive, a.needsTicketUpdate, a.rawData,
+               (SELECT p.imagePath FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imagePath,
+               (SELECT p.imageStatus FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imageStatus,
+               (SELECT p.createdAt FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imageCreatedAt,
+               (SELECT p.lastSentAt FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imageLastSentAt
+        FROM articles a
+        WHERE a.isActive = 1 AND a.rayon = :rayon
+        ORDER BY
+            CASE WHEN EXISTS (
+                SELECT 1 FROM product_images p
+                WHERE p.articleId = a.id AND p.imagePath IS NOT NULL AND trim(p.imagePath) != ''
+            ) THEN 0 ELSE 1 END,
+            a.designation COLLATE NOCASE ASC
+        """,
+    )
+    fun pagingWithImagesByRayon(rayon: String): PagingSource<Int, ArticleWithImage>
+
+    @Query(
+        """
         SELECT DISTINCT rayon FROM articles
         WHERE isActive = 1 AND rayon IS NOT NULL AND trim(rayon) != ''
         ORDER BY rayon COLLATE NOCASE ASC
@@ -302,6 +324,24 @@ interface ArticleDao {
         """,
     )
     suspend fun getWithImageByIdSync(id: Long): ArticleWithImage?
+
+    @Query(
+        """
+        SELECT a.id, a.barcode, a.codeart, a.designation, a.normalizedName, a.price, a.previousPrice,
+               a.reference, a.category, a.rayon, a.brand, a.stock, a.unit, a.changeStatus,
+               a.isActive, a.needsTicketUpdate, a.rawData,
+               (SELECT p.imagePath FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imagePath,
+               (SELECT p.imageStatus FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imageStatus,
+               (SELECT p.createdAt FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imageCreatedAt,
+               (SELECT p.lastSentAt FROM product_images p WHERE p.articleId = a.id ORDER BY p.id DESC LIMIT 1) AS imageLastSentAt
+        FROM articles a
+        WHERE a.isActive = 1
+          AND a.price BETWEEN :minPrice AND :maxPrice
+        ORDER BY abs(a.price - :targetPrice) ASC, a.designation COLLATE NOCASE ASC
+        LIMIT :limit
+        """,
+    )
+    suspend fun searchNearPrice(targetPrice: Double, minPrice: Double, maxPrice: Double, limit: Int): List<ArticleWithImage>
 
     @Query(
         """
@@ -1107,6 +1147,17 @@ interface PrintBatchDao {
     )
     suspend fun getLatestPrintAtForArticle(articleId: Long): Long?
 
+    @Query(
+        """
+        SELECT pbi.priceSnapshot FROM print_batch_items pbi
+        INNER JOIN print_batches pb ON pb.id = pbi.batchId
+        WHERE pbi.articleId = :articleId
+        ORDER BY pb.createdAt DESC
+        LIMIT 1
+        """,
+    )
+    suspend fun getLatestPriceSnapshotForArticle(articleId: Long): Double?
+
     @Update
     suspend fun update(batch: PrintBatchEntity)
 
@@ -1179,6 +1230,9 @@ interface PromoAlertDao {
 interface ArticleAlternateBarcodeDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insert(entity: ArticleAlternateBarcodeEntity): Long
+
+    @Query("SELECT barcode FROM article_alternate_barcodes")
+    suspend fun getAllBarcodes(): List<String>
 
     @Query("SELECT * FROM article_alternate_barcodes WHERE barcode = :barcode LIMIT 1")
     suspend fun getByBarcode(barcode: String): ArticleAlternateBarcodeEntity?

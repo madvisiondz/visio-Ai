@@ -1,21 +1,55 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# Visio Ai — ProGuard / R8 rules (release builds)
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
+-keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# Room
+-keep class * extends androidx.room.RoomDatabase
+-keep @androidx.room.Entity class *
+-dontwarn androidx.room.paging.**
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# App DB layer
+-keep class com.oasismall.oasisai.data.db.** { *; }
+-keep class com.oasismall.oasisai.data.model.** { *; }
+
+# ML Kit barcode
+-keep class com.google.mlkit.** { *; }
+-dontwarn com.google.mlkit.**
+
+# ONNX Runtime
+-keep class ai.onnxruntime.** { *; }
+-dontwarn ai.onnxruntime.**
+
+# TensorFlow Lite
+-keep class org.tensorflow.lite.** { *; }
+-dontwarn org.tensorflow.lite.**
+
+# NanoHTTPD (phone sync)
+-keep class org.nanohttpd.** { *; }
+-keepclassmembers class * extends org.nanohttpd.protocols.http.NanoHTTPD { *; }
+
+# Coil
+-dontwarn coil.**
+
+# Kotlin coroutines / serialization metadata
+-keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
+-keepnames class kotlinx.coroutines.CoroutineExceptionHandler {}
+-keepclassmembers class kotlin.Metadata { public *; }
+
+# Compose — keep Composable method signatures
+-keepclassmembers class * {
+    @androidx.compose.runtime.Composable <methods>;
+}
+
+# Hilt
+-keep class dagger.hilt.** { *; }
+-keep class javax.inject.** { *; }
+-keep class * extends dagger.hilt.android.internal.managers.ViewComponentManager$FragmentContextWrapper { *; }
+-keepclasseswithmembers class * {
+    @dagger.* <methods>;
+}
+-keep @dagger.hilt.android.lifecycle.HiltViewModel class * { *; }
+
+# Timber
+-dontwarn org.jetbrains.annotations.**

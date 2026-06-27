@@ -2,6 +2,12 @@
 
 sdk.dir=C\:\\Users\\YourName\\AppData\\Local\\Android\\Sdk
 
-# Supabase — Dashboard → Project Settings → API → anon / publishable key (NOT the PC secret key)
-supabase.url=https://wjtawsojtoiovovreeri.supabase.co
+# Optional Supabase (leave empty if unused)
+supabase.url=
 supabase.anon.key=
+
+# Release signing (optional — release build falls back to debug signing when unset)
+# release.keystore.file=C\:\\path\\to\\visioai-release.jks
+# release.keystore.password=
+# release.key.alias=
+# release.key.password=

@@ -1139,3 +1139,91 @@
 **User:** PARAY Phase 5 — Knowledge Fusion System (offline shared intelligence via PKP).
 
 **Assistant:** **v2.22.0** — `ParayKnowledgeFusionEngine`, PKP `.pkp.zip`, PARAY Home Export/Import/Fusion History, `paray_home/fusion/`; see `docs/PARAY_FUSION.md`.
+
+---
+
+## Session 137 — 2026-06-14
+
+**User:** Build v2.22.1 — full app eval/optimize services; **Add PNG image** on article/AGENT/to-shoot/to-share cards; sub-barcode flow: scan then choose shoot flavor vs link barcode only.
+
+**Assistant:** **v2.22.1 (308)** — `GalleryPngAssignService` + `AssignPngImageButton`; fast PNG metadata append; PhotoRoom import perf fixes; sub-barcode choice dialog; APK built.
+
+---
+
+## Session 138 — 2026-06-14
+
+**User:** Shared 6 sub-barcodes from To share — app showed correct images but Telegram received 6 identical images.
+
+**Assistant:** **v2.22.2** — `PngShareHelper` used designation-only filename; all variants overwrote same cache file. Fixed: export uses each variant's gallery PNG name (`Designation1.png`, …).
+
+---
+
+## Session 139 — 2026-06-27
+
+**User:** Run Phase A production readiness (DB safety, release build, tests, logging).
+
+**Assistant:** **v2.23.0 (311)** — destructive migration off; `OasisDatabaseMigrations`; schema export; migration tests; R8 release; Timber/OasisLog; unit tests. See `docs/PRODUCTION_READINESS.md`.
+
+---
+
+## Session 140 — 2026-06-27
+
+**User:** Run Phase B (scale & performance).
+
+**Assistant:** **v2.23.1 (312)** — rayon Paging 3; PARAY learn cache; PhotoRoom single-flight; Design render cancel; search debounce 600ms.
+
+---
+
+## Session 141 — 2026-06-27
+
+**User:** Run Phase C (polish).
+
+**Assistant:** **v2.24.0 (313)** — Hilt core DI (`OasisDatabaseModule`); `AtomicJsonWriter` on PARAY/registries; network security config; optional backup AES-256 encryption; `LocalCrashReporter`. APK at `VisioAI-debug.apk`.
+
+---
+
+## Session 142 — 2026-06-27
+
+**User:** Show rayon on all cards; AGENT shelf ticket verify with PARAY responsible.
+
+**Assistant:** **v2.26.0 (317)** — `ArticleRayonLine` on all article cards; AGENT **Ticket** mode with `ParayTicketAdvisor` (catalog vs last print snapshot); `ticket_events.jsonl`; APK `VisioAI-debug.apk`.
+
+---
+
+## Session 143 — 2026-06-14
+
+**User:** Camera sees shelf ticket (designation + price + small foggy PNG); PARAY should detect regardless of rayon and fuse three signals with fuzzy probability.
+
+**Assistant:** **v2.27.0 (320)** — `ParayTicketFuzzyMatcher` (text 42% + price 32% + PNG 26%); product crop left of yellow block; rayon soft preference only; match % + breakdown on article card; APK `VisioAI-debug.apk`.
+
+---
+
+## Session 144 — 2026-06-14
+
+**User:** Ticket mode sees yellow ticket but nothing opens; wants debug logcat + high-end OCR.
+
+**Assistant:** **v2.27.1 (321)** — rotate frame before detect/OCR; upscale+contrast dual-pass ML Kit; price SQL search; live camera overlay; filter Logcat `Oasis/Paray`; APK `VisioAI-debug.apk`.
+
+---
+
+## Session 145 — 2026-06-14
+
+**User:** Production-grade PARAY ticket stabilization — marketing-ready feature with complex working techniques.
+
+**Assistant:** **v2.30.0 (324)** — **PARAY Vision**: 6-frame ring buffer with Laplacian+yellow quality scoring; best-frame snap + alternate-frame retry; recovery contrast boost; match tiers (Confirmed/High/Probable); anti-flip stabilizer; haptics; live quality meter + freeze-frame UI; tier badges on article card; APK `VisioAI-debug.apk`.
+
+---
+
+## Session 146 — 2026-06-14
+
+**User:** Remove rayon filter; tap camera to shoot photo; agent crops ticket and scans text/price/PNG; PNG weight 20%.
+
+**Assistant:** **v2.31.0 (325)** — tap-to-capture replaces hold-to-snap; rayon picker removed; fusion 50% designation / 30% price / 20% catalog PNG; APK `VisioAI-debug.apk`.
+
+---
+
+## Session 147 — 2026-06-14
+
+**User:** Crop preview stretched/distorted (vertical stripes); camera feed foggy; multi-camera device may be using weak camera.
+
+**Assistant:** **v2.32.1 (329)** — root cause: naive YUV plane concat in `CameraFrameUtils` → stride-aware NV21 conversion; Ticket mode binds best back camera (largest sensor) + 4K resolution selector + JPEG 95; warm-block scout rejects narrow desk blobs; crop preview uses correct aspect ratio; APK `VisioAI-debug.apk`.

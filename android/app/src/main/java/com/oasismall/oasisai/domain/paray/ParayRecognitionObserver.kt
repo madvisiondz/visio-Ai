@@ -178,6 +178,8 @@ class ParayRecognitionObserver(
         ParayRecognitionEventType.MANUAL_CORRECTION -> "Manual correction"
         ParayRecognitionEventType.PACKAGING_DRIFT -> "Packaging drift"
         ParayRecognitionEventType.UNKNOWN_BARCODE -> "Unknown barcode"
+        ParayRecognitionEventType.TICKET_VERIFY_SCAN -> "Shelf ticket scan"
+        ParayRecognitionEventType.TICKET_VERIFIED -> "Shelf ticket verified"
     }
 
     companion object {

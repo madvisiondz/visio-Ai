@@ -3,6 +3,7 @@ package com.oasismall.oasisai.ui.screens.checkshoot
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.oasismall.oasisai.data.db.dao.ArticleWithImage
@@ -10,6 +11,7 @@ import com.oasismall.oasisai.data.model.AgentCaptureMode
 import com.oasismall.oasisai.data.model.CartType
 import com.oasismall.oasisai.data.repository.OasisRepository
 import com.oasismall.oasisai.data.repository.SubBarcodeInfo
+import com.oasismall.oasisai.domain.GalleryPngAssignService
 import com.oasismall.oasisai.domain.ImageMatcher
 import com.oasismall.oasisai.domain.backgroundremoval.BackgroundRemovalOptions
 import com.oasismall.oasisai.domain.backgroundremoval.BackgroundRemovalService
@@ -18,7 +20,19 @@ import com.oasismall.oasisai.domain.paray.CheckShootPersistedSession
 import com.oasismall.oasisai.domain.paray.ParayAgent
 import com.oasismall.oasisai.domain.paray.ParayMatch
 import com.oasismall.oasisai.domain.paray.ParaySuggestion
+import com.oasismall.oasisai.domain.paray.ParayTicketAssessment
+import com.oasismall.oasisai.domain.paray.ParayTicketAdvisor
+import com.oasismall.oasisai.domain.paray.ParayTicketMatch
+import com.oasismall.oasisai.domain.paray.ParayTicketMatchTier
+import com.oasismall.oasisai.domain.paray.ParayTicketReadResult
+import com.oasismall.oasisai.domain.paray.ParayTicketReader
+import com.oasismall.oasisai.domain.paray.ParayTicketSnapResult
+import com.oasismall.oasisai.domain.paray.ParayTicketSnapStabilizer
+import com.oasismall.oasisai.domain.paray.TicketSnapPhase
+import com.oasismall.oasisai.domain.paray.TicketSnapStep
 import com.oasismall.oasisai.ui.components.CartSourceTags
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,6 +45,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.max
 
 enum class CheckShootPhase {
@@ -46,6 +61,10 @@ data class CheckShootScan(
     val price: Double? = null,
     val lastPriceChangedAt: Long? = null,
     val lastPrintedAt: Long? = null,
+    val lastPrintedPrice: Double? = null,
+    val rayon: String? = null,
+    val needsTicketUpdate: Boolean = false,
+    val changeStatus: String = "UNCHANGED",
     val codeart: String? = null,
     val existingImagePath: String? = null,
     val inGestiumCatalog: Boolean = false,
@@ -74,8 +93,12 @@ class CheckShootViewModel(
     private val bulkStore: BulkCaptureStore,
     private val workflowTracker: com.oasismall.oasisai.domain.paray.ParayWorkflowTracker,
     private val recognitionTracker: com.oasismall.oasisai.domain.paray.ParayRecognitionTracker,
+    private val galleryPngAssign: GalleryPngAssignService,
 ) : ViewModel() {
     private val advisor = paray.barcodeAdvisor(repository)
+    private val ticketAdvisor: ParayTicketAdvisor = paray.ticketAdvisor(repository)
+    private val ticketReader: ParayTicketReader = paray.ticketReader(repository)
+    private val appContext = context.applicationContext
     private val prefs = context.getSharedPreferences(PREFS_AGENT, Context.MODE_PRIVATE)
 
     private val _scan = MutableStateFlow<CheckShootScan?>(null)
@@ -116,6 +139,31 @@ class CheckShootViewModel(
 
     private val _bulkScan = MutableStateFlow<BulkScanState?>(null)
     val bulkScan: StateFlow<BulkScanState?> = _bulkScan.asStateFlow()
+
+    private val _ticketAssessment = MutableStateFlow<ParayTicketAssessment?>(null)
+    val ticketAssessment: StateFlow<ParayTicketAssessment?> = _ticketAssessment.asStateFlow()
+
+    private val _ticketWalkStatus = MutableStateFlow(TicketWalkStatus.READY)
+    val ticketWalkStatus: StateFlow<TicketWalkStatus> = _ticketWalkStatus.asStateFlow()
+
+    private val _ticketFeedback = MutableStateFlow<TicketCameraFeedback?>(null)
+    val ticketFeedback: StateFlow<TicketCameraFeedback?> = _ticketFeedback.asStateFlow()
+
+    private val _ticketSnapProgress = MutableStateFlow<TicketSnapUiState?>(null)
+    val ticketSnapProgress: StateFlow<TicketSnapUiState?> = _ticketSnapProgress.asStateFlow()
+
+    private val _ticketMatchTier = MutableStateFlow<ParayTicketMatchTier?>(null)
+    val ticketMatchTier: StateFlow<ParayTicketMatchTier?> = _ticketMatchTier.asStateFlow()
+
+    private val ticketSnapInFlight = AtomicBoolean(false)
+    private var ticketSnapJob: Job? = null
+    private var lastStepEmitMs = 0L
+    private var lastTicketArticleId: Long? = null
+    private var lastTicketProbability: Float? = null
+    private var lastTicketLockMs = 0L
+
+    private var stableTicketKey: String? = null
+    private var stableTicketCount = 0
 
     val bulkCaptureCount = bulkStore.observeCaptureCount()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
@@ -159,17 +207,171 @@ class CheckShootViewModel(
 
     fun setAgentMode(mode: AgentCaptureMode) {
         if (_agentMode.value == mode) return
-        if (mode == AgentCaptureMode.BULK) {
+        if (mode == AgentCaptureMode.BULK || mode == AgentCaptureMode.TICKET) {
             unlockForNextScan()
             _bulkScan.value = null
             pendingBulkBarcode = null
         }
+        if (mode != AgentCaptureMode.TICKET) {
+            cancelTicketSnap()
+            _ticketAssessment.value = null
+            _ticketMatchTier.value = null
+            _ticketWalkStatus.value = TicketWalkStatus.READY
+        } else {
+            _ticketWalkStatus.value = if (_isLocked.value) TicketWalkStatus.PAUSED else TicketWalkStatus.READY
+        }
         _agentMode.value = mode
         prefs.edit().putString(KEY_AGENT_MODE, mode.name).apply()
-        _message.value = if (mode == AgentCaptureMode.BULK) {
-            "Bulk mode — scan barcodes, replace or skip."
-        } else {
-            "Smart mode — PARAY + catalog checks."
+        _message.value = when (mode) {
+            AgentCaptureMode.BULK -> "Bulk mode — scan barcodes, replace or skip."
+            AgentCaptureMode.TICKET -> "PARAY Ticket — tap screen on yellow ticket; reads designation + price + PNG."
+            AgentCaptureMode.SMART -> "Smart mode — PARAY + catalog checks."
+        }
+    }
+
+    fun snapTicket(buffer: TicketCameraBuffer) {
+        if (_agentMode.value != AgentCaptureMode.TICKET ||
+            _isLocked.value ||
+            _phase.value != CheckShootPhase.SCANNING ||
+            _ticketWalkStatus.value == TicketWalkStatus.PAUSED
+        ) {
+            return
+        }
+        if (!ticketSnapInFlight.compareAndSet(false, true)) return
+
+        if (!buffer.hasFreshFrame) {
+            ticketSnapInFlight.set(false)
+            _message.value = "Frame too old — point at ticket and tap again"
+            return
+        }
+
+        val snap = buffer.takeLatestSnap()
+        if (snap == null) {
+            ticketSnapInFlight.set(false)
+            _message.value = "Camera not ready — wait a moment and tap again"
+            return
+        }
+
+        ticketSnapJob?.cancel()
+        ticketSnapJob = viewModelScope.launch(Dispatchers.Default) {
+            try {
+                TicketSnapHaptics.tapShutter(appContext)
+                _ticketWalkStatus.value = TicketWalkStatus.PROCESSING
+                lastStepEmitMs = 0L
+                val freeze = com.oasismall.oasisai.domain.paray.ParayTicketBitmapUtils.previewCopy(snap.bitmap)
+                _ticketSnapProgress.value = TicketSnapUiState(
+                    phase = TicketSnapPhase.CAPTURED,
+                    message = "Photo captured — cropping ticket…",
+                    previewBitmap = freeze,
+                    frameQuality = snap.qualityScore,
+                )
+
+                var result = runTicketSnap(snap)
+                if (result?.match == null) {
+                    val alt = buffer.takeAlternateSnap(snap.capturedAtMs)
+                    if (alt != null) {
+                        withContext(Dispatchers.Main) {
+                            _message.value = "Trying alternate frame…"
+                        }
+                        result = runTicketSnap(alt)
+                        alt.bitmap.recycle()
+                    }
+                }
+                snap.bitmap.recycle()
+
+                val match = result?.match
+                if (match != null) {
+                    val decision = ParayTicketSnapStabilizer.decideLock(
+                        match,
+                        lastTicketArticleId,
+                        lastTicketProbability,
+                        lastTicketLockMs,
+                    )
+                    if (!decision.allowLock) {
+                        result?.frame?.recycle()
+                        withContext(Dispatchers.Main) {
+                            _ticketWalkStatus.value = TicketWalkStatus.READY
+                            _message.value = decision.message ?: "Tap again to confirm"
+                        }
+                        TicketSnapHaptics.failed(appContext)
+                        delay(1_800)
+                        withContext(Dispatchers.Main) { clearTicketSnapProgress() }
+                        return@launch
+                    }
+                    result?.frame?.recycle()
+                    val tier = decision.tier ?: result?.matchTier
+                    withContext(Dispatchers.Main) {
+                        _ticketMatchTier.value = tier
+                        if (tier != null) TicketSnapHaptics.match(appContext, tier)
+                        processTicketMatch(match, tier, decision.message)
+                    }
+                } else {
+                    withContext(Dispatchers.Main) {
+                        _ticketWalkStatus.value = TicketWalkStatus.READY
+                        _message.value = _ticketSnapProgress.value?.error
+                            ?: "No match — tap again closer to the yellow ticket"
+                    }
+                    TicketSnapHaptics.failed(appContext)
+                    delay(2_200)
+                    withContext(Dispatchers.Main) { clearTicketSnapProgress() }
+                }
+            } catch (_: kotlinx.coroutines.CancellationException) {
+                withContext(Dispatchers.Main) { clearTicketSnapProgress() }
+            } finally {
+                ticketSnapInFlight.set(false)
+                ticketSnapJob = null
+            }
+        }
+    }
+
+    private suspend fun runTicketSnap(frame: TicketCameraBuffer.Frame): ParayTicketSnapResult? =
+        ticketReader.processSnap(
+            frame.bitmap,
+            frame.rotationDegrees,
+            frame.qualityScore,
+        ) { step -> emitSnapStep(step) }
+
+    fun cancelTicketSnap() {
+        ticketSnapJob?.cancel()
+        ticketSnapJob = null
+        ticketSnapInFlight.set(false)
+        clearTicketSnapProgress()
+        if (_agentMode.value == AgentCaptureMode.TICKET && !_isLocked.value) {
+            _ticketWalkStatus.value = TicketWalkStatus.READY
+        }
+    }
+
+    private suspend fun emitSnapStep(step: TicketSnapStep) {
+        val isDone = step.phase == TicketSnapPhase.DONE
+        val isFailure = step.phase == TicketSnapPhase.FAILED
+        val terminal = isDone || isFailure
+        val now = System.currentTimeMillis()
+        if (!terminal && now - lastStepEmitMs < UI_STEP_MIN_MS) return
+        lastStepEmitMs = now
+        withContext(Dispatchers.Main) {
+            val prev = _ticketSnapProgress.value
+            if (prev?.message == step.message && step.preview == null && prev.phase == step.phase) return@withContext
+            val prior = prev?.steps.orEmpty().map { it.copy(done = true) }
+            val line = TicketSnapStepLine(
+                phase = step.phase,
+                message = step.message,
+                done = isDone,
+                failed = isFailure,
+            )
+            val steps = if (prior.lastOrNull()?.message == step.message) prior else prior + line
+            prev?.previewBitmap?.takeIf { step.preview != null }?.recycle()
+            _ticketSnapProgress.value = TicketSnapUiState(
+                phase = step.phase,
+                message = step.message,
+                steps = steps,
+                previewBitmap = step.preview ?: prev?.previewBitmap,
+                ocrDesignation = step.ocrDesignation ?: prev?.ocrDesignation,
+                ocrPrice = step.ocrPrice ?: prev?.ocrPrice,
+                fusionPercent = step.fusion?.probabilityPercent ?: prev?.fusionPercent,
+                matchTier = step.matchTier ?: prev?.matchTier,
+                frameQuality = step.frameQuality ?: prev?.frameQuality,
+                error = step.error ?: prev?.error,
+            )
         }
     }
 
@@ -211,11 +413,26 @@ class CheckShootViewModel(
             stableBarcode = trimmed
             stableReadCount = 1
         }
-        if (stableReadCount < STABLE_READS_REQUIRED) return
-        if (trimmed == debounceBarcode && now - debounceTimeMs < SCAN_DEBOUNCE_MS) return
-        debounceBarcode = trimmed
-        debounceTimeMs = now
-        processBarcodeInput(trimmed, manual = false)
+        viewModelScope.launch {
+            val resolved = repository.resolveScannedBarcode(trimmed)
+            val minReads = if (resolved != null) STABLE_READS_CATALOG else STABLE_READS_UNKNOWN
+            if (stableReadCount < minReads) return@launch
+            if (!_isLocked.value && !_subBcMode.value && _scan.value != null) {
+                val current = _scan.value!!
+                val articleId = resolved?.article?.id
+                if (articleId != null && articleId == current.articleId) return@launch
+                if (trimmed == current.barcode) return@launch
+            }
+            val debounceMs = if (resolved?.article?.id != null && resolved.article.id == _scan.value?.articleId) {
+                SCAN_DEBOUNCE_SAME_ARTICLE_MS
+            } else {
+                SCAN_DEBOUNCE_MS
+            }
+            if (trimmed == debounceBarcode && now - debounceTimeMs < debounceMs) return@launch
+            debounceBarcode = trimmed
+            debounceTimeMs = now
+            processBarcodeInput(trimmed, manual = false)
+        }
     }
 
     private fun processBarcodeInput(trimmed: String, manual: Boolean) {
@@ -224,13 +441,28 @@ class CheckShootViewModel(
             viewModelScope.launch { refreshBulkScan(trimmed) }
             return
         }
+        if (_agentMode.value == AgentCaptureMode.TICKET) {
+            if (!manual && _isLocked.value) return
+            viewModelScope.launch {
+                val read = ParayTicketReadResult(
+                    source = com.oasismall.oasisai.domain.paray.ParayTicketReadSource.BARCODE,
+                    barcode = trimmed,
+                )
+                val match = ticketReader.resolve(read)
+                if (match != null) {
+                    processTicketMatch(match)
+                } else {
+                    processTicketScanUnknown(trimmed)
+                }
+            }
+            return
+        }
         if (_paraySuggest.value != null || _suffixMatch.value != null) return
         if (_subBcMode.value && _isLocked.value) {
             viewModelScope.launch { handleSubBarcodeScanned(trimmed) }
             return
         }
-        if (_isLocked.value) return
-        if (!manual && _scan.value != null) return
+        if (_isLocked.value && !_subBcMode.value) return
         if (manual && _scan.value != null && !_isLocked.value) {
             _scan.value = null
             _paraySuggest.value = null
@@ -275,6 +507,43 @@ class CheckShootViewModel(
         viewModelScope.launch {
             val articleId = locked.articleId ?: resolveArticleId(locked)
             _openSubBcBatchShoot.emit(articleId to pending)
+        }
+    }
+
+    fun linkSubBarcodeOnly() {
+        val pending = _subBarcodeConfirm.value ?: return
+        _subBarcodeConfirm.value = null
+        val locked = _scan.value ?: return
+        viewModelScope.launch {
+            val articleId = locked.articleId ?: resolveArticleId(locked)
+            val err = repository.linkSubBarcodeToMainArticle(
+                articleId = articleId,
+                mainBarcode = locked.barcode,
+                subBarcode = pending,
+                imagePath = locked.existingImagePath,
+            )
+            if (err != null) {
+                _message.value = err
+            } else {
+                refreshSubBarcodes(articleId)
+                _message.value = "Linked $pending — same product, alternate barcode (no photo)"
+            }
+        }
+    }
+
+    fun assignPng(uri: Uri) {
+        val locked = _scan.value ?: return
+        val articleId = locked.articleId ?: return
+        viewModelScope.launch {
+            galleryPngAssign.assignPngToArticle(uri, articleId, subBarcode = null, cartType = CartType.SHARE)
+                .fold(
+                    onSuccess = { msg ->
+                        _message.value = msg
+                        val updated = repository.getArticleWithImageById(articleId)
+                        _scan.value = locked.copy(existingImagePath = updated?.imagePath)
+                    },
+                    onFailure = { e -> _message.value = e.message ?: "Could not assign PNG" },
+                )
         }
     }
 
@@ -588,10 +857,23 @@ class CheckShootViewModel(
     }
 
     fun unlockForNextScan() {
+        cancelTicketSnap()
         _isLocked.value = false
         _subBcMode.value = false
         _subBarcodes.value = emptyList()
         _scan.value = null
+        _ticketAssessment.value = null
+        _ticketMatchTier.value = null
+        clearTicketSnapProgress()
+        _ticketFeedback.value = null
+        lastTicketArticleId = null
+        lastTicketProbability = null
+        lastTicketLockMs = 0L
+        stableTicketKey = null
+        stableTicketCount = 0
+        if (_agentMode.value == AgentCaptureMode.TICKET) {
+            _ticketWalkStatus.value = TicketWalkStatus.READY
+        }
         _phase.value = CheckShootPhase.SCANNING
         _preview.value = null
         _paraySuggest.value = null
@@ -626,7 +908,7 @@ class CheckShootViewModel(
             val articleId = resolveArticleId(current)
             repository.addToCart(articleId, CartType.SHARE, CartSourceTags.CHECK_SHOOT)
             _message.value = "Added to To share."
-            unlockForNextScan()
+            finishActionAndUnlock()
         }
     }
 
@@ -640,7 +922,12 @@ class CheckShootViewModel(
             val articleId = resolveArticleId(current)
             repository.addToCart(articleId, CartType.DESIGN, CartSourceTags.CHECK_SHOOT)
             _message.value = "Added to Design queue."
+            finishActionAndUnlock()
         }
+    }
+
+    private fun finishActionAndUnlock() {
+        if (_isLocked.value) unlockForNextScan()
     }
 
     fun prepareCreateAsset(onReady: () -> Unit) {
@@ -844,6 +1131,10 @@ class CheckShootViewModel(
             price = article?.price,
             lastPriceChangedAt = lastPriceChange?.changedAt ?: meta?.lastPriceChangedAt,
             lastPrintedAt = meta?.lastPrintedAt,
+            lastPrintedPrice = meta?.lastPrintedPrice,
+            rayon = article?.rayon,
+            needsTicketUpdate = article?.needsTicketUpdate == true,
+            changeStatus = article?.changeStatus ?: "UNCHANGED",
             codeart = meta?.codeart,
             existingImagePath = existing,
             inGestiumCatalog = resolved != null,
@@ -851,6 +1142,82 @@ class CheckShootViewModel(
             linkedViaBodyKey = resolved?.linkedViaBodyKey == true,
         )
         if (_isLocked.value) persistSession()
+    }
+
+    private fun clearTicketSnapProgress() {
+        _ticketSnapProgress.value?.previewBitmap?.recycle()
+        _ticketSnapProgress.value = null
+    }
+
+    private suspend fun processTicketMatch(
+        match: ParayTicketMatch,
+        tier: ParayTicketMatchTier? = null,
+        stabilizerHint: String? = null,
+    ) {
+        val article = match.article
+        val barcode = match.barcode
+        refreshScan(barcode)
+        val meta = repository.getArticlePanelMeta(article.id)
+        val assessment = ticketAdvisor.assess(
+            article,
+            barcode,
+            meta.lastPrintedPrice,
+            match.read.ocrPrice,
+            fusion = match.fusion,
+            ocrDesignation = match.read.ocrDesignation,
+        )
+        _ticketAssessment.value = assessment
+        ticketAdvisor.onScan(barcode, article, assessment)
+        recognitionTracker.recordTicketScan(barcode, article.id, article.designation, assessment)
+        workflowTracker.recordFeature(com.oasismall.oasisai.domain.paray.ParayWorkflowFeature.TICKET_VERIFY)
+        _isLocked.value = true
+        _ticketWalkStatus.value = TicketWalkStatus.PAUSED
+        clearTicketSnapProgress()
+        lastTicketArticleId = article.id
+        lastTicketProbability = match.fusion.probability
+        lastTicketLockMs = System.currentTimeMillis()
+        val tierLabel = tier?.marketingLabel ?: "PARAY ${match.fusion.probabilityPercent}%"
+        val readHint = when (match.read.source) {
+            com.oasismall.oasisai.domain.paray.ParayTicketReadSource.OCR_DESIGNATION ->
+                "$tierLabel · ${match.read.ocrDesignation ?: article.designation}"
+            com.oasismall.oasisai.domain.paray.ParayTicketReadSource.BARCODE -> "Barcode: $barcode"
+        }
+        _message.value = listOfNotNull(readHint, stabilizerHint, assessment.message).joinToString(" · ")
+        persistSession()
+    }
+
+    private suspend fun processTicketScanUnknown(barcode: String) {
+        refreshScan(barcode)
+        val assessment = ticketAdvisor.assess(null, barcode, null)
+        _ticketAssessment.value = assessment
+        ticketAdvisor.onScan(barcode, null, assessment)
+        recognitionTracker.recordTicketScan(barcode, null, null, assessment)
+        workflowTracker.recordFeature(com.oasismall.oasisai.domain.paray.ParayWorkflowFeature.TICKET_VERIFY)
+        _isLocked.value = true
+        _ticketWalkStatus.value = TicketWalkStatus.PAUSED
+        _message.value = assessment.message
+        persistSession()
+    }
+
+    fun markTicketVerified() {
+        val scan = _scan.value ?: return
+        val articleId = scan.articleId ?: return
+        val assessment = _ticketAssessment.value
+        viewModelScope.launch {
+            repository.markTicketVerified(articleId)
+            refreshScan(scan.barcode)
+            val article = repository.getArticleWithImageById(articleId)
+            if (assessment != null) {
+                ticketAdvisor.onVerified(scan.barcode, article, assessment)
+                recognitionTracker.recordTicketVerified(
+                    scan.barcode,
+                    articleId,
+                    article?.designation,
+                    assessment,
+                )
+            }
+            _message.value = "Ticket verified — swipe unlock for next shelf."
+        }
     }
 
     private suspend fun restorePersistedSession() {
@@ -897,6 +1264,7 @@ class CheckShootViewModel(
 
     override fun onCleared() {
         bgService.close()
+        ticketReader.close()
         super.onCleared()
     }
 
@@ -910,8 +1278,11 @@ class CheckShootViewModel(
     }
 
     companion object {
-        private const val SCAN_DEBOUNCE_MS = 3_000L
-        private const val STABLE_READS_REQUIRED = 4
+        private const val SCAN_DEBOUNCE_MS = 1_500L
+        private const val SCAN_DEBOUNCE_SAME_ARTICLE_MS = 400L
+        private const val STABLE_READS_CATALOG = 2
+        private const val STABLE_READS_UNKNOWN = 3
+        private const val UI_STEP_MIN_MS = 45L
         private const val PREFS_AGENT = "oasis_agent_prefs"
         private const val KEY_AGENT_MODE = "capture_mode"
     }

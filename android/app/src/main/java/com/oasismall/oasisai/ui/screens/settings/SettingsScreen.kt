@@ -37,6 +37,8 @@ import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -87,7 +89,9 @@ fun SettingsScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val photoroomFolderLabel by viewModel.photoroomFolderLabel.collectAsStateWithLifecycle()
     val photoroomCustomFolder by viewModel.photoroomCustomFolder.collectAsStateWithLifecycle()
+    val backupEncryptionEnabled by viewModel.backupEncryptionEnabled.collectAsStateWithLifecycle()
     val parayImport by app.parayImportManager.state.collectAsStateWithLifecycle()
+    var backupPassword by remember { mutableStateOf("") }
 
     LaunchedEffect(Unit) {
         viewModel.refreshPhotoroomFolder(context)
@@ -142,6 +146,11 @@ fun SettingsScreen(
     ) { uri ->
         if (uri != null) viewModel.exportVisioProBundle(context, uri)
     }
+    val visioProImportPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) viewModel.importVisioProBundle(context, uri)
+    }
 
     fun defaultBackupZipName(): String {
         val stamp = java.text.SimpleDateFormat("yyyy-MM-dd_HHmm", java.util.Locale.US)
@@ -160,7 +169,7 @@ fun SettingsScreen(
 
     val busy = uiState.isLoadingImages || uiState.isReindexing || uiState.isLoadingSample ||
         uiState.isExportingPngs || uiState.isPurgingCatalog || uiState.isExportingBackup ||
-        uiState.isImportingBackup || uiState.isExportingVisioPro || uiState.isRestoringSubBarcodeFlavors
+        uiState.isImportingBackup || uiState.isExportingVisioPro || uiState.isImportingVisioPro || uiState.isRestoringSubBarcodeFlavors
 
     Scaffold(topBar = {
         TopAppBar(
@@ -397,9 +406,48 @@ fun SettingsScreen(
 
             item { SectionTitle("Device transfer") }
             item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                        ListItem(
+                            headlineContent = { Text("Encrypt backup (AES-256)") },
+                            supportingContent = {
+                                Text("Optional password for full ZIP export and import on another device")
+                            },
+                            trailingContent = {
+                                Switch(
+                                    checked = backupEncryptionEnabled,
+                                    onCheckedChange = viewModel::setBackupEncryptionEnabled,
+                                    enabled = !busy,
+                                )
+                            },
+                        )
+                        if (backupEncryptionEnabled) {
+                            OutlinedTextField(
+                                value = backupPassword,
+                                onValueChange = {
+                                    backupPassword = it
+                                    viewModel.setBackupPassword(it)
+                                },
+                                label = { Text("Backup password") },
+                                visualTransformation = PasswordVisualTransformation(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 8.dp),
+                                singleLine = true,
+                                enabled = !busy,
+                            )
+                        }
+                    }
+                }
+            }
+            item {
                 SettingsRow(
                     title = "Export full backup (ZIP)",
-                    subtitle = "Choose where to save — catalog, carts, PNGs, VisioPRO, PARAY, Design (not kept in app cache)",
+                    subtitle = if (backupEncryptionEnabled) {
+                        "Encrypted export — catalog, carts, PNGs, VisioPRO, PARAY, Design"
+                    } else {
+                        "Choose where to save — catalog, carts, PNGs, VisioPRO, PARAY, Design (not kept in app cache)"
+                    },
                     icon = Icons.Default.CloudUpload,
                     enabled = !busy,
                     onClick = { backupExportPicker.launch(defaultBackupZipName()) },
@@ -434,8 +482,22 @@ fun SettingsScreen(
             }
             item {
                 SettingsRow(
+                    title = "Import VisioPRO presets",
+                    subtitle = "Restore from VisioPRO_export_*.zip (same format as export — merges sections & photos)",
+                    icon = Icons.Default.FileDownload,
+                    enabled = !busy,
+                    onClick = {
+                        visioProImportPicker.launch(arrayOf("application/zip", "application/octet-stream", "*/*"))
+                    },
+                    trailing = {
+                        if (uiState.isImportingVisioPro) CircularProgressIndicator()
+                    },
+                )
+            }
+            item {
+                SettingsRow(
                     title = "Sync sub-PNGs",
-                    subtitle = "Scan flavor PNGs (metadata) → link sub-barcodes for search & scanner; renames legacy sub_*.png",
+                    subtitle = "Scan flavor PNGs (metadata) → link sub-barcodes for search & scanner; run after CSV if you added flavor PNGs",
                     icon = Icons.Default.Link,
                     enabled = !busy,
                     onClick = { viewModel.syncSubPngs(context) },

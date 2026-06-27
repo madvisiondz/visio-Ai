@@ -49,7 +49,7 @@ class CatalogViewModel(
     init {
         @OptIn(FlowPreview::class)
         _query
-            .debounce(900)
+            .debounce(600)
             .map { it.trim() }
             .distinctUntilChanged()
             .onEach { repository.logSearchQuery(it) }

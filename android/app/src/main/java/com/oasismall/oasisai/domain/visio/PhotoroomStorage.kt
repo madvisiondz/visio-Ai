@@ -7,6 +7,7 @@ import androidx.documentfile.provider.DocumentFile
 import com.oasismall.oasisai.util.NameNormalizer
 import com.oasismall.oasisai.util.PngMetadata
 import java.io.File
+import java.util.concurrent.atomic.AtomicReference
 
 /** Reads cutout PNGs from a user-selected folder or default Pictures/Photoroom/. */
 object PhotoroomStorage {
@@ -14,10 +15,11 @@ object PhotoroomStorage {
     private const val PREFS = "visio_photoroom"
     private const val KEY_FOLDER_URI = "folder_tree_uri"
     private const val KEY_FOLDER_LABEL = "folder_label"
+    private const val CACHE_TTL_MS = 24L * 60 * 60 * 1000
     private val FOLDER_CANDIDATES = listOf("Photoroom", "PhotoRoom", "photoroom")
 
-    @Volatile
-    private var cachedIndex: PhotoroomIndex? = null
+    private val cachedIndex = AtomicReference<PhotoroomIndex?>(null)
+    private val indexBuildLock = Any()
 
     data class PngRef(
         val name: String,
@@ -33,7 +35,10 @@ object PhotoroomStorage {
             legacyFile?.let { return it }
             val uri = documentUri ?: error("No PNG source for $name")
             val cache = File(context.cacheDir, "photoroom_import/${name}")
-            if (cache.exists() && cache.length() > 0L) return cache
+            val fresh = cache.exists() &&
+                cache.length() > 0L &&
+                System.currentTimeMillis() - cache.lastModified() < CACHE_TTL_MS
+            if (fresh) return cache
             cache.parentFile?.mkdirs()
             context.contentResolver.openInputStream(uri)?.use { input ->
                 cache.outputStream().use { output -> input.copyTo(output) }
@@ -81,7 +86,7 @@ object PhotoroomStorage {
     }
 
     fun invalidateCache() {
-        cachedIndex = null
+        cachedIndex.set(null)
     }
 
     fun saveFolderTree(context: Context, treeUri: Uri): String {
@@ -134,28 +139,29 @@ object PhotoroomStorage {
         index(context).find(barcode, designation)
 
     private fun index(context: Context): PhotoroomIndex {
-        cachedIndex?.let { return it }
-        val files = loadAllPngRefs(context)
-        val byBarcode = mutableMapOf<String, PngRef>()
-        val byDesignation = mutableMapOf<String, PngRef>()
-        files.forEach { ref ->
-            val stem = ref.name.substringBeforeLast('.')
-            PngMetadata.extractBarcodeFromFilename(stem)?.let { bc ->
-                byBarcode.putIfAbsent(PngMetadata.barcodeFileStem(bc), ref)
-            }
-            val file = ref.legacyFileOrNull()
-            if (file != null && file.exists()) {
-                val details = PngMetadata.readArticleDetails(file)
-                details.barcode?.let { bc ->
+        cachedIndex.get()?.let { return it }
+        synchronized(indexBuildLock) {
+            cachedIndex.get()?.let { return it }
+            val files = loadAllPngRefs(context)
+            val byBarcode = mutableMapOf<String, PngRef>()
+            val byDesignation = mutableMapOf<String, PngRef>()
+            files.forEach { ref ->
+                val stem = ref.name.substringBeforeLast('.')
+                PngMetadata.extractBarcodeFromFilename(stem)?.let { bc ->
                     byBarcode.putIfAbsent(PngMetadata.barcodeFileStem(bc), ref)
                 }
-                details.designation?.let { des ->
-                    val key = NameNormalizer.toDisplayFileStem(des).lowercase()
-                    if (key.isNotBlank()) byDesignation.putIfAbsent(key, ref)
+                val nameStem = stem.lowercase()
+                if (nameStem.isNotBlank()) {
+                    val desStem = NameNormalizer.toDisplayFileStem(
+                        PngMetadata.stemWithoutBarcodeSuffix(stem),
+                    ).lowercase()
+                    if (desStem.isNotBlank()) {
+                        byDesignation.putIfAbsent(desStem, ref)
+                    }
                 }
             }
+            return PhotoroomIndex(files, byBarcode, byDesignation).also { cachedIndex.set(it) }
         }
-        return PhotoroomIndex(files, byBarcode, byDesignation).also { cachedIndex = it }
     }
 
     private fun loadAllPngRefs(context: Context): List<PngRef> {

@@ -51,6 +51,7 @@ import coil.compose.AsyncImage
 import com.oasismall.oasisai.data.db.dao.ArticleWithImage
 import com.oasismall.oasisai.ui.components.ArticleActionPanel
 import com.oasismall.oasisai.ui.components.ArticlePanelData
+import com.oasismall.oasisai.ui.components.ArticleRayonLine
 import com.oasismall.oasisai.ui.components.ManualBarcodeEntrySection
 import com.oasismall.oasisai.ui.screens.scanner.BarcodeCameraPreview
 import com.oasismall.oasisai.util.PriceFormatter
@@ -128,16 +129,22 @@ fun CameraBatchShootScreen(
     subBarcodeConfirm?.let { pending ->
         AlertDialog(
             onDismissRequest = viewModel::declineSubBarcodeAdd,
-            title = { Text("Add sub-barcode?") },
+            title = { Text("Sub-barcode scanned") },
             text = {
-                Text(
-                    "Link barcode ${pending.scannedBarcode} to ${parentDesignation ?: "this article"}? " +
-                        "Shoot a photo next — saved after PhotoRoom import.",
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "Barcode ${pending.scannedBarcode} for ${parentDesignation ?: "this article"}. " +
+                            "Shoot a separate flavor photo, or link the barcode only (same look, different barcode).",
+                    )
+                    Button(onClick = viewModel::confirmSubBarcodeAdd, modifier = Modifier.fillMaxWidth()) {
+                        Text("Shoot flavor photo")
+                    }
+                    OutlinedButton(onClick = viewModel::linkSubBarcodeOnly, modifier = Modifier.fillMaxWidth()) {
+                        Text("Link barcode only")
+                    }
+                }
             },
-            confirmButton = {
-                TextButton(onClick = viewModel::confirmSubBarcodeAdd) { Text("Add & shoot") }
-            },
+            confirmButton = {},
             dismissButton = {
                 TextButton(onClick = viewModel::declineSubBarcodeAdd) { Text("Cancel") }
             },
@@ -338,6 +345,7 @@ private fun MatchPickerCard(match: ArticleWithImage, viewModel: CameraBatchShoot
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("CSV match", style = MaterialTheme.typography.labelLarge)
             Text(match.designation, fontWeight = FontWeight.SemiBold)
+            ArticleRayonLine(rayon = match.rayon)
             Text("Main barcode: ${match.barcode}", style = MaterialTheme.typography.bodySmall)
             Text(PriceFormatter.format(match.price), color = MaterialTheme.colorScheme.primary)
             if (match.hasAppGalleryImage() && !match.imagePath.isNullOrBlank()) {

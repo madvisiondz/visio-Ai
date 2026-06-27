@@ -1,5 +1,7 @@
 package com.oasismall.oasisai.domain.paray
 
+import com.oasismall.oasisai.util.writeTextAtomic
+
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -30,7 +32,7 @@ class ParayBrandKnowledgeStore(private val home: ParayHome) {
                 .put("familySignature", signaturesToJson(record.familySignature))
                 .put("updatedAt", System.currentTimeMillis()),
         )
-        file.writeText(root.toString(2))
+        file.writeTextAtomic(root.toString(2))
     }
 
     fun allEntries(): List<ParayBrandFamilyEntry> =

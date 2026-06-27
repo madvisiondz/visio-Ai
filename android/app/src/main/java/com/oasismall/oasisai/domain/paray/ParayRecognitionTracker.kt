@@ -131,6 +131,53 @@ class ParayRecognitionTracker(
         }
     }
 
+    fun recordTicketScan(
+        barcode: String,
+        articleId: Long?,
+        designation: String?,
+        assessment: com.oasismall.oasisai.domain.paray.ParayTicketAssessment,
+    ) {
+        scope.launch {
+            observer.record(
+                ParayRecognitionEvent(
+                    type = ParayRecognitionEventType.TICKET_VERIFY_SCAN,
+                    barcode = barcode,
+                    articleId = articleId,
+                    source = SOURCE_AGENT,
+                    metadata = mapOf(
+                        "designation" to (designation ?: ""),
+                        "status" to assessment.status.name,
+                        "message" to assessment.message,
+                        "rayon" to (assessment.rayon ?: ""),
+                    ),
+                ),
+            )
+        }
+    }
+
+    fun recordTicketVerified(
+        barcode: String,
+        articleId: Long?,
+        designation: String?,
+        assessment: com.oasismall.oasisai.domain.paray.ParayTicketAssessment,
+    ) {
+        scope.launch {
+            observer.record(
+                ParayRecognitionEvent(
+                    type = ParayRecognitionEventType.TICKET_VERIFIED,
+                    barcode = barcode,
+                    articleId = articleId,
+                    source = SOURCE_AGENT,
+                    metadata = mapOf(
+                        "designation" to (designation ?: ""),
+                        "status" to assessment.status.name,
+                        "rayon" to (assessment.rayon ?: ""),
+                    ),
+                ),
+            )
+        }
+    }
+
     companion object {
         const val SOURCE_AGENT = "agent"
         const val SOURCE_SCANNER = "scanner"

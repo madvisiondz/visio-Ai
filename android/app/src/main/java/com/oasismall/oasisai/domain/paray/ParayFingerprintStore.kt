@@ -1,5 +1,7 @@
 package com.oasismall.oasisai.domain.paray
 
+import com.oasismall.oasisai.util.writeTextAtomic
+
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -64,7 +66,7 @@ class ParayFingerprintStore(home: ParayHome) {
                     entries.forEach { put(toJson(it)) }
                 },
             )
-        storeFile.writeText(root.toString())
+        storeFile.writeTextAtomic(root.toString())
     }
 
     private fun invalidateCache() {

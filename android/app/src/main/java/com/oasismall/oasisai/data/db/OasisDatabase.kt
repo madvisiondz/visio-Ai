@@ -51,9 +51,12 @@ import com.oasismall.oasisai.data.db.entity.WorkflowHistoryEntity
         BatchCameraQueueEntity::class,
     ],
     version = 18,
-    exportSchema = false,
+    exportSchema = true,
 )
 abstract class OasisDatabase : RoomDatabase() {
+    companion object {
+        const val VERSION = 18
+    }
     abstract fun articleDao(): ArticleDao
     abstract fun articleAlternateBarcodeDao(): ArticleAlternateBarcodeDao
     abstract fun importDao(): ImportDao

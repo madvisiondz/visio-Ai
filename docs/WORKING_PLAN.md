@@ -93,6 +93,16 @@
 - [x] **v2.20.3** Knowledge tab — cached catalog knowledge JSON
 - [x] **v2.20.4** Statistics tab — cached learning/knowledge/workflow KPIs
 
+## Phase 4g — AGENT shelf ticket verify ✅ (V1)
+
+- [x] **v2.28.0** Hold-to-snap ticket mode — step UI; no continuous OCR
+- [x] **v2.31.0** Ticket tap-to-capture; rayon filter removed; fusion 50/30/20
+- [x] **v2.30.0** PARAY Vision — ring buffer, frame quality, recovery, match tiers, haptics
+- [x] **v2.27.1** Ticket OCR pipeline — rotation, upscale, price search
+- [x] **v2.26.1** Live camera OCR on yellow shelf tickets; rayon walk preference
+- [x] **v2.26.0** Rayon on all article cards; AGENT **Ticket** mode; `ParayTicketAdvisor`; audit log + recognition events
+- [ ] Tighter OCR when multiple tickets visible in one frame
+
 ## Phase 4f — PARAY Knowledge Fusion ✅ (V1)
 
 - [x] **v2.22.0** PKP export/import on PARAY Home; incremental merge engine; `docs/PARAY_FUSION.md`

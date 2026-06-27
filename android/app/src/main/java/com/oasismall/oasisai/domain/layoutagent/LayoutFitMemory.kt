@@ -1,5 +1,7 @@
 package com.oasismall.oasisai.domain.layoutagent
 
+import com.oasismall.oasisai.util.writeTextAtomic
+
 import android.content.Context
 import org.json.JSONObject
 import java.io.File
@@ -43,7 +45,7 @@ class LayoutFitMemory(context: Context) {
                 .put("scale", scale.toDouble())
                 .put("updatedAt", System.currentTimeMillis()),
         )
-        memoryFile.writeText(root.toString())
+        memoryFile.writeTextAtomic(root.toString())
     }
 
     /** Blend learned scale with computed contain scale when content aspect is similar. */

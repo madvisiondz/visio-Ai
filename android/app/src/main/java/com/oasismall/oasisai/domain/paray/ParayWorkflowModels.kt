@@ -9,6 +9,7 @@ enum class ParayWorkflowFeature(val label: String) {
     CSV_IMPORT("CSV import"),
     PNG_IMPORT("PNG import"),
     PARAY_LEARN_SESSION("PARAY Learn session"),
+    TICKET_VERIFY("Shelf ticket verify"),
 }
 
 enum class ParayWorkflowConfidence {

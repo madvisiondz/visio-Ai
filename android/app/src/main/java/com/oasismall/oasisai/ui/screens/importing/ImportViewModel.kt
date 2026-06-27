@@ -97,9 +97,9 @@ class ImportViewModel(
             val result = runCatching {
                 withContext(Dispatchers.IO) {
                     context.contentResolver.openInputStream(uri)?.use { stream ->
-                        _uiState.value = _uiState.value.copy(progress = TaskProgress("Parsing CSV file", 35))
+                        _uiState.value = _uiState.value.copy(progress = TaskProgress("Reading CSV file", 20))
                         val parseResult = CsvParser.parseWithFallback(stream)
-                        _uiState.value = _uiState.value.copy(progress = TaskProgress("Validating CSV rows", 75))
+                        _uiState.value = _uiState.value.copy(progress = TaskProgress("Checking columns", 85))
                         val validation = CsvParser.validate(parseResult.headers)
                         if (!validation.isValid) {
                             throw IllegalArgumentException(

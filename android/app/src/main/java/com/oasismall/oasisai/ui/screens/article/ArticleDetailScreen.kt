@@ -16,12 +16,18 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import com.oasismall.oasisai.ui.components.rememberAssignPngPicker
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.oasismall.oasisai.ui.components.ArticleActionPanel
 import com.oasismall.oasisai.ui.components.ArticlePanelData
@@ -49,6 +55,22 @@ fun ArticleDetailScreen(
     }
     val article by viewModel.article.collectAsStateWithLifecycle()
     val meta by viewModel.meta.collectAsStateWithLifecycle()
+    val panelMessage by viewModel.message.collectAsStateWithLifecycle()
+    var assignArticleId by remember { mutableLongStateOf(0L) }
+    val launchAssignPng = rememberAssignPngPicker { uri ->
+        if (assignArticleId > 0L) viewModel.assignPng(uri, assignArticleId)
+    }
+
+    panelMessage?.let { msg ->
+        AlertDialog(
+            onDismissRequest = viewModel::clearMessage,
+            title = { androidx.compose.material3.Text("Gallery") },
+            text = { androidx.compose.material3.Text(msg) },
+            confirmButton = {
+                TextButton(onClick = viewModel::clearMessage) { androidx.compose.material3.Text("OK") }
+            },
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -79,6 +101,10 @@ fun ArticleDetailScreen(
                     scrollable = false,
                     onCreateAsset = { onCreateAsset(a.barcode) },
                     onAddSubBarcodeBatchShoot = { onOpenSubBarcodeBatchShoot(articleId) },
+                    onAssignPngImage = {
+                        assignArticleId = articleId
+                        launchAssignPng()
+                    },
                     onOpenCameraBatch = { onOpenCameraBatch(articleId) },
                     onAddToShare = viewModel::addToShareCart,
                     onAddToShoot = viewModel::addToPhotoshootCart,

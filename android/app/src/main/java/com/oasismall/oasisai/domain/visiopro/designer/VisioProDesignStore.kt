@@ -1,5 +1,7 @@
 package com.oasismall.oasisai.domain.visiopro.designer
 
+import com.oasismall.oasisai.util.writeTextAtomic
+
 import android.content.Context
 import com.oasismall.oasisai.domain.visiopro.VisioProTemplateAssets
 import android.graphics.Color
@@ -25,7 +27,7 @@ class VisioProDesignStore(
 
     suspend fun save(document: VisioProDesignerDocument) = withContext(Dispatchers.IO) {
         val updated = document.copy(modifiedAt = System.currentTimeMillis())
-        fileForKey(updated.presetKey).writeText(serialize(updated).toString(2))
+        fileForKey(updated.presetKey).writeTextAtomic(serialize(updated).toString(2))
     }
 
     suspend fun reset(key: VisioProPresetDesignKey) = withContext(Dispatchers.IO) {

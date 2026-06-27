@@ -1,10 +1,14 @@
 package com.oasismall.oasisai.ui.screens.home
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.paging.PagingData
+import androidx.paging.cachedIn
 import com.oasismall.oasisai.data.db.dao.ArticleWithImage
 import com.oasismall.oasisai.data.model.CartType
 import com.oasismall.oasisai.data.repository.OasisRepository
+import com.oasismall.oasisai.domain.GalleryPngAssignService
 import com.oasismall.oasisai.ui.components.CartSourceTags
 import com.oasismall.oasisai.util.hasAppGalleryImage
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -33,6 +37,7 @@ data class HomeSearchResult(
 
 class HomeViewModel(
     private val repository: OasisRepository,
+    private val galleryPngAssign: GalleryPngAssignService,
 ) : ViewModel() {
     private val _query = MutableStateFlow("")
     val query: StateFlow<String> = _query.asStateFlow()
@@ -45,11 +50,22 @@ class HomeViewModel(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     @OptIn(ExperimentalCoroutinesApi::class)
+    val rayonArticles = _selectedRayon
+        .flatMapLatest { rayon ->
+            if (rayon.isNullOrBlank()) {
+                flowOf(PagingData.empty())
+            } else {
+                repository.pagerArticlesByRayon(rayon)
+            }
+        }
+        .cachedIn(viewModelScope)
+
+    @OptIn(ExperimentalCoroutinesApi::class)
     val searchResult: StateFlow<HomeSearchResult> = combine(_query, _selectedRayon) { q, rayon ->
         q.trim() to rayon
     }
         .flatMapLatest { (q, rayon) ->
-            if (q.isBlank() && rayon == null) {
+            if (q.isBlank()) {
                 flowOf(HomeSearchResult())
             } else {
                 repository.observeArticles(q, rayon).map { articles ->
@@ -66,10 +82,27 @@ class HomeViewModel(
     val photoshootCartCount = repository.observeCartCount(CartType.PHOTOSHOOT)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
+    private val _message = MutableStateFlow<String?>(null)
+    val message: StateFlow<String?> = _message.asStateFlow()
+
+    fun clearMessage() {
+        _message.value = null
+    }
+
+    fun assignPng(uri: Uri, articleId: Long) {
+        viewModelScope.launch {
+            galleryPngAssign.assignPngToArticle(uri, articleId, subBarcode = null, cartType = null)
+                .fold(
+                    onSuccess = { _message.value = it },
+                    onFailure = { e -> _message.value = e.message ?: "Could not assign PNG" },
+                )
+        }
+    }
+
     init {
         @OptIn(FlowPreview::class)
         _query
-            .debounce(900)
+            .debounce(600)
             .map { it.trim() }
             .distinctUntilChanged()
             .onEach { repository.logSearchQuery(it) }

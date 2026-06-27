@@ -31,6 +31,22 @@ import com.oasismall.oasisai.util.PriceFormatter
 import com.oasismall.oasisai.util.hasAppGalleryImage
 import java.io.File
 
+@Composable
+fun ArticleRayonLine(rayon: String?, modifier: Modifier = Modifier, prominent: Boolean = false) {
+    val label = rayon?.trim()?.takeIf { it.isNotEmpty() } ?: return
+    Text(
+        "Rayon: $label",
+        modifier = modifier,
+        style = if (prominent) {
+            MaterialTheme.typography.titleSmall
+        } else {
+            MaterialTheme.typography.bodyMedium
+        },
+        fontWeight = if (prominent) FontWeight.SemiBold else FontWeight.Normal,
+        color = MaterialTheme.colorScheme.tertiary,
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ArticleCard(
@@ -71,6 +87,7 @@ fun ArticleCard(
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text(article.designation, fontWeight = FontWeight.SemiBold)
+                ArticleRayonLine(rayon = article.rayon)
                 Text(PriceFormatter.format(article.price), color = MaterialTheme.colorScheme.primary)
                 Text(article.barcode, style = MaterialTheme.typography.bodySmall)
                 StatusChip(article.changeStatus, article.needsTicketUpdate)
@@ -150,76 +167,6 @@ fun TicketStatusLabel(needsTicketUpdate: Boolean, changeStatus: String) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ScanResultPanel(
-    article: ArticleWithImage,
-    modifier: Modifier = Modifier,
-    onAddToShare: () -> Unit,
-    onMarkVerified: () -> Unit,
-    onOpenDetail: () -> Unit,
-    onCreateAsset: () -> Unit,
-) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text("Scan result", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            val path = article.imagePath
-            if (!path.isNullOrBlank() && File(path).exists()) {
-                AsyncImage(
-                    model = File(path),
-                    contentDescription = article.designation,
-                    modifier = Modifier.size(120.dp),
-                    contentScale = ContentScale.Fit,
-                )
-            } else {
-                Surface(
-                    modifier = Modifier.size(120.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                ) {
-                    Text("No image", modifier = Modifier.padding(16.dp))
-                }
-            }
-            Text(article.designation, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleSmall)
-            Text(
-                PriceFormatter.format(article.price),
-                color = MaterialTheme.colorScheme.primary,
-                style = MaterialTheme.typography.headlineSmall,
-            )
-            Text("Barcode: ${article.barcode}", style = MaterialTheme.typography.bodySmall)
-            TicketStatusLabel(article.needsTicketUpdate, article.changeStatus)
-            ImageStatusLabel(article.imageStatus, article.imagePath)
-            if (article.changeStatus != ArticleChangeStatus.UNCHANGED.name) {
-                StatusChip(article.changeStatus, article.needsTicketUpdate)
-            }
-            val canShare = article.hasAppGalleryImage()
-            Button(onClick = onCreateAsset, modifier = Modifier.fillMaxWidth()) {
-                Text("Create asset (new photo + cutout)")
-            }
-            Button(
-                onClick = onAddToShare,
-                enabled = canShare,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(if (canShare) "Add to To share" else "No image — use AGENT")
-            }
-            if (article.needsTicketUpdate) {
-                OutlinedButton(onClick = onMarkVerified, modifier = Modifier.fillMaxWidth()) {
-                    Text("Mark ticket verified on shelf")
-                }
-            }
-            OutlinedButton(onClick = onOpenDetail, modifier = Modifier.fillMaxWidth()) {
-                Text("Open article detail")
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
 fun ImportChangeCard(
     row: ImportChangeUiRow,
     modifier: Modifier = Modifier,
@@ -259,6 +206,7 @@ fun ImportChangeCard(
                 ImportChangeThumbnail(article)
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(change.designation, fontWeight = FontWeight.SemiBold)
+                    article?.rayon?.let { ArticleRayonLine(rayon = it) }
                     Text(
                         "${changeTypeLabelShort(change.changeType)} — ${change.barcode}",
                         style = MaterialTheme.typography.bodySmall,

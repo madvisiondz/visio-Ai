@@ -1,5 +1,7 @@
 package com.oasismall.oasisai.domain.paray
 
+import com.oasismall.oasisai.util.writeTextAtomic
+
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -28,7 +30,7 @@ class ParayLearnSettingsStore(private val home: ParayHome) {
         val validated = settings.validated()
         synchronized(lock) {
             file.parentFile?.mkdirs()
-            file.writeText(toJson(validated).toString(2))
+            file.writeTextAtomic(toJson(validated).toString(2))
             _settings.value = validated
         }
     }
@@ -43,7 +45,7 @@ class ParayLearnSettingsStore(private val home: ParayHome) {
         if (!file.exists()) {
             val defaults = ParayLearnSettings.factoryDefaults()
             file.parentFile?.mkdirs()
-            file.writeText(toJson(defaults).toString(2))
+            file.writeTextAtomic(toJson(defaults).toString(2))
             return defaults
         }
         val root = runCatching { JSONObject(file.readText()) }.getOrDefault(JSONObject())

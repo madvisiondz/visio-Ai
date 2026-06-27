@@ -15,6 +15,7 @@ import com.oasismall.oasisai.domain.paray.ParayAgent
 import com.oasismall.oasisai.util.DesignPriceMessage
 import com.oasismall.oasisai.util.ExportShareHelper
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -78,6 +79,7 @@ class DesignViewModel(
     val batchDetail: StateFlow<DesignBatchDetailState> = _batchDetail.asStateFlow()
 
     private var lastAutoSharedPath: String? = null
+    private var renderJob: Job? = null
 
     fun clearMessage() {
         _message.value = null
@@ -331,7 +333,8 @@ class DesignViewModel(
             _message.value = "Ajoutez des articles depuis To share."
             return
         }
-        viewModelScope.launch {
+        renderJob?.cancel()
+        renderJob = viewModelScope.launch {
             _isRendering.value = true
             runCatching {
                 withContext(Dispatchers.Default) {

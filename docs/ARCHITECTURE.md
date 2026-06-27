@@ -7,7 +7,7 @@
 | UI | Jetpack Compose + Material 3 (Oasis orange `#FF5E13`, dark surfaces) |
 | Navigation | Navigation Compose |
 | State | ViewModel + StateFlow |
-| Database | Room (SQLite) — **v16** (design promo tickets on `preselection_items`; v15: `variantBarcode`) |
+| Database | Room (SQLite) — **v18** (`exportSchema = true`; migrations in `OasisDatabaseMigrations.kt`; **no destructive fallback**) |
 | Images | Coil lazy previews + local `files/product_images/` + FileProvider sharing |
 | Barcode | ML Kit (dependency) + manual entry |
 | Print export | Android `PdfDocument` |
@@ -93,7 +93,9 @@ Shelf labels: **Design** screen → `ShelfA4Renderer` → landscape A4 JPEG (12-
 
 Phone-to-phone PNG sync: **Phone sync** (hotspot LAN, port 8776) — see `docs/PHONE_SYNC.md`.
 
-- **AGENT** tab: **Smart** (PARAY + catalog + SUB-BC) or **Bulk** (barcode-only mall captures → `bulk_images/` + `bulk_captures`).
+- **AGENT** tab: **Smart** (PARAY + catalog + SUB-BC), **Ticket** (PARAY Vision hold-to-snap + fuzzy fusion + match tiers), or **Bulk** (barcode-only mall captures → `bulk_images/` + `bulk_captures`).
+- **Article cards**: all list/detail panels show **Rayon** (`ArticleRayonLine`) for mall location when printing or verifying tickets.
+- **PARAY Ticket** (v2.30.0): `ParayTicketReader` + `ParayTicketFuzzyMatcher` + `ParayTicketFrameQuality` + `ParayTicketSnapStabilizer` — ring buffer, recovery pass, tiers, anti-flip; `ParayTicketAdvisor`; `ticket_events.jsonl`.
 - **PARAY home** (`paray_home/`): memory (learn/visual), **observer**, **knowledge**, **workflows**, **recognition**, **fusion** (PKP lineage, v2.22.0), sessions, logs.
 - **PARAY tab → Memory** (v2.20.2): `ParayMemoryRepository` reads `learn_index.json` only — UI never queries Room for learning status.
 - **PARAY tab → Knowledge** (v2.20.3): `ParayKnowledgeRepository` reads `knowledge_summary.json` + `knowledge_articles.json` — rollups derived in memory, no SQL.

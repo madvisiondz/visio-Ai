@@ -262,6 +262,12 @@ class ParayAgent(
     fun barcodeAdvisor(repository: OasisRepository) =
         ParayBarcodeAdvisor(repository, barcodeMemory)
 
+    fun ticketAdvisor(repository: OasisRepository) =
+        ParayTicketAdvisor(repository, ParayTicketStore(home))
+
+    fun ticketReader(repository: OasisRepository) =
+        ParayTicketReader(repository, paray = this)
+
     fun learnedBarcodePatterns(): Int = barcodeMemory.count()
 
     fun activateDesignSession(queueSize: Int) = layoutFit.activateDesignSession(queueSize)

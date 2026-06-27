@@ -1,5 +1,7 @@
 package com.oasismall.oasisai.domain.paray
 
+import com.oasismall.oasisai.util.writeTextAtomic
+
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -50,7 +52,7 @@ class ParayRecognitionStore(private val home: ParayHome) {
                     .put("lastArticleId", record.lastArticleId),
             )
         }
-        unknownFile.writeText(root.toString())
+        unknownFile.writeTextAtomic(root.toString())
     }
 
     fun readFailurePatterns(): MutableMap<String, ParayFailurePatternRecord> {
@@ -90,7 +92,7 @@ class ParayRecognitionStore(private val home: ParayHome) {
                     .put("sampleDesignation", pattern.sampleDesignation),
             )
         }
-        patternsFile.writeText(root.toString())
+        patternsFile.writeTextAtomic(root.toString())
     }
 
     fun readSummary(): ParayRecognitionSummary {
@@ -112,7 +114,7 @@ class ParayRecognitionStore(private val home: ParayHome) {
 
     fun writeSummary(summary: ParayRecognitionSummary) {
         summaryFile.parentFile?.mkdirs()
-        summaryFile.writeText(
+        summaryFile.writeTextAtomic(
             JSONObject()
                 .put("totalFailures", summary.totalFailures)
                 .put("totalLowConfidence", summary.totalLowConfidence)
@@ -205,7 +207,7 @@ class ParayRecognitionStore(private val home: ParayHome) {
         if (!eventsFile.exists()) return
         val lines = eventsFile.readLines()
         if (lines.size <= MAX_EVENTS) return
-        eventsFile.writeText(lines.takeLast(MAX_EVENTS).joinToString("\n", postfix = "\n"))
+        eventsFile.writeTextAtomic(lines.takeLast(MAX_EVENTS).joinToString("\n", postfix = "\n"))
     }
 
     companion object {

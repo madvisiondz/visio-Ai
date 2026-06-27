@@ -1,5 +1,7 @@
 package com.oasismall.oasisai.domain.bulk
 
+import com.oasismall.oasisai.util.writeTextAtomic
+
 import android.content.ContentUris
 import android.content.ContentValues
 import android.content.Context
@@ -90,7 +92,7 @@ object BulkDownloadStorage {
             writeBytesToMediaStore(context, TRACKER_FILE, "text/plain", text.toByteArray())
         } else {
             bulkDir().mkdirs()
-            trackerFile().writeText(text)
+            trackerFile().writeTextAtomic(text)
         }
     }
 

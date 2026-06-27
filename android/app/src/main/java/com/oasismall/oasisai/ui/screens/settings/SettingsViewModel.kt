@@ -9,6 +9,7 @@ import com.oasismall.oasisai.data.repository.OasisRepository
 import com.oasismall.oasisai.domain.ImageMatcher
 import com.oasismall.oasisai.domain.background.OasisBackgroundTaskKind
 import com.oasismall.oasisai.domain.background.OasisBackgroundTaskManager
+import com.oasismall.oasisai.domain.settings.BackupSecurityStore
 import com.oasismall.oasisai.domain.visio.PhotoroomStorage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,6 +30,7 @@ data class SettingsUiState(
     val isExportingBackup: Boolean = false,
     val isImportingBackup: Boolean = false,
     val isExportingVisioPro: Boolean = false,
+    val isImportingVisioPro: Boolean = false,
     val isRestoringSubBarcodeFlavors: Boolean = false,
     val progress: com.oasismall.oasisai.util.TaskProgress? = null,
     val message: String? = null,
@@ -49,6 +51,7 @@ class SettingsViewModel(
     private val repository: OasisRepository,
     private val imageMatcher: ImageMatcher,
     private val backgroundTasks: OasisBackgroundTaskManager,
+    private val backupSecurityStore: BackupSecurityStore,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
@@ -81,6 +84,9 @@ class SettingsViewModel(
     private val _photoroomCustomFolder = MutableStateFlow(false)
     val photoroomCustomFolder: StateFlow<Boolean> = _photoroomCustomFolder.asStateFlow()
 
+    private val _backupEncryptionEnabled = MutableStateFlow(backupSecurityStore.isEncryptionEnabled())
+    val backupEncryptionEnabled: StateFlow<Boolean> = _backupEncryptionEnabled.asStateFlow()
+
     init {
         refreshPngCountsLight()
         viewModelScope.launch {
@@ -95,6 +101,7 @@ class SettingsViewModel(
                             isExportingBackup = task.kind == OasisBackgroundTaskKind.EXPORT_FULL_BACKUP,
                             isImportingBackup = task.kind == OasisBackgroundTaskKind.IMPORT_FULL_BACKUP,
                             isExportingVisioPro = task.kind == OasisBackgroundTaskKind.EXPORT_VISIOPRO_BUNDLE,
+                            isImportingVisioPro = task.kind == OasisBackgroundTaskKind.IMPORT_VISIOPRO_BUNDLE,
                             isLoadingSample = task.kind == OasisBackgroundTaskKind.LOAD_SAMPLE_DATA,
                             isLoadingImages = task.kind == OasisBackgroundTaskKind.LOAD_READY_PNGS,
                             progress = task.progress,
@@ -120,6 +127,7 @@ class SettingsViewModel(
                             isExportingBackup = false,
                             isImportingBackup = false,
                             isExportingVisioPro = false,
+                            isImportingVisioPro = false,
                             isLoadingSample = false,
                             isLoadingImages = false,
                             progress = null,
@@ -220,4 +228,16 @@ class SettingsViewModel(
 
     fun exportVisioProBundle(context: Context, outputUri: Uri) =
         start(context, OasisBackgroundTaskKind.EXPORT_VISIOPRO_BUNDLE, outputUri)
+
+    fun importVisioProBundle(context: Context, uri: Uri) =
+        start(context, OasisBackgroundTaskKind.IMPORT_VISIOPRO_BUNDLE, uri)
+
+    fun setBackupEncryptionEnabled(enabled: Boolean) {
+        backupSecurityStore.setEncryptionEnabled(enabled)
+        _backupEncryptionEnabled.value = enabled
+    }
+
+    fun setBackupPassword(password: String) {
+        backupSecurityStore.setPassword(password)
+    }
 }

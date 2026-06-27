@@ -54,6 +54,27 @@ OASIS MALL operates at scale with fragmented workflows:
 | 2026-06-19 | **VisioPRO**: in-app preset cards (agent-maintained catalog); CSV/manual prices; social + print export |
 | 2026-06-19 | **PSD pipeline**: `tools/psd` (psd-tools) + `tools/psd-node` (ag-psd) — inspect layers/bounds → JSON for template cloning |
 | 2026-06-19 | **PSD template pipeline**: Python psd-tools + Node ag-psd inspectors → `templates/psd-specs/*.json` for Design cloning |
+| 2026-06-14 | **Visio Ai v2.28.0**: Ticket mode **hold-to-snap** — no live OCR; hold screen → photo → step-by-step PARAY crop/OCR/fuzzy match UI |
+| 2026-06-14 | **Visio Ai v2.32.1**: Ticket camera fix — stride-aware YUV→bitmap (no stripe crop); main back camera + up to 4K in Ticket mode; warm-block false-positive guard |
+| 2026-06-14 | **Visio Ai v2.32.0**: **PARAY Vision Corps** — 5-strategy ticket scout (warm/price/text/layout), 6-variant OCR corps + consensus, full-frame fallback |
+| 2026-06-14 | **Visio Ai v2.31.2**: Ticket crop fix — upright frames, connected yellow blob detect, latest-frame tap, stable step UI |
+| 2026-06-14 | **Visio Ai v2.31.1**: Fix ticket tap crash — add `VIBRATE` permission for shutter haptics |
+| 2026-06-14 | **Visio Ai v2.31.0**: Ticket **tap-to-capture** (no hold); rayon filter removed; fusion weights **50% text · 30% price · 20% PNG** |
+| 2026-06-14 | **Visio Ai v2.30.0**: **PARAY Vision** stabilization — multi-frame ring buffer + sharpness/yellow quality scoring; recovery pass; match tiers (Confirmed/High/Probable); anti-flip guard; haptics; live quality meter |
+| 2026-06-14 | **Visio Ai v2.29.0**: Ticket snap **production perf** — parallel OCR+visual, single PARAY identify, sampled PNG decode, metrics, cancellable pipeline |
+| 2026-06-14 | **Visio Ai v2.28.0**: Ticket **hold-to-snap** — hold screen → photo → PARAY step UI (crop/OCR/match); no live OCR |
+| 2026-06-14 | **Visio Ai v2.27.1**: Ticket OCR fix — rotate camera frame before yellow detect; upscale+contrast OCR; price-index search; live debug overlay; Logcat `Oasis/Paray` |
+| 2026-06-14 | **Visio Ai v2.27.0**: Ticket mode **fuzzy fusion** — PARAY matches any rayon via designation + price OCR + foggy ticket PNG (`ParayTicketFuzzyMatcher`); probability % on article card |
+| 2026-06-27 | **Visio Ai v2.26.2**: Ticket mode UI — fixed header overlap, scrollable rayon sheet, stable OCR status (no flicker) |
+| 2026-06-27 | **Visio Ai v2.26.0**: **Rayon on all article cards**; AGENT **Ticket** mode — PARAY shelf ticket verify (barcode scan vs catalog/last print); `paray_home/workflows/ticket_events.jsonl` |
+| 2026-06-27 | **Visio Ai v2.25.2**: Debug APK uses same `applicationId` as on-device app — sideload upgrades in-place (keeps data) |
+| 2026-06-27 | **Visio Ai v2.25.1**: **CSV import perf** — removed automatic sub-PNG full scan from import; skip sub-barcode false removals; faster Settings sync |
+| 2026-06-27 | **Visio Ai v2.25.0**: **UX & options standardization** — shared `ArticleActionMenu`; AGENT smart scan + long-press lock + swipe unlock; VisioPRO import |
+| 2026-06-27 | **Visio Ai v2.24.0**: **Phase C polish** — Hilt core DI; atomic JSON writes; network security config; optional backup AES encryption; local crash reports |
+| 2026-06-27 | **Visio Ai v2.23.1**: **Phase B performance** — rayon Paging 3; PARAY learn cache; PhotoRoom single-flight; Design render guard |
+| 2026-06-27 | **Visio Ai v2.23.0**: **Phase A production hardening** — no destructive DB migration; Room schema export; migration tests; R8 release; Timber/OasisLog; unit tests; see `docs/PRODUCTION_READINESS.md` |
+| 2026-06-14 | **Visio Ai v2.22.2**: **Telegram sub-barcode share fix** — each variant PNG exported with its gallery filename (`Designation1.png`, …); no cache overwrite |
+| 2026-06-14 | **Visio Ai v2.22.1**: **PNG assign + import perf + sub-barcode UX** — Add PNG image on article/AGENT/cart cards; scan sub-barcode → shoot flavor OR link barcode only; fast PNG metadata append; PhotoRoom import speed fixes |
 | 2026-06-14 | **Visio Ai v2.22.0**: **PARAY Knowledge Fusion Phase 5** — PKP `.pkp.zip` export/import; incremental merge; `paray_home/fusion/`; PARAY Home Knowledge Fusion section; see `docs/PARAY_FUSION.md` |
 | 2026-06-14 | **Visio Ai v2.21.1**: **PARAY Living AI Presence V1** — activity LED + `ParayActivityMonitor`; Recognition dashboard on Home + Statistics |
 | 2026-06-14 | **Visio Ai v2.21.0**: **PARAY Recognition Phase 4** — `ParayRecognitionObserver`; `paray_home/recognition/`; AGENT blind-spot curiosity |
@@ -642,6 +663,23 @@ It:
 
 | Date | Change |
 |------|--------|
+| 2026-06-14 | **Visio Ai v2.32.1**: Fix ticket crop stretch — proper YUV_420_888→NV21 stride copy; Ticket mode uses best back camera + high-res selector (4K); warm-block desk false positives rejected; crop preview aspect ratio; APK 2.32.1 (329) |
+| 2026-06-14 | **Visio Ai v2.32.0**: PARAY Vision Corps — 5-strategy visual scout + 6-variant OCR corps + consensus; faded/warm/magenta tickets OK; full-frame fallback; APK 2.32.0 (328) |
+| 2026-06-14 | **Visio Ai v2.31.2**: Ticket crop/orientation fix — rotate frames to match preview, largest yellow blob (not noise strips), tap uses latest frame, cleaner failure UI; APK 2.31.2 (327) |
+| 2026-06-14 | **Visio Ai v2.31.1**: Fix ticket tap crash — `android.permission.VIBRATE` in manifest; safe haptics fallback; APK 2.31.1 (326) |
+| 2026-06-14 | **Visio Ai v2.31.0**: Ticket tap-to-capture (tap screen = photo); rayon picker removed; fuzzy fusion 50/30/20 (text/price/PNG); APK 2.31.0 (325) |
+| 2026-06-14 | **Visio Ai v2.30.0**: PARAY Vision stabilization — ring buffer best-frame snap, Laplacian+yellow quality, recovery boost pass, alternate-frame retry, match tiers + anti-flip, haptics, live quality UI; APK 2.30.0 (324) |
+| 2026-06-14 | **Visio Ai v2.29.0**: Ticket snap production optimization — parallel OCR/visual, cached visual hints, fast OCR path, buffer downscale, step timing logs; APK 2.29.0 (323) |
+| 2026-06-14 | **Visio Ai v2.28.0**: Ticket hold-to-snap — user holds on ticket → single photo → PARAY step UI; APK 2.28.0 (322) |
+| 2026-06-14 | **Visio Ai v2.27.1**: Ticket OCR pipeline fix — upright rotation before yellow detect; 720px upscale + contrast OCR; APK 2.27.1 (321) |
+| 2026-06-14 | **Visio Ai v2.27.0**: Ticket mode fuzzy fusion — `ParayTicketFuzzyMatcher` fuses OCR designation + price + ticket product PNG; matches any rayon; probability % + text/price/PNG breakdown on card; APK 2.27.0 (320) |
+| 2026-06-27 | **Visio Ai v2.25.1**: CSV import ~5min faster — no auto sub-PNG scan; sub-barcode removal fix |
+| 2026-06-27 | **Visio Ai v2.25.0**: Shared article action menus; AGENT scan UX; VisioPRO import/export parity |
+| 2026-06-27 | **Visio Ai v2.24.0**: Phase C — Hilt core DI; atomic JSON; network security config; backup AES encryption; LocalCrashReporter |
+| 2026-06-27 | **Visio Ai v2.23.1**: Phase B — rayon Paging 3; PARAY learn cache; PhotoRoom single-flight; Design render cancel |
+| 2026-06-27 | **Visio Ai v2.23.0**: Phase A — destructive migration off; schema export; migration tests; R8 release; Timber; PngShareHelper + ImportCatalogMaps tests |
+| 2026-06-14 | **Visio Ai v2.22.2**: Fix Telegram share — sub-barcode variants no longer overwrite same export filename |
+| 2026-06-14 | **Visio Ai v2.22.1**: PNG assign on article/AGENT/cart cards; sub-barcode scan → shoot flavor OR link barcode only; fast PNG metadata append; PhotoRoom import perf |
 | 2026-06-14 | **Visio Ai v2.22.0**: PARAY Knowledge Fusion Phase 5 — PKP `.pkp.zip`; `ParayKnowledgeFusionEngine` + `ParayFusionConflictResolver`; export/import on PARAY Home; `paray_home/fusion/`; incremental merge only; see `docs/PARAY_FUSION.md` |
 | 2026-06-14 | **Visio Ai v2.21.0**: PARAY Recognition Phase 4 — `ParayRecognitionObserver` + `paray_home/recognition/`; failures, low confidence, corrections, drift, unknown barcodes; see `docs/PARAY_RECOGNITION.md` |
 | 2026-06-14 | **Visio Ai v2.20.4**: PARAY Statistics tab — learn_index + knowledge_summary + workflow_summary KPIs; coverage bar; learning trend list |

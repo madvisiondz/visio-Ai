@@ -1,5 +1,7 @@
 package com.oasismall.oasisai.domain.paray
 
+import com.oasismall.oasisai.util.writeTextAtomic
+
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -22,7 +24,7 @@ class ParayVisualIndex(home: ParayHome) {
             merge(existing, signature)
         }
         root.put(key, toJson(merged))
-        indexFile.writeText(root.toString())
+        indexFile.writeTextAtomic(root.toString())
     }
 
     fun get(articleId: Long): ProductVisualSignature? =
@@ -58,7 +60,7 @@ class ParayVisualIndex(home: ParayHome) {
             }
             root.put(key, toJson(merged))
         }
-        indexFile.writeText(root.toString())
+        indexFile.writeTextAtomic(root.toString())
     }
 
     private fun invalidateCache() {

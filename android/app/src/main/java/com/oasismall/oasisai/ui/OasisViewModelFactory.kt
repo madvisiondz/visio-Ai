@@ -49,12 +49,13 @@ class OasisViewModelFactory(
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         return when {
             modelClass.isAssignableFrom(HomeViewModel::class.java) ->
-                HomeViewModel(app.repository) as T
+                HomeViewModel(app.repository, app.galleryPngAssignService) as T
             modelClass.isAssignableFrom(SettingsViewModel::class.java) ->
                 SettingsViewModel(
                     app.repository,
                     app.imageMatcher,
                     app.backgroundTaskManager,
+                    app.backupSecurityStore,
                 ) as T
             modelClass.isAssignableFrom(ImportantRayonsViewModel::class.java) ->
                 ImportantRayonsViewModel(app.repository) as T
@@ -101,7 +102,7 @@ class OasisViewModelFactory(
             modelClass.isAssignableFrom(CatalogViewModel::class.java) ->
                 CatalogViewModel(app.repository) as T
             modelClass.isAssignableFrom(ArticleDetailViewModel::class.java) ->
-                ArticleDetailViewModel(app.repository) as T
+                ArticleDetailViewModel(app.repository, app.galleryPngAssignService) as T
             modelClass.isAssignableFrom(ScannerViewModel::class.java) ->
                 ScannerViewModel(app.repository, app.parayWorkflowTracker, app.parayRecognitionTracker) as T
             modelClass.isAssignableFrom(PreselectionViewModel::class.java) ->
@@ -139,6 +140,7 @@ class OasisViewModelFactory(
                     app.bulkCaptureStore,
                     app.parayWorkflowTracker,
                     app.parayRecognitionTracker,
+                    app.galleryPngAssignService,
                 ) as T
             modelClass.isAssignableFrom(PhoneSyncViewModel::class.java) ->
                 PhoneSyncViewModel(app.repository, app.imageMatcher) as T
@@ -190,7 +192,7 @@ class OasisViewModelFactory(
         object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                return CartViewModel(cartType, app.repository) as T
+                return CartViewModel(cartType, app.repository, app.galleryPngAssignService) as T
             }
         }
 

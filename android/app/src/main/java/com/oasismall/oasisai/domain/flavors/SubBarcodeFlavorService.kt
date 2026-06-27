@@ -56,15 +56,16 @@ class SubBarcodeFlavorService(
     suspend fun syncSubPngsFromMetadata(
         onProgress: ((TaskProgress) -> Unit)? = null,
     ): SubBarcodeSyncResult = withContext(Dispatchers.IO) {
-        imageMatcher.invalidatePngCache()
         val articles = repository.getAllArticles()
         val articlesByBarcode = articles.associateBy { it.barcode }
         val articlesById = articles.associateBy { it.id }
+        val primaryByBarcode = articlesByBarcode
         val alts = repository.getAllAlternateBarcodes()
         val altBySubBarcode = alts.associateBy { it.barcode }
         val altByImagePath = alts.mapNotNull { alt ->
             alt.imagePath?.let { it to alt }
         }.toMap()
+        val altIndexByParent = buildAltIndexUsageByParent()
 
         val pngs = imagesDir.listFiles()
             ?.filter { it.isFile && it.extension.equals("png", true) }
@@ -81,14 +82,15 @@ class SubBarcodeFlavorService(
         val prepared = ArrayList<PreparedSubPng>(pngs.size)
 
         pngs.forEachIndexed { index, file ->
-            if (index % 25 == 0 || index == pngs.lastIndex) {
+            if (index % 50 == 0 || index == pngs.lastIndex) {
                 val pct = ((index + 1) * 30 / pngs.size.coerceAtLeast(1))
                 onProgress?.invoke(TaskProgress("Scanning PNGs (${index + 1}/${pngs.size})", pct))
             }
             if (!PngMetadata.isSubVariantPng(file, altImagePaths)) return@forEachIndexed
 
-            val chunks = PngMetadata.readAllTextChunks(file)
-            var details = detailsFromChunks(file, chunks)
+            val details = runCatching { PngMetadata.readArticleDetails(file) }.getOrDefault(
+                PngMetadata.PngArticleDetails(),
+            )
             val alt = altByImagePath[file.absolutePath]
             val parentFromDb = alt?.let { articlesById[it.articleId] }
 
@@ -113,9 +115,12 @@ class SubBarcodeFlavorService(
                 return@forEachIndexed
             }
 
-            val needsMetadata = chunks[PngMetadata.KEY_VARIANT_TYPE] != "sub" ||
-                chunks[PngMetadata.KEY_PARENT_BARCODE].isNullOrBlank() ||
-                chunks[PngMetadata.KEY_BARCODE].isNullOrBlank()
+            val needsMetadata = details.parentBarcode.isNullOrBlank() ||
+                details.barcode.isNullOrBlank() ||
+                runCatching {
+                    val chunks = PngMetadata.readAllTextChunks(file)
+                    chunks[PngMetadata.KEY_VARIANT_TYPE] != "sub"
+                }.getOrDefault(true)
             if (needsMetadata) {
                 writeSubMetadata(file, subBarcode, parentArticle)
                 metadataUpdated++
@@ -124,7 +129,7 @@ class SubBarcodeFlavorService(
             var currentFile = file
             if (shouldRenameSubFile(currentFile, parentArticle)) {
                 val stem = PngMetadata.subVariantDesignationStem(parentArticle.designation)
-                val altIndex = allocateAltIndex(parentArticle.barcode, stem, currentFile)
+                val altIndex = allocateAltIndex(parentArticle.barcode, stem, currentFile, altIndexByParent)
                 val target = File(imagesDir, PngMetadata.subVariantFileName(stem, altIndex))
                 if (target.absolutePath != currentFile.absolutePath) {
                     if (target.exists()) target.delete()
@@ -156,9 +161,15 @@ class SubBarcodeFlavorService(
                 parentMissing++
                 return@forEachIndexed
             }
-            val ownPrimary = repository.getPrimaryArticleByBarcode(item.subBarcode)
+            val ownPrimary = primaryByBarcode[item.subBarcode]
             if (ownPrimary != null && ownPrimary.id != parent.id) {
                 skippedConflict++
+                return@forEachIndexed
+            }
+            val existingAlt = altBySubBarcode[item.subBarcode]
+            if (existingAlt?.articleId == parent.id &&
+                existingAlt.imagePath == item.file.absolutePath
+            ) {
                 return@forEachIndexed
             }
             val err = repository.linkSubBarcodeToMainArticle(
@@ -170,7 +181,9 @@ class SubBarcodeFlavorService(
             if (err == null) linked++
         }
 
-        imageMatcher.invalidatePngCache()
+        if (linked > 0 || renamed > 0 || metadataUpdated > 0) {
+            imageMatcher.invalidatePngCache()
+        }
         onProgress?.invoke(TaskProgress("Sub-PNG sync complete", 100))
         SubBarcodeSyncResult(
             scanned = pngs.size,
@@ -191,20 +204,22 @@ class SubBarcodeFlavorService(
 
     suspend fun registryCount(): Int = registry.count()
 
-    private fun detailsFromChunks(file: File, chunks: Map<String, String>): PngMetadata.PngArticleDetails {
-        val stem = file.nameWithoutExtension.removePrefix("sub_")
-        val barcode = chunks[PngMetadata.KEY_BARCODE]?.trim()?.takeIf { it.isNotBlank() }
-            ?: PngMetadata.extractBarcodeFromFilename(stem)
-        return PngMetadata.PngArticleDetails(
-            barcode = barcode,
-            codeart = chunks[PngMetadata.KEY_CODEART]?.trim()?.takeIf { it.isNotBlank() },
-            designation = chunks[PngMetadata.KEY_DESIGNATION]?.trim()?.takeIf { it.isNotBlank() },
-            priceNow = chunks[PngMetadata.KEY_PRICE_NOW]?.toDoubleOrNull(),
-            priceBefore = chunks[PngMetadata.KEY_PRICE_BEFORE]?.toDoubleOrNull(),
-            rayon = chunks[PngMetadata.KEY_RAYON]?.trim()?.takeIf { it.isNotBlank() },
-            parentBarcode = chunks[PngMetadata.KEY_PARENT_BARCODE]?.trim()?.takeIf { it.isNotBlank() },
-            description = chunks[PngMetadata.KEY_DESCRIPTION]?.trim()?.takeIf { it.isNotBlank() },
-        )
+    private fun buildAltIndexUsageByParent(): MutableMap<String, MutableSet<Int>> {
+        val map = mutableMapOf<String, MutableSet<Int>>()
+        imagesDir.listFiles()
+            ?.filter { it.isFile && it.extension.equals("png", true) }
+            ?.forEach { file ->
+                val details = runCatching { PngMetadata.readArticleDetails(file) }.getOrDefault(
+                    PngMetadata.PngArticleDetails(),
+                )
+                val parent = details.parentBarcode?.trim()?.takeIf { it.isNotEmpty() } ?: return@forEach
+                val stem = details.designation?.let { PngMetadata.subVariantDesignationStem(it) }
+                    ?: return@forEach
+                PngMetadata.parseSubVariantAltIndex(file.nameWithoutExtension, stem)?.let { index ->
+                    map.getOrPut(parent) { mutableSetOf() }.add(index)
+                }
+            }
+        return map
     }
 
     private fun legacySubBarcodeFromFilename(file: File): String? {
@@ -235,21 +250,16 @@ class SubBarcodeFlavorService(
         )
     }
 
-    private fun allocateAltIndex(parentBarcode: String, designationStem: String, current: File): Int {
-        val used = mutableSetOf<Int>()
-        imagesDir.listFiles()
-            ?.filter { it.isFile && it.extension.equals("png", true) && it.absolutePath != current.absolutePath }
-            ?.forEach { file ->
-                val details = runCatching { PngMetadata.readArticleDetails(file) }.getOrDefault(
-                    PngMetadata.PngArticleDetails(),
-                )
-                if (details.parentBarcode != null && details.parentBarcode != parentBarcode) return@forEach
-                PngMetadata.parseSubVariantAltIndex(file.nameWithoutExtension, designationStem)?.let {
-                    used.add(it)
-                }
-            }
+    private fun allocateAltIndex(
+        parentBarcode: String,
+        designationStem: String,
+        current: File,
+        altIndexByParent: MutableMap<String, MutableSet<Int>>,
+    ): Int {
+        val used = altIndexByParent.getOrPut(parentBarcode) { mutableSetOf() }
         var index = 1
         while (used.contains(index)) index++
+        used.add(index)
         return index
     }
 

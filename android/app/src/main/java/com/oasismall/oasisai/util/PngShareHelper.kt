@@ -12,11 +12,9 @@ import java.io.File
 /**
  * Shares PNG bytes as **documents** (Telegram file attach), not gallery photos.
  *
- * Telegram (LaunchActivity) routes to photo compression when ContentResolver.getType(uri)
- * is image-type. Default FileProvider returns image/png for .png files.
- *
- * Fix: dedicated [OasisShareFileProvider] (always application/octet-stream) and
- * on-disk `.oasis` extension with DISPLAY_NAME = real `NAME.png`.
+ * Telegram reads [OpenableColumns.DISPLAY_NAME] from [OasisShareFileProvider], which is
+ * derived from the on-disk `.oasis` cache filename — not Intent extras. Cache files must
+ * therefore use the human-readable spaced display stem, while gallery PNGs may stay compact.
  */
 object PngShareHelper {
 
@@ -28,18 +26,72 @@ object PngShareHelper {
         "org.thunderdog.challegram",
     )
 
-    fun targetFileName(item: PreselectionWithArticle): String =
-        targetFileName(item.designation, item.barcode)
-
-    fun targetFileName(designation: String, barcode: String): String {
-        val displayStem = NameNormalizer.toDisplayFileStem(designation).takeIf { it.isNotBlank() }
-        val stem = displayStem ?: PngMetadata.barcodeFileStem(barcode)
-        return "$stem.png"
+    fun targetFileName(item: PreselectionWithArticle): String {
+        val source = item.imagePath?.let(::File)?.takeIf { it.exists() }
+        return shareDisplayName(item, source)
     }
 
-    private fun internalShareFileName(displayName: String): String {
-        val stem = displayName.removeSuffix(".png").removeSuffix(".PNG")
-        return "$stem${OasisShareFileProvider.SHARE_FILE_EXTENSION}"
+    fun targetFileName(designation: String, barcode: String): String {
+        val spacedStem = NameNormalizer.toDisplayFileStem(designation).takeIf { it.isNotBlank() }
+            ?: PngMetadata.barcodeFileStem(barcode)
+        return "$spacedStem.png"
+    }
+
+    private fun shareDisplayName(item: PreselectionWithArticle, source: File?): String {
+        val spacedStem = resolveSpacedStem(item, source)
+        if (source != null) {
+            val compactStem = PngMetadata.subVariantDesignationStem(item.designation)
+            val altIndex = variantIndexFromSource(source, compactStem)
+            if (altIndex != null) {
+                return "$spacedStem $altIndex.png"
+            }
+        }
+        val variant = item.variantBarcode.trim()
+        val main = item.barcode.trim()
+        if (variant.isNotEmpty() && variant != main) {
+            return "$spacedStem ${PngMetadata.barcodeFileStem(variant)}.png"
+        }
+        return "$spacedStem.png"
+    }
+
+    /** Prefer spaced designation from DB; fall back to PNG metadata when DB value is compact. */
+    private fun resolveSpacedStem(item: PreselectionWithArticle, source: File?): String {
+        val fromDb = NameNormalizer.toDisplayFileStem(item.designation)
+        if (' ' in fromDb) return fromDb
+
+        source?.let { file ->
+            runCatching { PngMetadata.readArticleDetails(file).designation }
+                .getOrNull()
+                ?.trim()
+                ?.takeIf { it.isNotBlank() }
+                ?.let { NameNormalizer.toDisplayFileStem(it) }
+                ?.takeIf { ' ' in it }
+                ?.let { return it }
+        }
+
+        val normalized = NameNormalizer.normalize(item.designation)
+        if (' ' in normalized) return normalized
+
+        return fromDb.ifBlank { PngMetadata.barcodeFileStem(item.barcode) }
+    }
+
+    private fun variantIndexFromSource(source: File, compactStem: String): Int? {
+        val diskStem = source.nameWithoutExtension
+        PngMetadata.parseSubVariantAltIndex(diskStem, compactStem)?.let { return it }
+        if (!diskStem.startsWith(compactStem, ignoreCase = true)) return null
+        return diskStem.removePrefix(compactStem).toIntOrNull()?.takeIf { it > 0 }
+    }
+
+    private fun cacheFileForDisplayName(dir: File, displayName: String, used: MutableSet<String>): File {
+        var stem = displayName.removeSuffix(".png").removeSuffix(".PNG")
+        var internal = "$stem${OasisShareFileProvider.SHARE_FILE_EXTENSION}"
+        var n = 2
+        while (!used.add(internal)) {
+            stem = "${displayName.removeSuffix(".png").removeSuffix(".PNG")}_$n"
+            internal = "$stem${OasisShareFileProvider.SHARE_FILE_EXTENSION}"
+            n++
+        }
+        return File(dir, internal)
     }
 
     suspend fun prepareNamedFiles(
@@ -50,10 +102,11 @@ object PngShareHelper {
             mkdirs()
             listFiles()?.forEach { it.delete() }
         }
+        val usedInternal = mutableSetOf<String>()
         return items.mapNotNull { item ->
             val source = item.imagePath?.let(::File)?.takeIf { it.exists() } ?: return@mapNotNull null
-            val displayName = targetFileName(item)
-            val dest = File(dir, internalShareFileName(displayName))
+            val displayName = shareDisplayName(item, source)
+            val dest = cacheFileForDisplayName(dir, displayName, usedInternal)
             source.copyTo(dest, overwrite = true)
             PngMetadata.writeArticleDetails(
                 file = dest,
@@ -92,7 +145,7 @@ object PngShareHelper {
                 val first = named.first()
                 clipData = ClipData.newRawUri(first.displayName, uris.first()).apply {
                     named.drop(1).zip(uris.drop(1)).forEach { (entry, uri) ->
-                        addItem(ClipData.Item(uri))
+                        addItem(ClipData.Item(entry.displayName, null, uri))
                     }
                 }
             }

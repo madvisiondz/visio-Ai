@@ -206,13 +206,15 @@ User query
 ## 2b. Sub-barcode acquisition (v2.4.0)
 
 ```
-Scan sub-barcode (AGENT SUB-BC or Article → Add sub-barcode & batch shoot)
+Scan sub-barcode (AGENT SUB-BC or Article → Add sub-barcode)
     → validateSubBarcodeLink (no DB write yet)
-    → Confirm add?
-    → Confirm add? → shoot photo (required for new sub-barcodes)
-        → Camera batch → JPEG → PhotoRoom PNG → importFromPhotoroom
-        → registerSubBarcodeImage → article_alternate_barcodes.imagePath
+    → User choice:
+        → **Shoot flavor photo** → Camera batch → JPEG → PhotoRoom PNG → importFromPhotoroom
+            → registerSubBarcodeImage → article_alternate_barcodes.imagePath
+        → **Link barcode only** → linkSubBarcodeToMainArticle (parent imagePath, no new photo)
     → importFromPhotoroom adds **sub-barcode flavor row** to To share (`variantBarcode` on preselection_items)
+    → **Add PNG image** (article detail / AGENT / carts / Articles search) → GalleryPngAssignService
+        → copy picked PNG → register main or sub variant → link DB + update cart row
     → **Pick PNG** on import screen when PhotoRoom export failed — user selects file; app renames to gallery PNG
     → Legacy sub-barcodes without imagePath: unchanged (fallback to main article image)
     → Tap sub-barcode chip → unlinkAlternateBarcode
@@ -442,6 +444,19 @@ AGENT (bottom nav) — Smart
          -> user confirms -> alternate barcode linked + PARAY memory
          -> optional: Let PARAY look (system camera) -> visual fingerprint match
     -> unlock -> clear session; scanner resumes immediately
+```
+
+### Ticket mode (tap-to-capture, v2.31.0)
+
+```
+AGENT — Ticket toggle
+    -> camera ring buffer (best frame on tap)
+    -> user taps screen on ticket → photo captured
+    -> ParayTicketReader.processSnap()
+         -> crop yellow block + product PNG from photo
+         -> OCR designation + price + PARAY PNG match (50/30/20 fusion)
+         -> auto-lock article card
+    -> swipe unlock → tap next ticket
 ```
 
 ### Bulk mode (mall photo job)

@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import com.oasismall.oasisai.data.repository.OasisRepository
 import com.oasismall.oasisai.domain.ImageMatcher
+import com.oasismall.oasisai.domain.settings.BackupSecurityStore
 import com.oasismall.oasisai.domain.settings.ImportantRayonsStore
 import com.oasismall.oasisai.domain.visiopro.VisioProCatalogConfigStore
 import com.oasismall.oasisai.domain.visiopro.VisioProCategory
@@ -25,16 +26,35 @@ class DeviceBackupImporter(
     private val imageMatcher: ImageMatcher,
     private val importantRayonsStore: ImportantRayonsStore,
     private val visioProCatalogConfigStore: VisioProCatalogConfigStore,
+    private val backupSecurityStore: BackupSecurityStore,
 ) {
     suspend fun importFromUri(
         uri: Uri,
         onProgress: ((TaskProgress) -> Unit)? = null,
     ): DeviceBackupImportResult = withContext(Dispatchers.IO) {
         onProgress?.invoke(TaskProgress("Reading backup file", 5))
-        val zipFile = File(context.cacheDir, "import_backup.zip")
+        val rawFile = File(context.cacheDir, "import_backup_raw")
         context.contentResolver.openInputStream(uri)?.use { input ->
-            zipFile.outputStream().use { output -> input.copyTo(output) }
+            rawFile.outputStream().use { output -> input.copyTo(output) }
         } ?: error("Cannot read backup file")
+
+        val zipFile = File(context.cacheDir, "import_backup.zip")
+        if (BackupCrypto.isEncrypted(rawFile)) {
+            val password = backupSecurityStore.getPassword()?.toCharArray()
+                ?: error("Encrypted backup — set the backup password in Settings first")
+            onProgress?.invoke(TaskProgress("Decrypting backup", 10))
+            try {
+                BackupCrypto.decrypt(rawFile, zipFile, password)
+            } finally {
+                password.fill('\u0000')
+            }
+            rawFile.delete()
+        } else {
+            rawFile.renameTo(zipFile) || run {
+                rawFile.copyTo(zipFile, overwrite = true)
+                rawFile.delete()
+            }
+        }
 
         val extractDir = File(context.cacheDir, "import_backup_extract").apply {
             deleteRecursively()

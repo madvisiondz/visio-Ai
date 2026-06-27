@@ -1,5 +1,7 @@
 package com.oasismall.oasisai.domain.paray
 
+import com.oasismall.oasisai.util.writeTextAtomic
+
 import org.json.JSONObject
 
 /** Persists PARAY Observer state, events, and rolling knowledge under `paray_home/observer/`. */
@@ -24,7 +26,7 @@ class ParayObserverStore(private val home: ParayHome) {
 
     fun writeState(state: ParayObserverState) {
         stateFile.parentFile?.mkdirs()
-        stateFile.writeText(
+        stateFile.writeTextAtomic(
             JSONObject()
                 .put("lastArticleCount", state.lastArticleCount)
                 .put("lastPngCount", state.lastPngCount)
@@ -68,7 +70,7 @@ class ParayObserverStore(private val home: ParayHome) {
 
     fun writeKnowledge(knowledge: ParayObserverKnowledge) {
         knowledgeFile.parentFile?.mkdirs()
-        knowledgeFile.writeText(
+        knowledgeFile.writeTextAtomic(
             JSONObject()
                 .put("lastChangeSummary", knowledge.lastChangeSummary)
                 .put("lastCsvImportId", knowledge.lastCsvImportId)
@@ -108,7 +110,7 @@ class ParayObserverStore(private val home: ParayHome) {
 
     fun writeSummary(summary: ParayObserverSummary) {
         home.observerSummaryFile.parentFile?.mkdirs()
-        home.observerSummaryFile.writeText(
+        home.observerSummaryFile.writeTextAtomic(
             JSONObject()
                 .put("lastObservationAt", summary.lastObservationAt)
                 .put("lastKnowledgeRefresh", summary.lastKnowledgeRefresh)
@@ -171,7 +173,7 @@ class ParayObserverStore(private val home: ParayHome) {
         val file = home.homeDisplayCacheFile
         file.parentFile?.mkdirs()
         val neural = cache.neural
-        file.writeText(
+        file.writeTextAtomic(
             JSONObject()
                 .put("agentName", cache.manifest.agentName)
                 .put("agentVersion", cache.manifest.version)

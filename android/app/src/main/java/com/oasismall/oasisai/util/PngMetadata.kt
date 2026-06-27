@@ -55,14 +55,16 @@ object PngMetadata {
                 val type = ByteArray(4)
                 if (raf.read(type) != 4) break
                 val chunkType = String(type, Charsets.US_ASCII)
-                val data = ByteArray(length)
-                if (length > 0 && raf.read(data) != length) break
-                raf.skipBytes(4)
                 if (chunkType == "tEXt" || chunkType == "iTXt") {
+                    val data = ByteArray(length)
+                    if (length > 0 && raf.read(data) != length) break
                     parseTextChunk(data, chunkType)?.let { (kw, text) ->
                         out[kw] = text
                     }
+                } else if (length > 0) {
+                    raf.skipBytes(length)
                 }
+                raf.skipBytes(4)
                 if (chunkType == "IEND") break
             }
         }
@@ -161,7 +163,13 @@ object PngMetadata {
             parentBarcode?.trim()?.takeIf { it.isNotBlank() }?.let { put(KEY_PARENT_BARCODE, it) }
             variantType?.trim()?.takeIf { it.isNotBlank() }?.let { put(KEY_VARIANT_TYPE, it) }
         }
-        writeTextChunks(file, chunks)
+        val existing = readAllTextChunks(file)
+        val hasOverlap = chunks.keys.any { existing.containsKey(it) }
+        if (!hasOverlap) {
+            appendTextChunksBeforeIend(file, chunks)
+        } else {
+            writeTextChunks(file, chunks)
+        }
     }
 
     fun extractBarcodeFromFilename(stem: String): String? =
@@ -220,13 +228,16 @@ object PngMetadata {
                 val type = ByteArray(4)
                 if (raf.read(type) != 4) break
                 val chunkType = String(type, Charsets.US_ASCII)
-                val data = ByteArray(length)
-                if (length > 0 && raf.read(data) != length) break
-                raf.skipBytes(4) // CRC
                 if (chunkType == "tEXt" || chunkType == "iTXt") {
+                    val data = ByteArray(length)
+                    if (length > 0 && raf.read(data) != length) break
+                    raf.skipBytes(4)
                     parseTextChunk(data, chunkType)?.let { (kw, text) ->
                         if (kw == keyword) return text
                     }
+                } else {
+                    if (length > 0) raf.skipBytes(length)
+                    raf.skipBytes(4)
                 }
                 if (chunkType == "IEND") break
             }
@@ -281,6 +292,44 @@ object PngMetadata {
         val newChunks = chunks.map { (keyword, text) -> buildTextChunk(keyword, text) }
         val combined = before + newChunks.fold(ByteArray(0)) { acc, c -> acc + c } + after
         file.writeBytes(combined)
+    }
+
+    /** Fast path — insert tEXt chunks before IEND without loading image data. */
+    private fun appendTextChunksBeforeIend(file: File, chunks: Map<String, String>) {
+        if (chunks.isEmpty()) return
+        RandomAccessFile(file, "rw").use { raf ->
+            val iendOffset = findIendOffsetRaf(raf) ?: return
+            val tailLen = (raf.length() - iendOffset).toInt()
+            if (tailLen < 12) return
+            val tail = ByteArray(tailLen)
+            raf.seek(iendOffset)
+            raf.readFully(tail)
+            raf.seek(iendOffset)
+            chunks.forEach { (keyword, text) ->
+                raf.write(buildTextChunk(keyword, text))
+            }
+            raf.write(tail)
+        }
+    }
+
+    private fun findIendOffsetRaf(raf: RandomAccessFile): Long? {
+        raf.seek(8)
+        while (raf.filePointer < raf.length()) {
+            val length = readIntBe(raf)
+            if (length < 0) return null
+            val type = ByteArray(4)
+            if (raf.read(type) != 4) return null
+            val chunkType = String(type, Charsets.US_ASCII)
+            if (chunkType == "IEND") return raf.filePointer - 8
+            raf.skipBytes(length + 4)
+        }
+        return null
+    }
+
+    private fun readIntBe(raf: RandomAccessFile): Int {
+        val buf = ByteArray(4)
+        if (raf.read(buf) != 4) return -1
+        return ByteBuffer.wrap(buf).order(ByteOrder.BIG_ENDIAN).int
     }
 
     private fun stripTextChunks(png: ByteArray, keywords: Set<String>): ByteArray {

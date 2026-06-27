@@ -1,5 +1,7 @@
 package com.oasismall.oasisai.domain.paray
 
+import com.oasismall.oasisai.util.writeTextAtomic
+
 import org.json.JSONObject
 import java.io.File
 
@@ -23,7 +25,7 @@ class ParayBarcodeMemory(home: ParayHome) {
                 .put("lastFourCatalog", lastFour(catalogBarcode))
                 .put("learnedAt", System.currentTimeMillis()),
         )
-        file.writeText(root.toString())
+        file.writeTextAtomic(root.toString())
     }
 
     fun lookupByLastFour(scannedBarcode: String): List<LearnedBarcodePattern> {

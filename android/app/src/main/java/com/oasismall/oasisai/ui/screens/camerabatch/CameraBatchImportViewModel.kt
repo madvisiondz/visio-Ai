@@ -13,6 +13,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -35,11 +37,14 @@ class CameraBatchImportViewModel(
     val pendingRows: StateFlow<List<PendingBatchRow>> = combine(
         store.observeAllPending(),
         refreshTick,
-    ) { items, _ ->
-        items.map { item ->
-            PendingBatchRow(item, store.findPhotoroomPng(item.barcode, item.designation))
+    ) { items, _ -> items }
+        .map { items ->
+            items.map { item ->
+                PendingBatchRow(item, store.findPhotoroomPng(item.barcode, item.designation))
+            }
         }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+        .flowOn(Dispatchers.IO)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val _photoroomPngCount = MutableStateFlow(0)
     val photoroomPngCount: StateFlow<Int> = _photoroomPngCount.asStateFlow()
@@ -67,11 +72,10 @@ class CameraBatchImportViewModel(
     fun importOne(itemId: Long) {
         viewModelScope.launch {
             _busy.value = true
-            store.importFromPhotoroom(itemId).fold(
-                onSuccess = { msg ->
-                    _message.value = msg
-                    refreshPhotoroomList()
-                },
+            withContext(Dispatchers.IO) {
+                store.importFromPhotoroom(itemId)
+            }.fold(
+                onSuccess = { msg -> _message.value = msg },
                 onFailure = { e -> _message.value = e.message ?: "Import failed" },
             )
             _busy.value = false
@@ -81,11 +85,10 @@ class CameraBatchImportViewModel(
     fun importManual(itemId: Long, uri: Uri) {
         viewModelScope.launch {
             _busy.value = true
-            store.importFromManualPng(itemId, uri).fold(
-                onSuccess = { msg ->
-                    _message.value = msg
-                    refreshPhotoroomList()
-                },
+            withContext(Dispatchers.IO) {
+                store.importFromManualPng(itemId, uri)
+            }.fold(
+                onSuccess = { msg -> _message.value = msg },
                 onFailure = { e -> _message.value = e.message ?: "Manual import failed" },
             )
             _busy.value = false
@@ -101,7 +104,6 @@ class CameraBatchImportViewModel(
                 if (result.failed > 0) append(", ${result.failed} still waiting")
                 if (result.errors.isNotEmpty()) append("\n${result.errors.joinToString("\n")}")
             }
-            refreshPhotoroomList()
             _busy.value = false
         }
     }
@@ -109,7 +111,9 @@ class CameraBatchImportViewModel(
     fun removePending(itemId: Long) {
         viewModelScope.launch {
             _busy.value = true
-            store.removePendingItem(itemId).fold(
+            withContext(Dispatchers.IO) {
+                store.removePendingItem(itemId)
+            }.fold(
                 onSuccess = { msg -> _message.value = msg },
                 onFailure = { e -> _message.value = e.message ?: "Could not remove" },
             )

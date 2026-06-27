@@ -1,5 +1,7 @@
 package com.oasismall.oasisai.domain.visio
 
+import com.oasismall.oasisai.util.writeTextAtomic
+
 import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
@@ -201,7 +203,6 @@ class CameraBatchStore(
         }.getOrNull()?.trim().orEmpty()
 
     suspend fun importAllPending(): ImportAllResult = withContext(Dispatchers.IO) {
-        refreshPhotoroomIndex()
         val pending = dao.getAllByStatus(CameraBatchStatus.AWAITING_PHOTOROOM.name)
         var imported = 0
         val errors = mutableListOf<String>()
@@ -258,7 +259,7 @@ class CameraBatchStore(
             price?.let { put("price", PriceFormatter.format(it)) }
             previousPrice?.let { put("priceBefore", PriceFormatter.format(it)) }
         }
-        File(jpgPath.removeSuffix(".jpg") + ".visio.json").writeText(json.toString())
+        File(jpgPath.removeSuffix(".jpg") + ".visio.json").writeTextAtomic(json.toString())
     }
 }
 

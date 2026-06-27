@@ -7,10 +7,14 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.hilt.android)
 }
 
 // Build outside OneDrive (sync locks files) — entire :app module in one folder so dex/APK stay consistent.
-layout.buildDirectory.set(File(System.getenv("LOCALAPPDATA"), "OasisAI-android-build"))
+val localAppData = System.getenv("LOCALAPPDATA")
+if (!localAppData.isNullOrBlank()) {
+    layout.buildDirectory.set(File(localAppData, "OasisAI-android-build"))
+}
 
 val localProperties = Properties().apply {
     val file = rootProject.file("local.properties")
@@ -28,26 +32,46 @@ android {
         applicationId = "com.oasismall.visioai"
         minSdk = 26
         targetSdk = 34
-        versionCode = 307
-        versionName = "2.22.0"
-
+        versionCode = 329
+        versionName = "2.32.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        val supabaseUrl = localProperties.getProperty("supabase.url")
-            ?: "https://wjtawsojtoiovovreeri.supabase.co"
+        val supabaseUrl = localProperties.getProperty("supabase.url", "")
         val supabaseAnon = localProperties.getProperty("supabase.anon.key", "")
         buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
         buildConfigField("String", "SUPABASE_ANON_KEY", "\"$supabaseAnon\"")
     }
 
+    signingConfigs {
+        create("release") {
+            val keystorePath = localProperties.getProperty("release.keystore.file")
+            if (!keystorePath.isNullOrBlank()) {
+                val keystore = File(keystorePath)
+                if (keystore.exists()) {
+                    storeFile = keystore
+                    storePassword = localProperties.getProperty("release.keystore.password", "")
+                    keyAlias = localProperties.getProperty("release.key.alias", "")
+                    keyPassword = localProperties.getProperty("release.key.password", "")
+                }
+            }
+        }
+    }
+
     buildTypes {
+        debug {
+            // Same applicationId as release — sideload updates in-place and keeps on-device data.
+            versionNameSuffix = "-debug"
+        }
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                "proguard-rules.pro",
             )
+            val releaseSigning = signingConfigs.getByName("release")
+            signingConfig = if (releaseSigning.storeFile != null) releaseSigning else signingConfigs.getByName("debug")
         }
     }
     compileOptions {
@@ -64,6 +88,13 @@ android {
     androidResources {
         noCompress += listOf("tflite", "onnx")
     }
+    sourceSets {
+        getByName("androidTest").assets.srcDir("$projectDir/schemas")
+    }
+}
+
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
 }
 
 dependencies {
@@ -82,11 +113,18 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
+    ksp(libs.hilt.compiler)
+    implementation(libs.hilt.android)
+    implementation(libs.androidx.security.crypto)
+    implementation(libs.androidx.room.paging)
+    implementation(libs.androidx.paging.runtime)
+    implementation(libs.androidx.paging.compose)
     implementation(libs.androidx.camera.core)
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
     implementation(libs.mlkit.barcode)
+    implementation(libs.mlkit.text.recognition)
     implementation(libs.coil.compose)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.okhttp)
@@ -94,11 +132,13 @@ dependencies {
     implementation(libs.tensorflow.lite)
     implementation(libs.onnxruntime.android)
     implementation(libs.nanohttpd)
+    implementation(libs.timber)
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.room.testing)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

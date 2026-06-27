@@ -11,12 +11,14 @@ import com.oasismall.oasisai.data.model.ImportStatus
 import com.oasismall.oasisai.data.db.dao.ArticleImportSnapshot
 import com.oasismall.oasisai.data.repository.OasisRepository
 import com.oasismall.oasisai.util.NameNormalizer
+import com.oasismall.oasisai.util.OasisLog
 import com.oasismall.oasisai.util.TaskProgress
 import java.io.InputStream
 
 class ImportService(
     private val repository: OasisRepository,
     private val imageMatcher: ImageMatcher,
+    @Suppress("unused")
     private val subBarcodeFlavorService: com.oasismall.oasisai.domain.flavors.SubBarcodeFlavorService,
     private val onParayObserver: (suspend (com.oasismall.oasisai.domain.paray.ParayObserverTrigger, com.oasismall.oasisai.domain.paray.ParayObserverContext) -> Unit)? = null,
 ) {
@@ -56,7 +58,9 @@ class ImportService(
                 ),
             )
 
+            onProgress?.invoke(TaskProgress("Loading catalog snapshot", 10))
             val catalogMaps = buildImportCatalogMaps(repository.getArticlesImportSnapshot())
+            val alternateSubBarcodes = repository.getAlternateSubBarcodeSet()
             val existingByBarcode = catalogMaps.byBarcode
             val existingByCodeart = catalogMaps.byCodeart
             val existingByNormalizedName = catalogMaps.byNormalizedName
@@ -118,7 +122,9 @@ class ImportService(
                 } else {
                     val priceChanged = existing.price != row.price
                     val renamed = existing.normalizedName != normalized
+                    val reappeared = !existing.isActive
                     val status = when {
+                        reappeared -> ArticleChangeStatus.NEW
                         priceChanged -> ArticleChangeStatus.PRICE_CHANGED
                         renamed -> ArticleChangeStatus.RENAMED
                         else -> ArticleChangeStatus.UNCHANGED
@@ -132,7 +138,7 @@ class ImportService(
                         renamedCount++
                         if (inImportantRayon) scopedRenamedCount++
                     }
-                    if (!priceChanged && !renamed) {
+                    if (!priceChanged && !renamed && !reappeared) {
                         unchangedCount++
                     } else {
                         val updated = existing.toUpdatedEntity(
@@ -141,6 +147,7 @@ class ImportService(
                             importId = importId,
                             status = status,
                             priceChanged = priceChanged,
+                            reactivate = reappeared,
                         )
                         articlesToSave.add(updated)
 
@@ -194,6 +201,7 @@ class ImportService(
             onProgress?.invoke(TaskProgress("Detecting removed articles", 62))
             val removed = existingByBarcode.values.filter { article ->
                 if (!article.isActive) return@filter false
+                if (article.barcode in alternateSubBarcodes) return@filter false
                 if (article.barcode in incomingBarcodes) return@filter false
                 val codeart = article.codeart?.trim().orEmpty()
                 if (codeart.isNotEmpty() && codeart in incomingCodearts) return@filter false
@@ -248,12 +256,7 @@ class ImportService(
             }
             val missingImages = repository.countMissingImages()
 
-            onProgress?.invoke(TaskProgress("Syncing sub-PNGs", 94))
-            subBarcodeFlavorService.syncSubPngsFromMetadata { progress ->
-                val shifted = 94 + (progress.normalizedPercent * 4 / 100)
-                onProgress?.invoke(progress.copy(percent = shifted))
-            }
-
+            // Sub-barcode links live in Room + registry — full PNG re-scan belongs in Settings → Sync sub-PNGs.
             if (!scopedToImportantRayons) {
                 scopedRowCount = parseResult.rows.size
             }
@@ -288,6 +291,7 @@ class ImportService(
             )
             result
         } catch (e: Exception) {
+            OasisLog.e(OasisLog.Domain.Import, "CSV import failed", e)
             ImportResult(false, errorMessage = e.message ?: "Import failed")
         }
     }
@@ -327,6 +331,7 @@ private fun ArticleImportSnapshot.toUpdatedEntity(
     importId: Long,
     status: ArticleChangeStatus,
     priceChanged: Boolean,
+    reactivate: Boolean = false,
 ): ArticleEntity = ArticleEntity(
     id = id,
     barcode = barcode,
@@ -347,7 +352,7 @@ private fun ArticleImportSnapshot.toUpdatedEntity(
     lastSeenAt = System.currentTimeMillis(),
     changeStatus = status.name,
     isActive = true,
-    needsTicketUpdate = priceChanged,
+    needsTicketUpdate = priceChanged || reactivate,
 )
 
 private fun ArticleImportSnapshot.toRemovedEntity(importId: Long): ArticleEntity = ArticleEntity(

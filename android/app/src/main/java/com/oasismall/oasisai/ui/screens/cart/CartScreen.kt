@@ -23,6 +23,15 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import com.oasismall.oasisai.ui.components.ArticleActionContext
+import com.oasismall.oasisai.ui.components.ArticleActionHandlers
+import com.oasismall.oasisai.ui.components.ArticleCard
+import com.oasismall.oasisai.ui.components.ArticleCompactActionRow
+import com.oasismall.oasisai.ui.components.rememberAssignPngPicker
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -55,6 +64,13 @@ fun CartScreen(
     val items by viewModel.items.collectAsStateWithLifecycle()
     val selectedIds by viewModel.selectedPreselectionIds.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
+    var assignTarget by remember { mutableStateOf<Pair<Long, String?>?>(null) }
+    val launchAssignPng = rememberAssignPngPicker { uri ->
+        assignTarget?.let { (articleId, variant) ->
+            viewModel.assignPng(uri, articleId, variant)
+        }
+        assignTarget = null
+    }
 
     val title = when (viewModel.cartType) {
         CartType.SHARE -> "Ready to share"
@@ -216,16 +232,24 @@ fun CartScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    if (viewModel.cartType == CartType.PHOTOSHOOT && onOpenCameraBatch != null) {
-                        OpenCameraBatchButton(
-                            onClick = onOpenCameraBatch,
-                            articleId = item.articleId,
-                        )
+                    val cartContext = when (viewModel.cartType) {
+                        CartType.SHARE -> ArticleActionContext.CART_SHARE
+                        CartType.PHOTOSHOOT -> ArticleActionContext.CART_PHOTOSHOOT
+                        CartType.DESIGN -> ArticleActionContext.CART_DESIGN
+                        CartType.DESIGN_DONE -> ArticleActionContext.CART_DESIGN
                     }
-                    OutlinedButton(
-                        onClick = { viewModel.remove(item.preselectionId) },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) { Text("Remove from cart") }
+                    ArticleCompactActionRow(
+                        article = item.toArticleWithImage(),
+                        context = cartContext,
+                        handlers = ArticleActionHandlers(
+                            onAssignPng = {
+                                assignTarget = item.articleId to item.variantBarcode.takeIf { it.isNotBlank() }
+                                launchAssignPng()
+                            },
+                            onOpenCameraBatch = onOpenCameraBatch,
+                            onRemoveFromCart = { viewModel.remove(item.preselectionId) },
+                        ),
+                    )
                 }
             }
         }
