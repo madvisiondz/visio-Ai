@@ -32,6 +32,10 @@ data class TicketCameraFeedback(
 enum class TicketWalkStatus {
     /** Camera live — tap screen to capture ticket. */
     READY,
+    /** Multi-frame sharpness pick after tap. */
+    STABILIZING,
+    /** User adjusting crop box before OCR. */
+    CROP_ADJUST,
     /** PARAY cropping + reading ticket. */
     PROCESSING,
     /** Article card locked — swipe unlock for next ticket. */
@@ -45,9 +49,11 @@ fun AgentTicketStatusBar(
     modifier: Modifier = Modifier,
 ) {
     val statusLine = when (walkStatus) {
-        TicketWalkStatus.PAUSED -> "Card locked — swipe ← → for next ticket"
-        TicketWalkStatus.PROCESSING -> "PARAY Vision Corps — scout + OCR + match…"
-        TicketWalkStatus.READY -> "Tap on ticket — works with faded/yellow/magenta price tickets"
+        TicketWalkStatus.CROP_ADJUST -> "Drag box onto ticket → Scan ticket"
+        TicketWalkStatus.PAUSED -> "Match locked — swipe ← → when ready for next ticket"
+        TicketWalkStatus.PROCESSING -> "PARAY reading your crop…"
+        TicketWalkStatus.READY -> "Tap ticket · hold card 1s to lock after match"
+        TicketWalkStatus.STABILIZING -> "Tap ticket — hold still"
     }
 
     Surface(

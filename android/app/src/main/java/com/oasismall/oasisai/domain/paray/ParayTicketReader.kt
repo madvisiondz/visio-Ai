@@ -24,37 +24,60 @@ class ParayTicketReader(
         rotationDegrees: Int,
         frameQuality: Float,
         onStep: suspend (TicketSnapStep) -> Unit,
+        userCropNorm: ParayTicketCropLearnStore.NormalizedCrop? = null,
     ): ParayTicketSnapResult? = withContext(Dispatchers.Default) {
         val totalStart = System.currentTimeMillis()
+        val userCropLocked = userCropNorm != null
+        // Own a copy — callers may still show the source bitmap in Compose.
+        var working = bitmap.copy(bitmap.config ?: Bitmap.Config.ARGB_8888, false)
 
         onStep(
             TicketSnapStep(
                 TicketSnapPhase.CAPTURED,
-                "Photo captured — PARAY Vision Corps analyzing…",
-                preview = ParayTicketBitmapUtils.previewCopy(bitmap),
+                if (userCropLocked) {
+                    "Photo captured — OCR on your crop…"
+                } else {
+                    "Photo captured — PARAY Vision Corps analyzing…"
+                },
+                preview = ParayTicketBitmapUtils.previewCopy(working),
                 frameQuality = frameQuality,
             ),
         )
 
-        var working = bitmap
         if (rotationDegrees != 0) {
             onStep(TicketSnapStep(TicketSnapPhase.ROTATE, "Orientation correction…"))
-            val rotated = ParayTicketImagePrep.rotateToUpright(bitmap, rotationDegrees)
-            if (rotated !== bitmap) {
-                bitmap.recycle()
+            val rotated = ParayTicketImagePrep.rotateToUpright(working, rotationDegrees)
+            if (rotated !== working) {
+                working.recycle()
                 working = rotated
             }
         }
+
+        if (userCropNorm != null) {
+            onStep(TicketSnapStep(TicketSnapPhase.CROP_YELLOW, "Your crop applied — locked for OCR"))
+            val cropped = ParayTicketCropLearnStore.cropBitmap(working, userCropNorm)
+            if (cropped !== working) {
+                working.recycle()
+                working = cropped
+            }
+        }
+
         val processed = ParayTicketBitmapUtils.forSnapProcessing(working)
         if (processed !== working) {
             working.recycle()
             working = processed
         }
 
-        onStep(TicketSnapStep(TicketSnapPhase.FIND_YELLOW, "Visual ticket scout (5 strategies)…"))
-
-        val analysis = ParayTicketVisionCorps.analyze(working, ocrCorps) { msg ->
-            onStep(TicketSnapStep(TicketSnapPhase.FIND_YELLOW, msg))
+        val analysis = if (userCropLocked) {
+            onStep(TicketSnapStep(TicketSnapPhase.FIND_YELLOW, "Reading all black text on your crop…"))
+            ParayTicketVisionCorps.analyzeUserValidatedCrop(working, ocrCorps) { msg ->
+                onStep(TicketSnapStep(TicketSnapPhase.FIND_YELLOW, msg))
+            }
+        } else {
+            onStep(TicketSnapStep(TicketSnapPhase.FIND_YELLOW, "Visual ticket scout (5 strategies)…"))
+            ParayTicketVisionCorps.analyze(working, ocrCorps) { msg ->
+                onStep(TicketSnapStep(TicketSnapPhase.FIND_YELLOW, msg))
+            }
         }
 
         if (analysis == null) {
@@ -63,7 +86,11 @@ class ParayTicketReader(
                 TicketSnapStep(
                     TicketSnapPhase.FAILED,
                     "OCR corps could not read ticket",
-                    error = "Fill frame with ticket, ensure designation + price visible, tap again",
+                    error = if (userCropLocked) {
+                        "Could not read your crop — widen box or tap again"
+                    } else {
+                        "Fill frame with ticket, ensure designation + price visible, tap again"
+                    },
                 ),
             )
             logMetrics(totalStart, 0, 0, 0, 0)
@@ -74,18 +101,28 @@ class ParayTicketReader(
         onStep(
             TicketSnapStep(
                 TicketSnapPhase.CROP_YELLOW,
-                "Ticket region: ${regions.strategy} (${(regions.confidence * 100).toInt()}%)",
-                preview = ParayTicketBitmapUtils.previewCopy(regions.textCrop),
+                if (userCropLocked) {
+                    "Your crop — OCR on full ticket"
+                } else {
+                    "Ticket region: ${regions.strategy} (${(regions.confidence * 100).toInt()}%)"
+                },
+                preview = if (userCropLocked) {
+                    ParayTicketBitmapUtils.previewCopy(working)
+                } else {
+                    ParayTicketBitmapUtils.previewCopy(regions.textCrop)
+                },
             ),
         )
-        regions.productCrop?.let { product ->
-            onStep(
-                TicketSnapStep(
-                    TicketSnapPhase.CROP_PNG,
-                    "Product strip isolated",
-                    preview = ParayTicketBitmapUtils.previewCopy(product),
-                ),
-            )
+        if (!userCropLocked) {
+            regions.productCrop?.let { product ->
+                onStep(
+                    TicketSnapStep(
+                        TicketSnapPhase.CROP_PNG,
+                        "Product strip isolated",
+                        preview = ParayTicketBitmapUtils.previewCopy(product),
+                    ),
+                )
+            }
         }
 
         val ocrResult = analysis.ocr.read
@@ -116,16 +153,18 @@ class ParayTicketReader(
 
         onStep(TicketSnapStep(TicketSnapPhase.STABILIZE, "Stabilizing match…"))
         val matchStart = System.currentTimeMillis()
-        val match = withContext(Dispatchers.IO) {
-            fuzzy.match(
+        val ranked = withContext(Dispatchers.IO) {
+            fuzzy.matchRanked(
                 read = ocrResult,
                 productCrop = regions.productCrop,
                 repository = repository,
                 paray = paray,
                 visualHints = visualPair.first,
                 productFeatures = visualPair.second,
+                limit = 5,
             )
         }
+        val match = ranked.firstOrNull()
         val matchMs = System.currentTimeMillis() - matchStart
 
         val frame = ParayTicketFrameRead(ocr = ocrResult, productCrop = regions.productCrop)
@@ -144,7 +183,7 @@ class ParayTicketReader(
                 ),
             )
             logMetrics(totalStart, 0, analysis.ocr.passes, matchMs, visualPair.first.size)
-            ParayTicketSnapResult(frame, match, tier, frameQuality, analysis.recoveryUsed)
+            ParayTicketSnapResult(frame, match, tier, frameQuality, analysis.recoveryUsed, ranked)
         } else {
             frame.recycle()
             onStep(

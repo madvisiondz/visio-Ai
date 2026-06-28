@@ -113,15 +113,25 @@ fun CheckShootScreen(
     val ticketAssessment by viewModel.ticketAssessment.collectAsStateWithLifecycle()
     val ticketWalkStatus by viewModel.ticketWalkStatus.collectAsStateWithLifecycle()
     val ticketSnapProgress by viewModel.ticketSnapProgress.collectAsStateWithLifecycle()
+    val ticketCropHelper by viewModel.ticketCropHelper.collectAsStateWithLifecycle()
     val ticketMatchTier by viewModel.ticketMatchTier.collectAsStateWithLifecycle()
     val showReadingIndicator = rememberDelayedReadingFlag(ticketWalkStatus)
     val ticketCameraBuffer = remember { TicketCameraBuffer() }
+    val ticketQualityLabel by ticketCameraBuffer.liveQualityLabel.collectAsStateWithLifecycle()
     DisposableEffect(Unit) {
         onDispose { ticketCameraBuffer.clear() }
     }
-    val ticketBufferActive = isTicket && !isLocked && ticketSnapProgress == null &&
-        paraySuggest == null && suffixMatch == null
-    val ticketScanActive = ticketBufferActive
+    val ticketCameraFeedActive = isTicket && paraySuggest == null && suffixMatch == null
+    val ticketTapEnabled = ticketCameraFeedActive &&
+        !isLocked &&
+        ticketWalkStatus == TicketWalkStatus.READY &&
+        ticketSnapProgress == null && scan == null &&
+        ticketCropHelper == null
+    LaunchedEffect(isLocked, ticketQualityLabel, isTicket) {
+        if (isTicket && !isLocked) {
+            viewModel.onTicketCameraReady()
+        }
+    }
     var pendingCaptureFile by remember { mutableStateOf<File?>(null) }
     var captureLaunched by remember { mutableStateOf(false) }
     var showManualBarcode by remember { mutableStateOf(false) }
@@ -301,10 +311,10 @@ fun CheckShootScreen(
                 enabled = true,
                 barcodeScanEnabled = when {
                     isBulk -> bulkScan == null
-                    isTicket -> ticketScanActive
+                    isTicket -> false
                     else -> (!isLocked || subBcMode) && paraySuggest == null && suffixMatch == null
                 },
-                ticketScanEnabled = ticketScanActive,
+                ticketScanEnabled = ticketCameraFeedActive,
                 ticketBuffer = if (isTicket) ticketCameraBuffer else null,
                 onBarcodeDetected = viewModel::onBarcodeScanned,
                 modifier = Modifier.fillMaxSize(),
@@ -324,16 +334,25 @@ fun CheckShootScreen(
         }
 
         if (scan == null && bulkScan == null && phase == CheckShootPhase.SCANNING && hasCameraPermission && isTicket) {
-            if (ticketSnapProgress != null) {
+            ticketCropHelper?.let {
+                TicketCropHelperOverlay(
+                    state = it,
+                    onConfirm = viewModel::confirmTicketCrop,
+                    onCancel = viewModel::cancelTicketCropHelper,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+            if (ticketCropHelper == null && ticketSnapProgress != null) {
                 TicketSnapProgressPanel(
                     state = ticketSnapProgress!!,
                     modifier = Modifier
                         .align(Alignment.Center)
                         .padding(horizontal = 16.dp),
                 )
-            } else {
+            } else if (ticketCropHelper == null && ticketSnapProgress == null) {
                 TicketTapToSnapOverlay(
-                    enabled = ticketBufferActive,
+                    enabled = ticketTapEnabled,
+                    qualityHint = ticketQualityLabel,
                     onSnap = { viewModel.snapTicket(ticketCameraBuffer) },
                     modifier = Modifier.fillMaxSize(),
                 )
@@ -435,13 +454,13 @@ fun CheckShootScreen(
                     ticketMatchTier = ticketMatchTier,
                     onLock = viewModel::lockScan,
                     onUnlock = viewModel::unlockForNextScan,
-                    onAddToShare = if (!isTicket && isLocked) viewModel::addToShareCart else null,
-                    onAddToDesign = if (!isTicket && isLocked) viewModel::addToDesignCart else null,
-                    onCreateAsset = if (!isTicket && isLocked) { { launchCamera() } } else null,
-                    onToggleSubBc = if (!isTicket && isLocked) viewModel::toggleSubBcAcquisition else null,
-                    onOpenCameraBatch = if (!isTicket && isLocked) onOpenCameraBatch else null,
-                    onAssignPngImage = if (!isTicket && isLocked && current.articleId != null) launchAssignPng else null,
-                    onRemoveSubBarcode = if (!isTicket && isLocked) viewModel::removeSubBarcode else null,
+                    onAddToShare = if (isLocked) viewModel::addToShareCart else null,
+                    onAddToDesign = if (isLocked) viewModel::addToDesignCart else null,
+                    onCreateAsset = if (isLocked) { { launchCamera() } } else null,
+                    onToggleSubBc = if (isLocked) viewModel::toggleSubBcAcquisition else null,
+                    onOpenCameraBatch = if (isLocked) onOpenCameraBatch else null,
+                    onAssignPngImage = if (isLocked && current.articleId != null) launchAssignPng else null,
+                    onRemoveSubBarcode = if (isLocked) viewModel::removeSubBarcode else null,
                     onMarkTicketVerified = if (isTicket && isLocked) viewModel::markTicketVerified else null,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
@@ -502,9 +521,9 @@ private fun CheckShootArticlePopup(
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(
             when {
-                ticketVerifyMode && isLocked -> "Glissez ← ou → pour le ticket suivant"
-                isLocked -> "Glissez la carte ← ou → pour scanner le suivant"
-                ticketVerifyMode -> "Tap on yellow ticket — card opens automatically"
+                isLocked -> "Glissez la carte ← ou → pour le ticket suivant"
+                ticketVerifyMode && ticketAssessment != null ->
+                    "Maintenez la carte 1 s pour verrouiller · actions après verrouillage"
                 else -> "Maintenez la carte 1 s (ou bouton cadenas) pour verrouiller · le scan continue"
             },
             style = MaterialTheme.typography.labelMedium,
@@ -583,8 +602,8 @@ private fun CheckShootArticlePopup(
                 scrollable = true,
                 maxHeight = 400.dp,
                 modelReady = modelReady,
-                showLockControls = !isLocked && !ticketVerifyMode,
-                externalLockButton = !ticketVerifyMode,
+                showLockControls = !isLocked,
+                externalLockButton = true,
                 onLock = onLock,
                 onUnlock = onUnlock,
                 onDismiss = null,

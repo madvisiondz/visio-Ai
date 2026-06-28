@@ -4,8 +4,8 @@ import android.graphics.Bitmap
 
 /** Match confidence tier shown on the article card after snap. */
 enum class ParayTicketMatchTier(val marketingLabel: String, val minProbability: Float) {
-    CONFIRMED("PARAY Confirmed", 0.72f),
-    HIGH("PARAY High match", 0.58f),
+    CONFIRMED("PARAY Confirmed", 0.78f),
+    HIGH("PARAY High match", 0.65f),
     PROBABLE("PARAY Probable", ParayTicketFuzzyMatcher.MIN_PROBABILITY),
     ;
 
@@ -53,4 +53,5 @@ data class ParayTicketSnapResult(
     val matchTier: ParayTicketMatchTier? = null,
     val frameQuality: Float = 0f,
     val recoveryPassUsed: Boolean = false,
+    val candidates: List<ParayTicketMatch> = emptyList(),
 )

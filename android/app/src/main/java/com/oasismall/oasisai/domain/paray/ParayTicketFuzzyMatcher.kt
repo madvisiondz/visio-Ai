@@ -67,9 +67,74 @@ class ParayTicketFuzzyMatcher {
             .sortedByDescending { it.second.probability }
 
         val best = ranked.firstOrNull() ?: return null
+        if (!passesMatchGates(read, best.second, ranked.getOrNull(1)?.second)) return null
         if (best.second.probability < MIN_PROBABILITY) return null
 
         return ParayTicketMatch(best.first, read, best.second)
+    }
+
+    /** Top catalog candidates for user pick — designation + price + PNG fusion. */
+    suspend fun matchRanked(
+        read: ParayTicketReadResult,
+        productCrop: Bitmap?,
+        repository: OasisRepository,
+        paray: ParayAgent?,
+        rayonPreference: String? = null,
+        visualHints: Map<Long, Float> = emptyMap(),
+        productFeatures: VisualFeatureExtractor.Features? = null,
+        limit: Int = 5,
+    ): List<ParayTicketMatch> {
+        read.barcode?.trim()?.takeIf { it.isNotEmpty() }?.let { barcode ->
+            repository.resolveScannedBarcode(barcode)?.article?.let { article ->
+                val fusion = scoreArticle(
+                    read, productCrop, article, paray, rayonPreference,
+                    barcodeBoost = 0.95f,
+                    visualHints = visualHints,
+                    productFeatures = productFeatures,
+                )
+                return listOf(ParayTicketMatch(article, read.copy(source = ParayTicketReadSource.BARCODE), fusion))
+            }
+        }
+
+        val designation = read.ocrDesignation?.trim()?.takeIf { it.length >= 3 } ?: run {
+            read.ocrPrice?.let { price ->
+                matchByPriceAndImage(
+                    read, productCrop, price, repository, paray, rayonPreference,
+                    visualHints, productFeatures,
+                )?.let { return listOf(it) }
+            }
+            return emptyList()
+        }
+
+        val candidates = gatherCandidates(read, designation, productCrop, repository, paray, visualHints)
+        if (candidates.isEmpty()) return emptyList()
+
+        return candidates
+            .distinctBy { it.id }
+            .map { article ->
+                val fusion = scoreArticle(
+                    read, productCrop, article, paray, rayonPreference,
+                    visualHints = visualHints,
+                    productFeatures = productFeatures,
+                )
+                ParayTicketMatch(article, read, fusion)
+            }
+            .filter { passesMatchGates(read, it.fusion, null) || it.fusion.probability >= MIN_PROBABILITY * 0.85f }
+            .sortedByDescending { it.fusion.probability }
+            .take(limit)
+    }
+
+    private fun passesMatchGates(
+        read: ParayTicketReadResult,
+        best: ParayTicketFusionBreakdown,
+        second: ParayTicketFusionBreakdown?,
+    ): Boolean {
+        val des = read.ocrDesignation?.trim().orEmpty()
+        if (des.isNotEmpty() && best.designationScore < MIN_DESIGNATION_SCORE) return false
+        if (read.ocrPrice != null && best.priceScore < MIN_PRICE_SCORE) return false
+        if (des.split(" ").size > 6 && best.probability < MIN_NOISY_DESIGNATION_PROBABILITY) return false
+        if (second != null && best.probability - second.probability < MIN_WIN_MARGIN) return false
+        return true
     }
 
     private suspend fun gatherCandidates(
@@ -151,7 +216,7 @@ class ParayTicketFuzzyMatcher {
     }
 
     private fun designationScore(ocrDesignation: String, article: ArticleWithImage): Float {
-        if (ocrDesignation.isBlank()) return 0.4f
+        if (ocrDesignation.isBlank()) return 0.22f
         val search = SearchQuery.prepare(ocrDesignation) ?: return 0.4f
         val rankScore = when (SearchQuery.score(article, search)) {
             0 -> 1f
@@ -175,7 +240,7 @@ class ParayTicketFuzzyMatcher {
     }
 
     private fun priceScore(ocrPrice: Double?, catalogPrice: Double): Float {
-        if (ocrPrice == null || ocrPrice <= 0) return 0.55f
+        if (ocrPrice == null || ocrPrice <= 0) return 0.22f
         val diff = abs(ocrPrice - catalogPrice)
         return when {
             diff < 0.5 -> 1f
@@ -290,6 +355,7 @@ class ParayTicketFuzzyMatcher {
             article to fusion
         }.sortedByDescending { it.second.probability }
         val best = ranked.firstOrNull() ?: return null
+        if (!passesMatchGates(read, best.second, ranked.getOrNull(1)?.second)) return null
         if (best.second.probability < MIN_PROBABILITY) return null
         return ParayTicketMatch(best.first, read, best.second)
     }
@@ -299,6 +365,10 @@ class ParayTicketFuzzyMatcher {
         private const val WEIGHT_PRICE = 0.30f
         private const val WEIGHT_IMAGE = 0.20f
         private const val MAX_CANDIDATES = 55
-        const val MIN_PROBABILITY = 0.36f
+        const val MIN_PROBABILITY = 0.52f
+        private const val MIN_DESIGNATION_SCORE = 0.58f
+        private const val MIN_PRICE_SCORE = 0.72f
+        private const val MIN_WIN_MARGIN = 0.10f
+        private const val MIN_NOISY_DESIGNATION_PROBABILITY = 0.76f
     }
 }

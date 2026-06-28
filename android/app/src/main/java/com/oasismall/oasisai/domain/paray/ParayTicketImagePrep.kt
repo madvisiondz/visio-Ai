@@ -9,7 +9,7 @@ import android.graphics.Paint
 
 /** Upscale + contrast for shelf-ticket OCR on yellow blocks. */
 object ParayTicketImagePrep {
-    private const val OCR_MIN_WIDTH_PX = 720
+    private const val OCR_MIN_WIDTH_PX = 1080
     private const val HIGH_CONFIDENCE = 0.88f
 
     private val enhancePaint by lazy {

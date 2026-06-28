@@ -13,11 +13,12 @@ import kotlin.math.min
  * Visual ticket region scout — finds Oasis shelf tickets without requiring pure yellow.
  *
  * Strategies (scored, best wins):
- * 1. Warm/cream price block (relaxed color — aged/faded tickets OK)
- * 2. Magenta/pink price anchor (Oasis printed price color)
- * 3. Text-density band (edge-rich designation area)
- * 4. Layout card (product left + text right — print aspect ratio)
- * 5. Center fallback (full ticket in frame)
+ * 1. Center ticket holder (shelf walk — ignores side products)
+ * 2. Warm/cream price block (relaxed color — aged/faded tickets OK)
+ * 3. Magenta/pink price anchor (Oasis printed price color)
+ * 4. Text-density band (edge-rich designation area)
+ * 5. Layout card (product left + text right — print aspect ratio)
+ * 6. Center fallback (full ticket in frame)
  */
 object ParayTicketRegionScout {
     private const val GRID = 8
@@ -50,10 +51,11 @@ object ParayTicketRegionScout {
         val scaleY = h.toFloat() / sample.height
 
         val candidates = buildList {
-            addAll(scoutWarmBlocks(sample))
+            addAll(scoutCenterHolder(sample))
+            addAll(scoutLayoutCards(sample))
             addAll(scoutPriceAnchors(sample))
             addAll(scoutTextBands(sample))
-            addAll(scoutLayoutCards(sample))
+            addAll(scoutWarmBlocks(sample))
             add(centerFallback(sample))
         }.map { c ->
             c.copy(
@@ -64,7 +66,7 @@ object ParayTicketRegionScout {
 
         if (owned && !sample.isRecycled) sample.recycle()
 
-        val best = candidates.maxByOrNull { it.score } ?: return null
+        val best = candidates.maxByOrNull { rankedScore(it, w, h) } ?: return null
         OasisLog.d(OasisLog.Domain.Paray, "Ticket scout: ${best.strategy} score=${"%.2f".format(best.score)}")
 
         val textCrop = ParayShelfYellowDetector.crop(bitmap, best.textRect)
@@ -83,6 +85,76 @@ object ParayTicketRegionScout {
             strategy = best.strategy,
             confidence = best.score.coerceIn(0f, 1f),
         )
+    }
+
+    /**
+     * User confirmed crop — entire crop is the OCR surface. No secondary yellow-band crop.
+     * Product strip is derived only for PNG catalog hints.
+     */
+    fun fromUserValidatedCrop(bitmap: Bitmap): TicketRegions {
+        val w = bitmap.width
+        val h = bitmap.height
+        val ticketRect = Rect(0, 0, w, h)
+        val textCrop = bitmap.copy(bitmap.config ?: Bitmap.Config.ARGB_8888, false)
+        val yellowW = (w * (
+            ShelfA4Renderer.YELLOW_W_MM /
+                (ShelfA4Renderer.IMAGE_W_MM + ShelfA4Renderer.YELLOW_W_MM)
+            )).toInt().coerceIn((w * 0.22f).toInt(), (w * 0.52f).toInt())
+        val textRect = Rect((w - yellowW).coerceAtLeast(0), 0, w, h)
+        val productRect = productRectLeftOf(textRect, w)
+        val productCrop = if (productRect.width() >= 24 && productRect.height() >= 24) {
+            ParayShelfYellowDetector.crop(bitmap, productRect)
+        } else {
+            null
+        }
+        return TicketRegions(
+            ticketRect = ticketRect,
+            textRect = ticketRect,
+            textCrop = textCrop,
+            productCrop = productCrop,
+            strategy = "user-crop",
+            confidence = 1f,
+        )
+    }
+
+    private fun scoutCenterHolder(bitmap: Bitmap): List<Candidate> {
+        val w = bitmap.width
+        val h = bitmap.height
+        val cardW = (w * 0.56f).toInt().coerceIn(120, (w * 0.78f).toInt())
+        val cardH = (cardW / ShelfA4Renderer.ticketAspectRatio).toInt()
+            .coerceIn(72, (h * 0.50f).toInt())
+        val left = ((w - cardW) / 2f).toInt().coerceAtLeast(0)
+        val top = ((h - cardH) / 2f).toInt().coerceAtLeast(0)
+        val card = Rect(left, top, min(left + cardW, w), min(top + cardH, h))
+        val yellowW = (card.width() * (
+            ShelfA4Renderer.YELLOW_W_MM /
+                (ShelfA4Renderer.IMAGE_W_MM + ShelfA4Renderer.YELLOW_W_MM)
+            )).toInt().coerceAtLeast(36)
+        val textRect = Rect(card.right - yellowW, card.top, card.right, card.bottom)
+        val score = (layoutScore(bitmap, card) * 0.88f + 0.24f).coerceIn(0f, 1f)
+        return listOf(Candidate(card, textRect, "center-holder", score))
+    }
+
+    private fun rankedScore(candidate: Candidate, fw: Int, fh: Int): Float {
+        val strategyBonus = when (candidate.strategy) {
+            "center-holder" -> 0.18f
+            "layout-card" -> 0.12f
+            "price-anchor" -> 0.06f
+            "text-band" -> 0.04f
+            "warm-block" -> -0.10f
+            else -> 0f
+        }
+        return candidate.score + strategyBonus + centerOverlapBonus(candidate.rect, fw, fh)
+    }
+
+    private fun centerOverlapBonus(rect: Rect, fw: Int, fh: Int): Float {
+        val cx = fw / 2f
+        val cy = fh / 2f
+        val rcx = (rect.left + rect.right) / 2f
+        val rcy = (rect.top + rect.bottom) / 2f
+        val dx = abs(rcx - cx) / fw
+        val dy = abs(rcy - cy) / fh
+        return (1f - dx * 1.6f - dy * 1.1f).coerceIn(0f, 0.20f)
     }
 
     private fun scoutWarmBlocks(bitmap: Bitmap): List<Candidate> =
@@ -113,7 +185,7 @@ object ParayTicketRegionScout {
         val w = bitmap.width
         val h = bitmap.height
         val targetAspect = ShelfA4Renderer.ticketAspectRatio
-        val roi = Rect((w * 0.05f).toInt(), (h * 0.08f).toInt(), (w * 0.95f).toInt(), (h * 0.92f).toInt())
+        val roi = Rect((w * 0.12f).toInt(), (h * 0.10f).toInt(), (w * 0.88f).toInt(), (h * 0.90f).toInt())
         val cardW = roi.width()
         val cardH = (cardW / targetAspect).toInt().coerceIn(roi.height() / 4, roi.height())
         val top = roi.top + (roi.height() - cardH) / 2

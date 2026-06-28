@@ -23,8 +23,17 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material3.IconButton
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -68,6 +77,7 @@ private val ParayGreen = Color(0xFF7CFC90)
 fun TicketTapToSnapOverlay(
     enabled: Boolean,
     onSnap: () -> Unit,
+    qualityHint: String? = null,
     modifier: Modifier = Modifier,
 ) {
     Box(
@@ -130,12 +140,24 @@ fun TicketTapToSnapOverlay(
                 color = Color.Black.copy(alpha = 0.65f),
                 shape = RoundedCornerShape(12.dp),
             ) {
-                Text(
-                    if (enabled) "Tap to capture ticket" else "Processing…",
+                Column(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                    color = Color.White,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Text(
+                        if (enabled) "Tap to capture ticket" else "Processing…",
+                        color = Color.White,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    if (enabled && !qualityHint.isNullOrBlank()) {
+                        Text(
+                            qualityHint,
+                            color = ParayYellow.copy(alpha = 0.9f),
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                    }
+                }
             }
         }
     }
@@ -145,7 +167,9 @@ fun TicketTapToSnapOverlay(
 fun TicketSnapProgressPanel(
     state: TicketSnapUiState,
     modifier: Modifier = Modifier,
+    stepsExpandedDefault: Boolean = false,
 ) {
+    var stepsExpanded by remember(state) { mutableStateOf(stepsExpandedDefault) }
     Surface(
         modifier = modifier.fillMaxWidth(),
         color = Color.Black.copy(alpha = 0.88f),
@@ -204,55 +228,6 @@ fun TicketSnapProgressPanel(
                 color = Color.White.copy(alpha = 0.92f),
                 style = MaterialTheme.typography.bodyMedium,
             )
-            state.previewBitmap?.let { bmp ->
-                val image = remember(bmp) { bmp.asImageBitmap() }
-                val aspect = bmp.width.toFloat() / bmp.height.coerceAtLeast(1)
-                androidx.compose.foundation.Image(
-                    bitmap = image,
-                    contentDescription = "Captured ticket",
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(aspect)
-                        .background(Color.White, RoundedCornerShape(8.dp))
-                        .padding(4.dp),
-                    contentScale = ContentScale.Fit,
-                )
-            }
-            if (state.steps.isNotEmpty()) {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    state.steps.forEach { line ->
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(
-                                when {
-                                    line.failed -> Icons.Default.Close
-                                    line.done -> Icons.Default.Check
-                                    else -> Icons.Default.Check
-                                },
-                                contentDescription = null,
-                                tint = when {
-                                    line.failed -> Color(0xFFFF8A80)
-                                    line.done -> ParayGreen
-                                    line.phase == state.phase -> ParayYellow
-                                    else -> Color.White.copy(alpha = 0.35f)
-                                },
-                                modifier = Modifier.size(16.dp),
-                            )
-                            Text(
-                                line.message,
-                                color = if (line.done || line.phase == state.phase) {
-                                    Color.White
-                                } else {
-                                    Color.White.copy(alpha = 0.5f)
-                                },
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-                        }
-                    }
-                }
-            }
             state.ocrDesignation?.let { des ->
                 Text(
                     "Designation: $des",
@@ -269,19 +244,83 @@ fun TicketSnapProgressPanel(
                 )
             }
             state.fusionPercent?.let { pct ->
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    "Best match: $pct%",
+                    color = ParayGreen,
+                    style = MaterialTheme.typography.labelLarge,
+                )
+            }
+            if (state.steps.isNotEmpty()) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Text(
-                        "Match: text + price + PNG → $pct%",
-                        color = ParayGreen,
-                        style = MaterialTheme.typography.labelLarge,
+                        "Process (${state.steps.size} steps)",
+                        color = Color.White.copy(alpha = 0.7f),
+                        style = MaterialTheme.typography.labelMedium,
                     )
-                    LinearProgressIndicator(
-                        progress = { pct / 100f },
-                        modifier = Modifier.fillMaxWidth(),
-                        color = ParayGreen,
-                        trackColor = Color.White.copy(alpha = 0.2f),
-                    )
+                    IconButton(onClick = { stepsExpanded = !stepsExpanded }) {
+                        Icon(
+                            if (stepsExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            contentDescription = if (stepsExpanded) "Collapse" else "Expand",
+                            tint = Color.White,
+                        )
+                    }
                 }
+                AnimatedVisibility(visible = stepsExpanded) {
+                    Column(
+                        modifier = Modifier.heightIn(max = 160.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        state.steps.forEach { line ->
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(
+                                    when {
+                                        line.failed -> Icons.Default.Close
+                                        line.done -> Icons.Default.Check
+                                        else -> Icons.Default.Check
+                                    },
+                                    contentDescription = null,
+                                    tint = when {
+                                        line.failed -> Color(0xFFFF8A80)
+                                        line.done -> ParayGreen
+                                        line.phase == state.phase -> ParayYellow
+                                        else -> Color.White.copy(alpha = 0.35f)
+                                    },
+                                    modifier = Modifier.size(16.dp),
+                                )
+                                Text(
+                                    line.message,
+                                    color = if (line.done || line.phase == state.phase) {
+                                        Color.White
+                                    } else {
+                                        Color.White.copy(alpha = 0.5f)
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            state.previewBitmap?.takeIf { !it.isRecycled }?.let { bmp ->
+                val image = remember(bmp) { bmp.asImageBitmap() }
+                val aspect = bmp.width.toFloat() / bmp.height.coerceAtLeast(1)
+                androidx.compose.foundation.Image(
+                    bitmap = image,
+                    contentDescription = "Captured ticket",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(aspect)
+                        .background(Color.White, RoundedCornerShape(8.dp))
+                        .padding(4.dp),
+                    contentScale = ContentScale.Fit,
+                )
             }
             state.error?.let { err ->
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {

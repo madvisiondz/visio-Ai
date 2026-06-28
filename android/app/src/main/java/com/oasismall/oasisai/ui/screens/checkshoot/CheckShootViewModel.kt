@@ -4,6 +4,8 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.oasismall.oasisai.data.db.dao.ArticleWithImage
@@ -22,12 +24,12 @@ import com.oasismall.oasisai.domain.paray.ParayMatch
 import com.oasismall.oasisai.domain.paray.ParaySuggestion
 import com.oasismall.oasisai.domain.paray.ParayTicketAssessment
 import com.oasismall.oasisai.domain.paray.ParayTicketAdvisor
+import com.oasismall.oasisai.domain.paray.ParayTicketCropLearnStore
 import com.oasismall.oasisai.domain.paray.ParayTicketMatch
 import com.oasismall.oasisai.domain.paray.ParayTicketMatchTier
 import com.oasismall.oasisai.domain.paray.ParayTicketReadResult
 import com.oasismall.oasisai.domain.paray.ParayTicketReader
 import com.oasismall.oasisai.domain.paray.ParayTicketSnapResult
-import com.oasismall.oasisai.domain.paray.ParayTicketSnapStabilizer
 import com.oasismall.oasisai.domain.paray.TicketSnapPhase
 import com.oasismall.oasisai.domain.paray.TicketSnapStep
 import com.oasismall.oasisai.ui.components.CartSourceTags
@@ -46,6 +48,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.max
 
 enum class CheckShootPhase {
@@ -98,7 +101,9 @@ class CheckShootViewModel(
     private val advisor = paray.barcodeAdvisor(repository)
     private val ticketAdvisor: ParayTicketAdvisor = paray.ticketAdvisor(repository)
     private val ticketReader: ParayTicketReader = paray.ticketReader(repository)
+    private val ticketCropLearnStore = ParayTicketCropLearnStore(paray.home)
     private val appContext = context.applicationContext
+    private val mainHandler = Handler(Looper.getMainLooper())
     private val prefs = context.getSharedPreferences(PREFS_AGENT, Context.MODE_PRIVATE)
 
     private val _scan = MutableStateFlow<CheckShootScan?>(null)
@@ -155,7 +160,13 @@ class CheckShootViewModel(
     private val _ticketMatchTier = MutableStateFlow<ParayTicketMatchTier?>(null)
     val ticketMatchTier: StateFlow<ParayTicketMatchTier?> = _ticketMatchTier.asStateFlow()
 
+    private val _ticketCropHelper = MutableStateFlow<TicketCropHelperState?>(null)
+    val ticketCropHelper: StateFlow<TicketCropHelperState?> = _ticketCropHelper.asStateFlow()
+
+    private val lastSnapSteps = mutableListOf<TicketSnapStepLine>()
+
     private val ticketSnapInFlight = AtomicBoolean(false)
+    private val ticketSnapSession = AtomicLong(0L)
     private var ticketSnapJob: Job? = null
     private var lastStepEmitMs = 0L
     private var lastTicketArticleId: Long? = null
@@ -220,6 +231,12 @@ class CheckShootViewModel(
         } else {
             _ticketWalkStatus.value = if (_isLocked.value) TicketWalkStatus.PAUSED else TicketWalkStatus.READY
         }
+        if (mode == AgentCaptureMode.SMART || mode == AgentCaptureMode.BULK) {
+            debounceBarcode = null
+            debounceTimeMs = 0L
+            stableBarcode = null
+            stableReadCount = 0
+        }
         _agentMode.value = mode
         prefs.edit().putString(KEY_AGENT_MODE, mode.name).apply()
         _message.value = when (mode) {
@@ -233,90 +250,103 @@ class CheckShootViewModel(
         if (_agentMode.value != AgentCaptureMode.TICKET ||
             _isLocked.value ||
             _phase.value != CheckShootPhase.SCANNING ||
-            _ticketWalkStatus.value == TicketWalkStatus.PAUSED
+            ticketSnapInFlight.get() ||
+            _ticketCropHelper.value != null ||
+            _ticketWalkStatus.value == TicketWalkStatus.PROCESSING
         ) {
             return
         }
         if (!ticketSnapInFlight.compareAndSet(false, true)) return
 
-        if (!buffer.hasFreshFrame) {
-            ticketSnapInFlight.set(false)
-            _message.value = "Frame too old — point at ticket and tap again"
-            return
-        }
-
-        val snap = buffer.takeLatestSnap()
+        val snap = buffer.takeInstantSnap()
         if (snap == null) {
             ticketSnapInFlight.set(false)
-            _message.value = "Camera not ready — wait a moment and tap again"
+            _message.value = "Camera warming up — wait a moment and tap again"
             return
         }
 
+        _message.value = null
+        TicketSnapHaptics.tapShutter(appContext)
+        val fullCopy = snap.bitmap.copy(
+            snap.bitmap.config ?: Bitmap.Config.ARGB_8888,
+            false,
+        )
+        deferBitmapRecycle(snap.bitmap)
+
+        _ticketCropHelper.value = TicketCropHelperState(
+            frameBitmap = fullCopy,
+            cropNorm = ticketCropLearnStore.suggestDefault(),
+            frameQuality = snap.qualityScore,
+        )
+        _ticketWalkStatus.value = TicketWalkStatus.CROP_ADJUST
+        _message.value = when {
+            snap.qualityScore >= 0.55f -> "Adjust crop → Scan ticket"
+            snap.qualityScore >= 0.38f -> "Hold still next time for sharper read"
+            else -> "Low sharpness — widen crop box if read fails"
+        }
+    }
+
+    fun confirmTicketCrop(crop: com.oasismall.oasisai.domain.paray.ParayTicketCropLearnStore.NormalizedCrop) {
+        val helper = _ticketCropHelper.value ?: return
+        val uiBitmap = helper.frameBitmap
+        _ticketCropHelper.value = null
+        ticketCropLearnStore.record(crop)
+        val processingBitmap = uiBitmap.copy(
+            uiBitmap.config ?: Bitmap.Config.ARGB_8888,
+            false,
+        )
+        deferBitmapRecycle(uiBitmap)
+        startTicketProcessing(processingBitmap, crop, helper.frameQuality)
+    }
+
+    /** Recycle after Compose has finished drawing — avoids recycled-bitmap crashes. */
+    private fun deferBitmapRecycle(vararg bitmaps: Bitmap?) {
+        val pending = bitmaps.filterNotNull().filter { !it.isRecycled }
+        if (pending.isEmpty()) return
+        mainHandler.postDelayed({
+            pending.forEach { bmp ->
+                if (!bmp.isRecycled) bmp.recycle()
+            }
+        }, BITMAP_RECYCLE_DEFER_MS)
+    }
+
+    fun cancelTicketCropHelper() {
+        val bmp = _ticketCropHelper.value?.frameBitmap
+        _ticketCropHelper.value = null
+        deferBitmapRecycle(bmp)
+        ticketSnapInFlight.set(false)
+        if (_agentMode.value == AgentCaptureMode.TICKET && !_isLocked.value) {
+            _ticketWalkStatus.value = TicketWalkStatus.READY
+        }
+    }
+
+    private fun startTicketProcessing(
+        bitmap: android.graphics.Bitmap,
+        crop: com.oasismall.oasisai.domain.paray.ParayTicketCropLearnStore.NormalizedCrop,
+        frameQuality: Float,
+    ) {
         ticketSnapJob?.cancel()
+        val session = ticketSnapSession.incrementAndGet()
+        lastSnapSteps.clear()
         ticketSnapJob = viewModelScope.launch(Dispatchers.Default) {
             try {
-                TicketSnapHaptics.tapShutter(appContext)
                 _ticketWalkStatus.value = TicketWalkStatus.PROCESSING
                 lastStepEmitMs = 0L
-                val freeze = com.oasismall.oasisai.domain.paray.ParayTicketBitmapUtils.previewCopy(snap.bitmap)
-                _ticketSnapProgress.value = TicketSnapUiState(
-                    phase = TicketSnapPhase.CAPTURED,
-                    message = "Photo captured — cropping ticket…",
-                    previewBitmap = freeze,
-                    frameQuality = snap.qualityScore,
-                )
-
-                var result = runTicketSnap(snap)
-                if (result?.match == null) {
-                    val alt = buffer.takeAlternateSnap(snap.capturedAtMs)
-                    if (alt != null) {
-                        withContext(Dispatchers.Main) {
-                            _message.value = "Trying alternate frame…"
-                        }
-                        result = runTicketSnap(alt)
-                        alt.bitmap.recycle()
-                    }
-                }
-                snap.bitmap.recycle()
-
-                val match = result?.match
-                if (match != null) {
-                    val decision = ParayTicketSnapStabilizer.decideLock(
-                        match,
-                        lastTicketArticleId,
-                        lastTicketProbability,
-                        lastTicketLockMs,
+                withContext(Dispatchers.Main) {
+                    _ticketSnapProgress.value = TicketSnapUiState(
+                        phase = TicketSnapPhase.CAPTURED,
+                        message = "PARAY reading ticket…",
+                        frameQuality = frameQuality,
                     )
-                    if (!decision.allowLock) {
-                        result?.frame?.recycle()
-                        withContext(Dispatchers.Main) {
-                            _ticketWalkStatus.value = TicketWalkStatus.READY
-                            _message.value = decision.message ?: "Tap again to confirm"
-                        }
-                        TicketSnapHaptics.failed(appContext)
-                        delay(1_800)
-                        withContext(Dispatchers.Main) { clearTicketSnapProgress() }
-                        return@launch
-                    }
-                    result?.frame?.recycle()
-                    val tier = decision.tier ?: result?.matchTier
-                    withContext(Dispatchers.Main) {
-                        _ticketMatchTier.value = tier
-                        if (tier != null) TicketSnapHaptics.match(appContext, tier)
-                        processTicketMatch(match, tier, decision.message)
-                    }
-                } else {
-                    withContext(Dispatchers.Main) {
-                        _ticketWalkStatus.value = TicketWalkStatus.READY
-                        _message.value = _ticketSnapProgress.value?.error
-                            ?: "No match — tap again closer to the yellow ticket"
-                    }
-                    TicketSnapHaptics.failed(appContext)
-                    delay(2_200)
-                    withContext(Dispatchers.Main) { clearTicketSnapProgress() }
                 }
+                val result = runTicketSnap(bitmap, 0, frameQuality, session, crop)
+                if (!bitmap.isRecycled) bitmap.recycle()
+                handleTicketSnapResult(result)
             } catch (_: kotlinx.coroutines.CancellationException) {
-                withContext(Dispatchers.Main) { clearTicketSnapProgress() }
+                invalidateTicketSnapSession()
+                withContext(Dispatchers.Main) {
+                    resetTicketWalkPipeline()
+                }
             } finally {
                 ticketSnapInFlight.set(false)
                 ticketSnapJob = null
@@ -324,29 +354,75 @@ class CheckShootViewModel(
         }
     }
 
-    private suspend fun runTicketSnap(frame: TicketCameraBuffer.Frame): ParayTicketSnapResult? =
-        ticketReader.processSnap(
-            frame.bitmap,
-            frame.rotationDegrees,
-            frame.qualityScore,
-        ) { step -> emitSnapStep(step) }
+    private suspend fun handleTicketSnapResult(result: ParayTicketSnapResult?) {
+        invalidateTicketSnapSession()
+        val match = result?.candidates?.firstOrNull() ?: result?.match
+        if (match != null) {
+            result?.frame?.recycle()
+            val tier = ParayTicketMatchTier.fromProbability(match.fusion.probability)
+            withContext(Dispatchers.Main) {
+                clearTicketSnapProgress()
+                ticketSnapInFlight.set(false)
+                if (tier != null) TicketSnapHaptics.match(appContext, tier)
+                _ticketMatchTier.value = tier
+            }
+            processTicketMatch(match, tier, null)
+        } else {
+            result?.frame?.recycle()
+            withContext(Dispatchers.Main) {
+                _ticketWalkStatus.value = TicketWalkStatus.READY
+                _message.value = _ticketSnapProgress.value?.error
+                    ?: "No match — tap ticket again when ready"
+                clearTicketSnapProgress()
+            }
+            TicketSnapHaptics.failed(appContext)
+        }
+    }
 
-    fun cancelTicketSnap() {
+    private fun resetTicketWalkPipeline() {
         ticketSnapJob?.cancel()
         ticketSnapJob = null
         ticketSnapInFlight.set(false)
+        invalidateTicketSnapSession()
+        deferBitmapRecycle(_ticketCropHelper.value?.frameBitmap)
+        _ticketCropHelper.value = null
         clearTicketSnapProgress()
+        lastSnapSteps.clear()
         if (_agentMode.value == AgentCaptureMode.TICKET && !_isLocked.value) {
             _ticketWalkStatus.value = TicketWalkStatus.READY
         }
     }
 
-    private suspend fun emitSnapStep(step: TicketSnapStep) {
+    private fun invalidateTicketSnapSession() {
+        ticketSnapSession.incrementAndGet()
+    }
+
+    private suspend fun runTicketSnap(
+        bitmap: android.graphics.Bitmap,
+        rotationDegrees: Int,
+        frameQuality: Float,
+        session: Long,
+        userCrop: com.oasismall.oasisai.domain.paray.ParayTicketCropLearnStore.NormalizedCrop?,
+    ): ParayTicketSnapResult? =
+        ticketReader.processSnap(
+            bitmap,
+            rotationDegrees,
+            frameQuality,
+            onStep = { step -> emitSnapStep(step, session) },
+            userCropNorm = userCrop,
+        )
+
+    fun cancelTicketSnap() {
+        resetTicketWalkPipeline()
+    }
+
+    private suspend fun emitSnapStep(step: TicketSnapStep, session: Long) {
+        if (session != ticketSnapSession.get()) return
         val isDone = step.phase == TicketSnapPhase.DONE
         val isFailure = step.phase == TicketSnapPhase.FAILED
         val terminal = isDone || isFailure
         val now = System.currentTimeMillis()
-        if (!terminal && now - lastStepEmitMs < UI_STEP_MIN_MS) return
+        if (!terminal && step.preview == null && now - lastStepEmitMs < UI_STEP_MIN_MS) return
         lastStepEmitMs = now
         withContext(Dispatchers.Main) {
             val prev = _ticketSnapProgress.value
@@ -359,7 +435,9 @@ class CheckShootViewModel(
                 failed = isFailure,
             )
             val steps = if (prior.lastOrNull()?.message == step.message) prior else prior + line
-            prev?.previewBitmap?.takeIf { step.preview != null }?.recycle()
+            val outgoingPreview = prev?.previewBitmap?.takeIf {
+                step.preview != null && it !== step.preview
+            }
             _ticketSnapProgress.value = TicketSnapUiState(
                 phase = step.phase,
                 message = step.message,
@@ -372,6 +450,9 @@ class CheckShootViewModel(
                 frameQuality = step.frameQuality ?: prev?.frameQuality,
                 error = step.error ?: prev?.error,
             )
+            deferBitmapRecycle(outgoingPreview)
+            lastSnapSteps.clear()
+            lastSnapSteps.addAll(steps)
         }
     }
 
@@ -577,6 +658,10 @@ class CheckShootViewModel(
             if (current.inGestiumCatalog) {
                 _paraySuggest.value = null
                 _isLocked.value = true
+                if (_agentMode.value == AgentCaptureMode.TICKET) {
+                    _ticketWalkStatus.value = TicketWalkStatus.PAUSED
+                    lastTicketLockMs = System.currentTimeMillis()
+                }
                 current.articleId?.let { refreshSubBarcodes(it) }
                 persistSession()
                 return@launch
@@ -857,7 +942,10 @@ class CheckShootViewModel(
     }
 
     fun unlockForNextScan() {
-        cancelTicketSnap()
+        ticketSnapInFlight.set(false)
+        ticketSnapJob?.cancel()
+        ticketSnapJob = null
+        resetTicketWalkPipeline()
         _isLocked.value = false
         _subBcMode.value = false
         _subBarcodes.value = emptyList()
@@ -886,6 +974,18 @@ class CheckShootViewModel(
         stableReadCount = 0
         _message.value = null
         paray.sessionStore.clear()
+    }
+
+    /** Called from UI when ticket camera buffer is ready after unlock / screen entry. */
+    fun onTicketCameraReady() {
+        if (_agentMode.value != AgentCaptureMode.TICKET || _isLocked.value) return
+        val msg = _message.value ?: return
+        if (msg.contains("warming up", ignoreCase = true) ||
+            msg.contains("tap again", ignoreCase = true) ||
+            msg.contains("frame too old", ignoreCase = true)
+        ) {
+            _message.value = null
+        }
     }
 
     fun dismissPopup() {
@@ -1145,8 +1245,9 @@ class CheckShootViewModel(
     }
 
     private fun clearTicketSnapProgress() {
-        _ticketSnapProgress.value?.previewBitmap?.recycle()
+        val preview = _ticketSnapProgress.value?.previewBitmap
         _ticketSnapProgress.value = null
+        deferBitmapRecycle(preview)
     }
 
     private suspend fun processTicketMatch(
@@ -1166,24 +1267,29 @@ class CheckShootViewModel(
             fusion = match.fusion,
             ocrDesignation = match.read.ocrDesignation,
         )
-        _ticketAssessment.value = assessment
         ticketAdvisor.onScan(barcode, article, assessment)
         recognitionTracker.recordTicketScan(barcode, article.id, article.designation, assessment)
         workflowTracker.recordFeature(com.oasismall.oasisai.domain.paray.ParayWorkflowFeature.TICKET_VERIFY)
-        _isLocked.value = true
-        _ticketWalkStatus.value = TicketWalkStatus.PAUSED
-        clearTicketSnapProgress()
-        lastTicketArticleId = article.id
-        lastTicketProbability = match.fusion.probability
-        lastTicketLockMs = System.currentTimeMillis()
-        val tierLabel = tier?.marketingLabel ?: "PARAY ${match.fusion.probabilityPercent}%"
-        val readHint = when (match.read.source) {
-            com.oasismall.oasisai.domain.paray.ParayTicketReadSource.OCR_DESIGNATION ->
-                "$tierLabel · ${match.read.ocrDesignation ?: article.designation}"
-            com.oasismall.oasisai.domain.paray.ParayTicketReadSource.BARCODE -> "Barcode: $barcode"
+        withContext(Dispatchers.Main) {
+            _ticketAssessment.value = assessment
+            _isLocked.value = false
+            _ticketWalkStatus.value = TicketWalkStatus.READY
+            lastTicketArticleId = article.id
+            lastTicketProbability = match.fusion.probability
+            lastTicketLockMs = 0L
+            val tierLabel = tier?.marketingLabel ?: "PARAY ${match.fusion.probabilityPercent}%"
+            val readHint = when (match.read.source) {
+                com.oasismall.oasisai.domain.paray.ParayTicketReadSource.OCR_DESIGNATION ->
+                    "$tierLabel · ${match.read.ocrDesignation ?: article.designation}"
+                com.oasismall.oasisai.domain.paray.ParayTicketReadSource.BARCODE -> "Barcode: $barcode"
+            }
+            _message.value = listOfNotNull(
+                readHint,
+                stabilizerHint,
+                "Hold card 1s to lock",
+                assessment.message,
+            ).joinToString(" · ")
         }
-        _message.value = listOfNotNull(readHint, stabilizerHint, assessment.message).joinToString(" · ")
-        persistSession()
     }
 
     private suspend fun processTicketScanUnknown(barcode: String) {
@@ -1193,10 +1299,9 @@ class CheckShootViewModel(
         ticketAdvisor.onScan(barcode, null, assessment)
         recognitionTracker.recordTicketScan(barcode, null, null, assessment)
         workflowTracker.recordFeature(com.oasismall.oasisai.domain.paray.ParayWorkflowFeature.TICKET_VERIFY)
-        _isLocked.value = true
-        _ticketWalkStatus.value = TicketWalkStatus.PAUSED
-        _message.value = assessment.message
-        persistSession()
+        _isLocked.value = false
+        _ticketWalkStatus.value = TicketWalkStatus.READY
+        _message.value = "${assessment.message} · Hold card 1s to lock"
     }
 
     fun markTicketVerified() {
@@ -1283,6 +1388,7 @@ class CheckShootViewModel(
         private const val STABLE_READS_CATALOG = 2
         private const val STABLE_READS_UNKNOWN = 3
         private const val UI_STEP_MIN_MS = 45L
+        private const val BITMAP_RECYCLE_DEFER_MS = 64L
         private const val PREFS_AGENT = "oasis_agent_prefs"
         private const val KEY_AGENT_MODE = "capture_mode"
     }

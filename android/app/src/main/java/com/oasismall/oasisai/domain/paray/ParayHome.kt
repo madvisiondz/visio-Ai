@@ -52,6 +52,7 @@ class ParayHome(private val context: Context) {
     val workflowSummaryFile: File = File(workflowsDir, "workflow_summary.json")
     val workflowScreenUsageFile: File = File(workflowsDir, "screen_usage.json")
     val ticketEventsFile: File = File(workflowsDir, "ticket_events.jsonl")
+    val ticketCropLearnFile: File = File(workflowsDir, "ticket_crop_learn.json")
     val recognitionDir: File = File(root, "recognition").also { it.mkdirs() }
     val recognitionEventsFile: File = File(recognitionDir, "recognition_events.jsonl")
     val recognitionUnknownProductsFile: File = File(recognitionDir, "unknown_products.json")

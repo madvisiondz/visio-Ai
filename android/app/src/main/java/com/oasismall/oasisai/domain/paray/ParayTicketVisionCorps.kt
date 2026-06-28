@@ -81,6 +81,60 @@ object ParayTicketVisionCorps {
         Analysis(finalRegions, finalOcr, recoveryUsed)
     }
 
+    /**
+     * OCR on a user-validated crop — never re-runs visual scout (crop stays locked).
+     */
+    suspend fun analyzeUserValidatedCrop(
+        frame: Bitmap,
+        ocrCorps: ParayTicketOcrCorps,
+        onProgress: suspend (String) -> Unit = {},
+    ): Analysis? = withContext(Dispatchers.Default) {
+        onProgress("Your crop locked — reading all ticket text…")
+        var regions = ParayTicketRegionScout.fromUserValidatedCrop(frame)
+        onProgress("OCR corps — full crop, black-on-yellow passes…")
+        var ocr = ocrCorps.read(
+            textCrop = regions.textCrop,
+            fullFrame = frame,
+            includeRecovery = true,
+            userValidatedCrop = true,
+        )
+        var recoveryUsed = false
+        if (ocr == null || ocr.read.confidence < 0.65f) {
+            onProgress("Recovery — enhanced scan on same crop…")
+            recoveryUsed = true
+            val boosted = ParayTicketImagePrep.boostForRecovery(frame)
+            val retryFrame = if (boosted !== frame) boosted else frame
+            val retryRegions = ParayTicketRegionScout.fromUserValidatedCrop(retryFrame)
+            val retryOcr = ocrCorps.read(
+                textCrop = retryRegions.textCrop,
+                fullFrame = retryFrame,
+                includeRecovery = true,
+                userValidatedCrop = true,
+            )
+            if (boosted !== frame && !boosted.isRecycled) boosted.recycle()
+            if (retryOcr != null && (ocr == null || retryOcr.corpsConfidence > ocr.corpsConfidence)) {
+                recycleUserCropRegions(regions, frame)
+                regions = retryRegions
+                ocr = retryOcr
+            } else {
+                recycleUserCropRegions(retryRegions, retryFrame)
+            }
+        }
+        val finalOcr = ocr ?: run {
+            recycleUserCropRegions(regions, frame)
+            return@withContext null
+        }
+        Analysis(regions, finalOcr, recoveryUsed)
+    }
+
+    private fun recycleUserCropRegions(
+        regions: ParayTicketRegionScout.TicketRegions,
+        frame: Bitmap,
+    ) {
+        if (regions.textCrop !== frame && !regions.textCrop.isRecycled) regions.textCrop.recycle()
+        regions.productCrop?.takeIf { !it.isRecycled }?.recycle()
+    }
+
     private fun buildFullFrameRegions(frame: Bitmap): ParayTicketRegionScout.TicketRegions {
         val w = frame.width
         val h = frame.height

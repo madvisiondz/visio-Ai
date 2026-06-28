@@ -1222,6 +1222,36 @@
 
 ---
 
+## Session 151 — 2026-06-14
+
+**User:** Post-user crop still happening; 520ms burst blurrier; OCR must read all black text on crop.
+
+**Assistant:** **v2.34.1 (337)** — removed yellow-band sub-crop after user confirm; instant WYSIWYG frame pick; `read(userValidatedCrop)` on full crop with 4-line designation; live quality hint. APK `VisioAI-debug.apk`.
+
+## Session 150 — 2026-06-14
+
+**User:** Blurry tap capture; user crop lost in OCR; "frame too old" after process blocks next scan.
+
+**Assistant:** **v2.34.0 (336)** — stabilization burst picks sharpest frame; user-validated crop path skips PARAY re-detect; buffer no longer cleared on unlock; clearer ready/warmup messages. APK `VisioAI-debug.apk`.
+
+## Session 149 — 2026-06-14
+
+**User:** Still crashes on ticket tab when process runs after crop (`Canvas: trying to use a recycled bitmap`).
+
+**Assistant:** **v2.33.3 (335)** — root causes: `previewCopy()` returned same bitmap as pipeline (recycled while progress panel drew it); `emitSnapStep` recycled previews synchronously before Compose finished draw; crop overlay shared bitmap with processing. Fix: UI-owned preview copies, deferred recycle via main Handler, crop overlay display copy. APK `VisioAI-debug.apk`.
+
+## Session 149 — 2026-06-14
+
+**User:** After first ticket capture works, unlock for next ticket → app shows "Point at ticket and tap again" and won't shoot again.
+
+**Assistant:** **v2.34.3 (339)** — root cause: camera buffer stopped while card locked + capture required frame ≤400ms old (stale ring after unlock). Fix: keep buffer live during lock; capture newest ring frame; reset snap-in-flight on unlock; clear stale error toasts. APK `VisioAI-debug.apk`.
+
+## Session 148 — 2026-06-14
+
+**User:** App crashes after crop confirm when processing starts (`Canvas: trying to use a recycled bitmap`).
+
+**Assistant:** **v2.33.2 (334)** — crop UI and PARAY pipeline shared one `Bitmap`; processing recycled it while Compose still drew the crop overlay. Fix: processing-owned copy on confirm + deferred UI recycle; `ParayTicketReader` copies input and never recycles caller bitmap. APK `VisioAI-debug.apk`.
+
 ## Session 147 — 2026-06-14
 
 **User:** Crop preview stretched/distorted (vertical stripes); camera feed foggy; multi-camera device may be using weak camera.

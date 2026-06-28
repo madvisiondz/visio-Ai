@@ -51,22 +51,12 @@ fun BarcodeCameraPreview(
             implementationMode = PreviewView.ImplementationMode.COMPATIBLE
         }
     }
-    val barcodeScanner = remember {
-        BarcodeScanning.getClient(
-            com.google.mlkit.vision.barcode.BarcodeScannerOptions.Builder()
-                .setBarcodeFormats(
-                    Barcode.FORMAT_EAN_13,
-                    Barcode.FORMAT_EAN_8,
-                    Barcode.FORMAT_UPC_A,
-                    Barcode.FORMAT_UPC_E,
-                    Barcode.FORMAT_CODE_128,
-                    Barcode.FORMAT_CODE_39,
-                    Barcode.FORMAT_ITF,
-                )
-                .build(),
-        )
-    }
+    // Stable executor across Smart ↔ Ticket rebinding — only shut down when composable leaves.
     val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
+
+    DisposableEffect(Unit) {
+        onDispose { cameraExecutor.shutdown() }
+    }
 
     AndroidView(
         factory = { previewView },
@@ -83,6 +73,21 @@ fun BarcodeCameraPreview(
         val mainExecutor = ContextCompat.getMainExecutor(context)
         val future = ProcessCameraProvider.getInstance(context)
         val highQualityTicket = ticketActive || ticketBuffer != null
+
+        // Fresh ML Kit client per camera bind — never reuse a closed scanner after tab switch.
+        val barcodeScanner = BarcodeScanning.getClient(
+            com.google.mlkit.vision.barcode.BarcodeScannerOptions.Builder()
+                .setBarcodeFormats(
+                    Barcode.FORMAT_EAN_13,
+                    Barcode.FORMAT_EAN_8,
+                    Barcode.FORMAT_UPC_A,
+                    Barcode.FORMAT_UPC_E,
+                    Barcode.FORMAT_CODE_128,
+                    Barcode.FORMAT_CODE_39,
+                    Barcode.FORMAT_ITF,
+                )
+                .build(),
+        )
 
         future.addListener(
             {
@@ -156,7 +161,6 @@ fun BarcodeCameraPreview(
             disposed.set(true)
             boundProvider?.unbindAll()
             barcodeScanner.close()
-            cameraExecutor.shutdown()
         }
     }
 }

@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * Ring buffer of upright camera frames — tap uses the freshest frame (WYSIWYG).
+ * Ring buffer of upright camera frames — tap uses the freshest sharp frame (WYSIWYG).
  */
 class TicketCameraBuffer {
     private val lock = Any()
@@ -26,13 +26,15 @@ class TicketCameraBuffer {
         val rotationDegrees: Int,
         val capturedAtMs: Long,
         val qualityScore: Float,
+        val sharpness: Float,
         val qualityReport: ParayTicketFrameQuality.Report,
     )
 
     val hasFreshFrame: Boolean
-        get() = synchronized(lock) {
-            freshFrames().isNotEmpty()
-        }
+        get() = synchronized(lock) { freshFrames().isNotEmpty() }
+
+    val hasAnyFrame: Boolean
+        get() = synchronized(lock) { ring.isNotEmpty() }
 
     fun offer(source: Bitmap, rotationDegrees: Int) {
         val now = System.currentTimeMillis()
@@ -42,11 +44,20 @@ class TicketCameraBuffer {
         if (scaled !== upright) upright.recycle()
         val report = ParayTicketFrameQuality.evaluate(scaled)
         synchronized(lock) {
-        if (ring.isNotEmpty() && now - ring.last().capturedAtMs < MIN_OFFER_INTERVAL_MS) {
-            scaled.recycle()
-            return
-        }
-            ring.addLast(Frame(scaled, rotationDegrees = 0, now, report.composite, report))
+            if (ring.isNotEmpty() && now - ring.last().capturedAtMs < MIN_OFFER_INTERVAL_MS) {
+                scaled.recycle()
+                return
+            }
+            ring.addLast(
+                Frame(
+                    bitmap = scaled,
+                    rotationDegrees = 0,
+                    capturedAtMs = now,
+                    qualityScore = report.composite,
+                    sharpness = report.sharpness,
+                    qualityReport = report,
+                ),
+            )
             while (ring.size > RING_CAPACITY) {
                 ring.removeFirst().bitmap.recycle()
             }
@@ -55,18 +66,34 @@ class TicketCameraBuffer {
         }
     }
 
-    /** Freshest frame — matches what the user just saw when tapping. */
-    fun takeLatestSnap(): Frame? = synchronized(lock) {
-        val latest = freshFrames().maxByOrNull { it.capturedAtMs } ?: return null
-        copyFrame(latest)
+    /**
+     * Instant capture — newest frame in the fresh ring (what the user sees).
+     * Never uses the narrow 400ms window; stale label + empty recent caused post-unlock failures.
+     */
+    fun takeInstantSnap(): Frame? = synchronized(lock) {
+        val fresh = freshFrames()
+        val pool = fresh.ifEmpty { ring.toList() }
+        if (pool.isEmpty()) return null
+        val pick = pool.maxWithOrNull(
+            compareBy<Frame> { it.capturedAtMs }
+                .thenBy { it.qualityScore }
+                .thenBy { it.sharpness },
+        ) ?: return null
+        copyFrame(pick)
     }
 
-    fun takeBestSnap(): Frame? = takeLatestSnap()
+    /** Newest frame timestamp — for diagnostics / UI readiness. */
+    fun newestFrameAgeMs(): Long {
+        val now = System.currentTimeMillis()
+        return synchronized(lock) {
+            freshFrames().maxOfOrNull { now - it.capturedAtMs } ?: Long.MAX_VALUE
+        }
+    }
 
     fun takeAlternateSnap(excludeCapturedAtMs: Long): Frame? = synchronized(lock) {
         val alt = freshFrames()
             .filter { it.capturedAtMs != excludeCapturedAtMs }
-            .maxByOrNull { it.qualityScore }
+            .maxWithOrNull(compareBy<Frame> { it.qualityScore }.thenBy { it.sharpness })
             ?: return null
         copyFrame(alt)
     }
@@ -91,8 +118,8 @@ class TicketCameraBuffer {
     }
 
     companion object {
-        private const val RING_CAPACITY = 4
-        private const val MAX_FRAME_AGE_MS = 1_500L
-        private const val MIN_OFFER_INTERVAL_MS = 80L
+        private const val RING_CAPACITY = 10
+        private const val MAX_FRAME_AGE_MS = 18_000L
+        private const val MIN_OFFER_INTERVAL_MS = 100L
     }
 }

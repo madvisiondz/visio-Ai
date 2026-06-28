@@ -2,6 +2,63 @@
 
 > What has been built. Update at end of each work session.
 
+## 2026-06-14 — Visio Ai v2.34.2 Ticket → article card (no suggestions)
+
+- [x] Best PARAY match opens standard article card (same as barcode Smart mode)
+- [x] Hold 1s / lock button → actions (share, design, PNG, verify ticket, sub-BC…)
+- [x] Swipe unlock → next ticket
+- [x] Removed suggestions picker overlay
+- [x] APK **2.34.2** (338)
+
+---
+
+## 2026-06-14 — Visio Ai v2.34.1 Ticket crop + capture polish
+
+- [x] **No post-user sub-crop** — OCR uses full user crop; yellow-band re-crop removed
+- [x] **Instant WYSIWYG capture** — removed 520ms burst; newest frame in last 400ms
+- [x] **Full-crop OCR** — all black text lines (up to 4 rows); no yellowBandOnly filter
+- [x] **Live quality hint** on tap overlay
+- [x] APK **2.34.1** (337)
+
+---
+
+## 2026-06-14 — Visio Ai v2.34.0 Ticket stabilization + crop lock
+
+- [x] **Stabilization burst** — ~520ms multi-frame pick sharpest frame (not latest/blur)
+- [x] **User crop locked** — `analyzeUserValidatedCrop` skips visual re-scout; OCR on confirmed crop only
+- [x] **Post-process tap fix** — removed buffer wipe on unlock; no false "frame too old"; clearer warmup messages
+- [x] APK **2.34.0** (336)
+
+---
+
+## 2026-06-14 — Visio Ai v2.33.3 Ticket process bitmap crash fix
+
+- [x] **`previewCopy`** — always returns UI-owned bitmap (never aliases pipeline working bitmap)
+- [x] **Deferred recycle** — crop/progress previews recycled ~64ms after state cleared (Compose draw safe)
+- [x] **Crop overlay** — owns display copy via `DisposableEffect`
+- [x] APK **2.33.3** (335)
+
+---
+
+## 2026-06-14 — Visio Ai v2.33.2 Ticket crop confirm crash fix
+
+- [x] **Recycled bitmap crash** — crop confirm copies frame for PARAY pipeline; UI bitmap recycled after Compose drops overlay
+- [x] **`ParayTicketReader`** — owns input copy; never recycles caller's bitmap
+- [x] APK **2.33.2** (334)
+
+---
+
+## 2026-06-14 — Visio Ai v2.32.2 Ticket walk auto-reset
+
+- [x] **Instant dismiss** — progress overlay clears as soon as match is found (no 1.8–2.2s hang)
+- [x] **Session guard** — stale OCR step updates ignored after terminal state
+- [x] **IO offload** — catalog lookup + assessment off main thread
+- [x] **Auto-unlock** — ~1.4s after match, agent resets for next ticket (swipe to skip wait)
+- [x] **Buffer flush** — camera ring buffer cleared on unlock
+- [x] APK **2.32.2** (330)
+
+---
+
 ## 2026-06-14 — Visio Ai v2.32.1 Ticket camera + crop fix
 
 - [x] **YUV stride fix** — `CameraFrameUtils.yuv420888ToNv21` copies luma/chroma with row/pixel stride (fixes vertical stripe / stretched crop preview)
@@ -1142,7 +1199,18 @@
 - [x] `ImportDiffSummary.displayCounts`, `summarizeImportsForDisplay`, filtered `observeMeaningfulImportChangesEnrichedFiltered`
 - [x] **BUILD SUCCESSFUL** — `VisioAI-debug.apk` v2.13.0 (278)
 
-### 2026-06-14 — VisioPRO print codes from CSV (v2.12.7)
+### 2026-06-14 — Smart↔Ticket camera + shelf OCR (v2.35.0)
+- [x] Fix ML Kit barcode scanner closed on tab switch (fresh client per camera bind)
+- [x] Disable barcode pipeline in Ticket mode; reset debounce when entering Smart/Bulk
+- [x] OCR: magenta-on-white, deglare, adaptive bin; split designation/price bands; 1080px upscale
+- [x] **BUILD SUCCESSFUL** — `VisioAI-debug.apk` v2.35.0 (340)
+
+### 2026-06-14 — Ticket re-shoot after unlock (v2.34.3)
+- [x] Camera buffer keeps feeding while article card locked (`ticketScanEnabled = ticketCameraFeedActive`)
+- [x] `takeInstantSnap()` uses newest frame in ring (18s fresh + full-ring fallback), not 400ms window
+- [x] `unlockForNextScan()` resets `ticketSnapInFlight`; stale "tap again" toasts cleared on camera ready
+- [x] **BUILD SUCCESSFUL** — `VisioAI-debug.apk` v2.34.3 (339)
+
 - [x] `VisioProPrintCode` — barcode last-3 or Gestium `codeart` for `CA:` imports
 - [x] fv_print renderer uses per-article code (not studio sample)
 - [x] **BUILD SUCCESSFUL** — `VisioAI-debug.apk` v2.12.7 (275)

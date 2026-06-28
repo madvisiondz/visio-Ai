@@ -18,8 +18,15 @@ internal object ParayTicketBitmapUtils {
         return Bitmap.createScaledBitmap(bitmap, w, h, true)
     }
 
-    /** Preview for UI — preserves aspect ratio (max side PREVIEW_MAX_PX). */
-    fun previewCopy(source: Bitmap): Bitmap = downscale(source, PREVIEW_MAX_PX)
+    /** Preview for UI — always returns a bitmap owned by the UI layer (never recycles with pipeline). */
+    fun previewCopy(source: Bitmap): Bitmap {
+        val scaled = downscale(source, PREVIEW_MAX_PX)
+        return if (scaled === source) {
+            source.copy(source.config ?: Bitmap.Config.ARGB_8888, false)
+        } else {
+            scaled
+        }
+    }
 
     fun forSnapProcessing(source: Bitmap): Bitmap = downscale(source, SNAP_MAX_PX)
 

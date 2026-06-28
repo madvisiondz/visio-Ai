@@ -55,6 +55,8 @@ OASIS MALL operates at scale with fragmented workflows:
 | 2026-06-19 | **PSD pipeline**: `tools/psd` (psd-tools) + `tools/psd-node` (ag-psd) — inspect layers/bounds → JSON for template cloning |
 | 2026-06-19 | **PSD template pipeline**: Python psd-tools + Node ag-psd inspectors → `templates/psd-specs/*.json` for Design cloning |
 | 2026-06-14 | **Visio Ai v2.28.0**: Ticket mode **hold-to-snap** — no live OCR; hold screen → photo → step-by-step PARAY crop/OCR/fuzzy match UI |
+| 2026-06-14 | **Visio Ai v2.32.3**: Ticket shelf walk — hold matched card, repeat snaps without restart, center-holder OCR, stricter match gates |
+| 2026-06-14 | **Visio Ai v2.32.2**: Ticket match auto-reset — clear progress immediately, IO offload, auto-unlock ~1.4s for next tap |
 | 2026-06-14 | **Visio Ai v2.32.1**: Ticket camera fix — stride-aware YUV→bitmap (no stripe crop); main back camera + up to 4K in Ticket mode; warm-block false-positive guard |
 | 2026-06-14 | **Visio Ai v2.32.0**: **PARAY Vision Corps** — 5-strategy ticket scout (warm/price/text/layout), 6-variant OCR corps + consensus, full-frame fallback |
 | 2026-06-14 | **Visio Ai v2.31.2**: Ticket crop fix — upright frames, connected yellow blob detect, latest-frame tap, stable step UI |
@@ -663,6 +665,12 @@ It:
 
 | Date | Change |
 |------|--------|
+| 2026-06-14 | **Visio Ai docs**: Added `docs/BLOCK_DIAGRAM.html` — A3 printable architecture diagrams (8 Mermaid blocks) |
+| 2026-06-14 | **Visio Ai v2.35.0**: Fix Smart↔Ticket camera interference (fresh ML Kit scanner per bind; no barcode in Ticket mode); stronger shelf OCR — magenta/deglare/adaptive variants, split designation/price bands, 1080px upscale; APK 2.35.0 (340) |
+| 2026-06-14 | **Visio Ai v2.34.3**: Fix ticket re-shoot after unlock — camera buffer stays live while card locked; capture uses newest frame in ring (not 400ms window); reset snap-in-flight on unlock; clear stale error toasts; APK 2.34.3 (339) |
+| 2026-06-14 | **Visio Ai v2.34.2**: Ticket match → article card (no suggestions list); hold-to-lock like Smart mode; full action menu when locked; APK 2.34.2 (338) |
+| 2026-06-14 | **Visio Ai v2.33.2**: Fix ticket crop confirm crash — separate processing bitmap from Compose crop preview; `ParayTicketReader` no longer recycles caller bitmap; APK 2.33.2 (334) | Hold matched card until swipe; fix one-shot bug (PAUSED gate + camera buffer during processing); center-holder scout + crop-first OCR for shelf noise; stricter fusion gates; APK 2.32.3 (331) |
+| 2026-06-14 | **Visio Ai v2.32.2**: Ticket walk auto-reset after match — dismiss progress overlay instantly, DB work off main thread, auto-unlock ~1.4s for next tap; APK 2.32.2 (330) |
 | 2026-06-14 | **Visio Ai v2.32.1**: Fix ticket crop stretch — proper YUV_420_888→NV21 stride copy; Ticket mode uses best back camera + high-res selector (4K); warm-block desk false positives rejected; crop preview aspect ratio; APK 2.32.1 (329) |
 | 2026-06-14 | **Visio Ai v2.32.0**: PARAY Vision Corps — 5-strategy visual scout + 6-variant OCR corps + consensus; faded/warm/magenta tickets OK; full-frame fallback; APK 2.32.0 (328) |
 | 2026-06-14 | **Visio Ai v2.31.2**: Ticket crop/orientation fix — rotate frames to match preview, largest yellow blob (not noise strips), tap uses latest frame, cleaner failure UI; APK 2.31.2 (327) |
