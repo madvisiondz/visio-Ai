@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Visio Ai — Features &amp; APIs (A4 Landscape)</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --oasis-orange: #ff5e13;
+      --ink: #1a1a2e;
+      --muted: #5a5a72;
+      --paper: #fff;
+      --border: #d8dce6;
+      --api-bg: #eef4ff;
+      --feat-bg: #fff8f4;
+      --offline: #e8f5e9;
+      --page-w: 297mm;
+      --page-h: 210mm;
+    }
+
+    * { box-sizing: border-box; }
+
+    @page { size: A4 landscape; margin: 7mm 9mm; }
+
+    html, body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      color: var(--ink);
+      background: #eef0f4;
+    }
+
+    body.screen { padding: 10px; }
+
+    .toolbar {
+      position: sticky; top: 0; z-index: 100;
+      background: var(--ink); color: #fff;
+      padding: 8px 14px;
+      display: flex; justify-content: space-between; align-items: center;
+      box-shadow: 0 2px 10px rgba(0,0,0,.18);
+    }
+    .toolbar h1 { margin: 0; font-size: 0.92rem; }
+    .toolbar span { font-size: 0.72rem; opacity: 0.85; }
+    .toolbar button {
+      background: var(--oasis-orange); border: none; color: #fff;
+      padding: 6px 14px; border-radius: 5px; font-weight: 600; cursor: pointer; font-size: 0.78rem;
+    }
+
+    .document {
+      width: var(--page-w); max-width: 100%;
+      margin: 0 auto; background: var(--paper);
+      box-shadow: 0 4px 20px rgba(0,0,0,.1);
+    }
+
+    .sheet {
+      width: var(--page-w); min-height: var(--page-h);
+      padding: 6mm 8mm 5mm;
+      page-break-after: always;
+      page-break-inside: avoid;
+      display: flex; flex-direction: column;
+    }
+    .sheet:last-child { page-break-after: auto; }
+    body.screen .sheet { border-bottom: 1px dashed var(--border); min-height: var(--page-h); }
+
+    /* One diagram per page — fill printable area */
+    .sheet.diagram-sheet { height: var(--page-h); }
+
+    .cover { flex-direction: row; gap: 8mm; align-items: stretch; }
+    .cover-main { flex: 1.2; border-right: 3px solid var(--oasis-orange); padding-right: 7mm; display: flex; flex-direction: column; justify-content: center; }
+    .cover-side { flex: 1; font-size: 0.68rem; display: flex; flex-direction: column; justify-content: center; }
+
+    .badge {
+      display: inline-block; background: var(--oasis-orange); color: #fff;
+      font-size: 0.58rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+      padding: 3px 7px; border-radius: 3px; margin-bottom: 6px; width: fit-content;
+    }
+
+    h1.doc-title { margin: 0 0 4px; font-size: 1.4rem; line-height: 1.15; }
+    .subtitle { margin: 0 0 8px; color: var(--muted); font-size: 0.82rem; }
+
+    .legend { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+    .legend span {
+      font-size: 0.6rem; padding: 2px 7px; border-radius: 3px; border: 1px solid var(--border);
+    }
+    .legend .feat { background: var(--feat-bg); }
+    .legend .api { background: var(--api-bg); }
+    .legend .off { background: var(--offline); }
+
+    .sheet-head { margin-bottom: 3px; flex-shrink: 0; }
+    .sheet-head h2 {
+      margin: 0; font-size: 0.88rem;
+      border-left: 4px solid var(--oasis-orange); padding-left: 7px;
+    }
+    .sheet-head p { margin: 1px 0 0; padding-left: 11px; font-size: 0.64rem; color: var(--muted); }
+
+    .mermaid-wrap {
+      flex: 1; min-height: 0;
+      border: 1px solid var(--border); border-radius: 5px;
+      background: #fafbfc; padding: 4px 2px; overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .diagram-sheet .mermaid-wrap { min-height: 175mm; }
+
+    .mermaid {
+      width: 100%;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .mermaid svg {
+      max-width: 100% !important;
+      max-height: 175mm !important;
+      width: auto !important;
+      height: auto !important;
+    }
+
+    table {
+      width: 100%; border-collapse: collapse; font-size: 0.58rem; flex-shrink: 0;
+    }
+    th, td { border: 1px solid var(--border); padding: 2px 5px; text-align: left; vertical-align: top; }
+    th { background: #f0f2f6; font-weight: 600; }
+    td code { font-size: 0.92em; background: #f4f4f8; padding: 0 3px; border-radius: 2px; }
+    tr:nth-child(even) td { background: #fafbfc; }
+    .tag {
+      display: inline-block; font-size: 0.52rem; padding: 0 4px; border-radius: 2px;
+      margin-right: 2px; white-space: nowrap;
+    }
+    .tag-ml { background: #e3f2fd; color: #1565c0; }
+    .tag-android { background: #fce4ec; color: #c62828; }
+    .tag-onnx { background: #e8eaf6; color: #3949ab; }
+    .tag-file { background: #fff3e0; color: #e65100; }
+    .tag-net { background: #e0f2f1; color: #00695c; }
+    .tag-ui { background: #f3e5f5; color: #6a1b9a; }
+    .tag-off { background: #e8f5e9; color: #2e7d32; }
+
+    .footer { font-size: 0.55rem; color: var(--muted); text-align: right; margin-top: 2px; flex-shrink: 0; }
+
+    @media print {
+      body { background: #fff; }
+      .toolbar { display: none; }
+      body.screen { padding: 0; }
+      .document { box-shadow: none; width: auto; max-width: none; margin: 0; }
+      body.screen .sheet { border: none; }
+      .diagram-sheet .mermaid svg { max-height: 182mm !important; }
+    }
+  </style>
+</head>
+<body class="screen">
+  <div class="toolbar">
+    <div>
+      <h1>Visio Ai — Features &amp; APIs</h1>
+      <span>A4 landscape · Ctrl+P · Background graphics ON</span>
+    </div>
+    <button type="button" onclick="window.print()">Print A4 Landscape</button>
+  </div>
+
+  <main class="document">
+    <!-- PAGE 1 COVER -->
+    <section class="sheet cover">
+      <div class="cover-main">
+        <span class="badge">Features × APIs map</span>
+        <h1 class="doc-title">Visio Ai / MadVision<br>Features &amp; APIs Reference</h1>
+        <p class="subtitle">What each module does · which SDK / library / platform API powers it</p>
+        <p style="font-size:0.68rem;margin:0;color:var(--muted);">
+          <strong>Offline-first:</strong> core mall workflows run without internet. Most “APIs” are on-device Android SDKs and bundled ML models — not cloud REST services.
+        </p>
+        <div class="legend">
+          <span class="feat">■ User feature / screen</span>
+          <span class="api">■ Library / SDK</span>
+          <span class="off">■ On-device / local only</span>
+        </div>
+      </div>
+      <div class="cover-side">
+        <strong style="color:var(--oasis-orange);font-size:0.72rem;">Pages</strong>
+        <ol style="margin:4px 0 0;padding-left:1.2em;line-height:1.5;color:var(--muted);">
+          <li>Feature map (all tabs)</li>
+          <li>AGENT modes → APIs</li>
+          <li>PARAY + vision stack</li>
+          <li>Import · export · sync APIs</li>
+          <li>Feature ↔ API matrix</li>
+          <li>Dependency inventory</li>
+        </ol>
+        <p style="margin:6px 0 0;font-size:0.58rem;color:var(--muted);">Diagrams §1–§4: one full page each.</p>
+        <p style="margin-top:8px;padding:6px 8px;background:#f5f6f8;border-left:3px solid var(--oasis-orange);font-size:0.62rem;">
+          v2.35.0 (340) · Kotlin · Compose · minSdk 26 · targetSdk 34
+        </p>
+      </div>
+    </section>
+
+    <!-- PAGE 2 FEATURE MAP -->
+    <section class="sheet diagram-sheet">
+      <div class="sheet-head">
+        <h2>§1 — Application feature map</h2>
+        <p>Nine bottom-nav modules + shared catalog / image core (designation-first identity).</p>
+      </div>
+      <div class="mermaid-wrap">
+        <pre class="mermaid">
+flowchart TB
+    subgraph Core["Shared core"]
+        CAT[Articles catalog search]
+        ROOM[(Room SQLite v18)]
+        PNG[PNG store product_images]
+        REPO[OasisRepository]
+    end
+
+    subgraph Nav["Bottom navigation features"]
+        VP[VisioPRO presets social print]
+        TS[To shoot photo queue]
+        AG[AGENT Smart Ticket Bulk]
+        PR[PARAY Learn AI home]
+        BT[Batch txt routing]
+        SH[To share PNG cart]
+        DS[Design shelf A4 12-up]
+        ST[Settings import backup]
+    end
+
+    subgraph Support["Cross-cutting"]
+        IMP[Gestium CSV import]
+        CUT[Background cutout U2NetP]
+        SYNC[Phone sync LAN 8776]
+        HIST[Print history audit]
+    end
+
+    CAT --> REPO --> ROOM
+    PNG --> REPO
+    IMP --> REPO
+    VP --> REPO
+    TS --> REPO
+    AG --> REPO
+    AG --> PR
+    PR --> JSON[paray_home JSON]
+    BT --> TS
+    BT --> SH
+    SH --> DS
+    DS --> HIST
+    ST --> IMP
+    ST --> SYNC
+    ST --> CUT
+        </pre>
+      </div>
+      <div class="footer">Page 2</div>
+    </section>
+
+    <!-- PAGE 3 AGENT -->
+    <section class="sheet diagram-sheet">
+      <div class="sheet-head">
+        <h2>§2 — AGENT tab: features → APIs</h2>
+        <p>Three capture modes share CameraX; ML pipelines isolated per mode (v2.35).</p>
+      </div>
+      <div class="mermaid-wrap">
+        <pre class="mermaid">
+flowchart LR
+    subgraph CamAPI["Camera APIs"]
+        CX[CameraX Preview ImageAnalysis]
+        C2[Camera2 best back selector]
+        YUV[YUV420 to Bitmap NV21 stride]
+    end
+
+    subgraph Smart["Smart mode"]
+        S1[Live barcode scan]
+        S2[Article card lock actions]
+        S3[PARAY visual ID fallback]
+        S4[SUB-BC alternate barcodes]
+    end
+
+    subgraph Ticket["Ticket mode"]
+        T1[Tap capture ring buffer]
+        T2[User crop overlay]
+        T3[OCR corps 10 variants]
+        T4[Fuzzy fusion match]
+        T5[Price verify advisor]
+    end
+
+    subgraph Bulk["Bulk mode"]
+        B1[Barcode scan]
+        B2[System camera JPEG]
+        B3[Optional cutout save]
+    end
+
+    CX --> Smart
+    CX --> Ticket
+    CX --> Bulk
+    C2 --> CX
+    YUV --> CX
+
+    S1 --> MLBC[ML Kit Barcode v17.2]
+    S3 --> VF[VisualFeatureExtractor custom]
+    S3 --> PL[ParayLearnStore fingerprints]
+
+    T1 --> BUF[TicketCameraBuffer]
+    T3 --> MLTXT[ML Kit Text Recognition v16 Latin]
+    T3 --> PRE[ParayTicketPreprocessCorps]
+    T4 --> FUZ[ParayTicketFuzzyMatcher Room search]
+
+    B1 --> MLBC
+    B2 --> TP[Activity TakePicture contract]
+    B3 --> ONNX[ONNX U2NetP cutout]
+        </pre>
+      </div>
+      <div class="footer">Page 3</div>
+    </section>
+
+    <!-- PAGE 4 PARAY -->
+    <section class="sheet diagram-sheet">
+      <div class="sheet-head">
+        <h2>§3 — PARAY AI features → APIs</h2>
+        <p>JSON file store; UI never aggregates live from Room.</p>
+      </div>
+      <div class="mermaid-wrap">
+        <pre class="mermaid">
+flowchart TB
+    subgraph Feat["PARAY features"]
+        L[Learn session multi-view]
+        M[Memory tab browse index]
+        K[Knowledge brands categories]
+        W[Workflow screen stats]
+        R[Recognition blind spots]
+        F[PKP fusion export import]
+        A[Ticket advisor events]
+    end
+
+    subgraph APIs["APIs and engines"]
+        CAM2[CameraX ParayLearnCameraPreview]
+        VF2[VisualFeatureExtractor]
+        SIM[ParayVisualSimilarity]
+        IDX[learn_index.json IO]
+        OBS[ParayObserver JSONL]
+        ZIP[PKP zip merge engine]
+    end
+
+    L --> CAM2 --> VF2 --> SIM --> IDX
+    M --> IDX
+    K --> KS[knowledge_summary.json]
+    W --> WF[workflow_summary.json]
+    R --> REC[recognition_summary.json]
+    F --> ZIP
+    A --> TE[ticket_events.jsonl]
+        </pre>
+      </div>
+      <div class="footer">Page 4</div>
+    </section>
+
+    <!-- PAGE 5 IMPORT / EXPORT / SYNC -->
+    <section class="sheet diagram-sheet">
+      <div class="sheet-head">
+        <h2>§4 — Import · export · sync APIs</h2>
+        <p>File-based integrations; LAN sync only network feature in core app.</p>
+      </div>
+      <div class="mermaid-wrap">
+        <pre class="mermaid">
+flowchart TB
+    subgraph In["Data in"]
+        CSV[Gestium CSV SAF OpenDocument]
+        PKP2[PARAY PKP zip import]
+        BKP[Backup ZIP restore]
+        PH[PhotoRoom folder DocumentFile]
+        PICK[Manual PNG picker]
+    end
+
+    subgraph Out["Data out"]
+        ZIP2[Backup VisioPRO ZIP CreateDocument]
+        EXP[Design A4 JPEG Canvas render]
+        PDF[Settings PDF PdfDocument]
+        SHARE[Telegram ACTION_SEND FileProvider]
+        BULK2[Bulk PNG DCIM Download]
+    end
+
+    subgraph Net["Local network"]
+        SRV[NanoHTTPD server :8776]
+        CLI[OkHttp client REST-like]
+        PIN[PIN header auth]
+    end
+
+    CSV --> IMP2[ImportService Room diff]
+    PH --> IM[ImageMatcher PNG index]
+    SRV --> PIN
+    CLI --> SRV
+    SHARE --> OFP[OasisShareFileProvider]
+        </pre>
+      </div>
+      <div class="footer">Page 5</div>
+    </section>
+
+    <!-- PAGE 5 MATRIX -->
+    <section class="sheet">
+      <div class="sheet-head">
+        <h2>§5 — Feature ↔ API matrix (selected)</h2>
+        <p>Primary technology binding per user-visible capability.</p>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th style="width:14%">Feature</th>
+            <th style="width:22%">User capability</th>
+            <th style="width:28%">API / library / SDK</th>
+            <th style="width:18%">Package / module</th>
+            <th style="width:18%">Network</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Articles</strong></td>
+            <td>Search 20k+ catalog by designation, barcode, rayon</td>
+            <td><span class="tag tag-ui">Room</span> <span class="tag tag-ui">Paging 3</span> <span class="tag tag-ui">Compose</span></td>
+            <td><code>OasisRepository</code> · <code>ArticleDao</code></td>
+            <td><span class="tag tag-off">Offline</span></td>
+          </tr>
+          <tr>
+            <td><strong>AGENT Smart</strong></td>
+            <td>Scan barcode → card → lock → share / design / teach</td>
+            <td><span class="tag tag-ml">ML Kit Barcode</span> <span class="tag tag-android">CameraX</span> <span class="tag tag-off">VisualFeatureExtractor</span></td>
+            <td><code>BarcodeCameraPreview</code> · <code>ParayCameraMatcher</code></td>
+            <td><span class="tag tag-off">Offline</span></td>
+          </tr>
+          <tr>
+            <td><strong>AGENT Ticket</strong></td>
+            <td>Tap shelf ticket → OCR designation + price → catalog match</td>
+            <td><span class="tag tag-ml">ML Kit Text OCR</span> <span class="tag tag-android">CameraX 4K</span> <span class="tag tag-off">OCR corps preprocess</span></td>
+            <td><code>ParayTicketReader</code> · <code>ParayTicketOcrCorps</code></td>
+            <td><span class="tag tag-off">Offline</span></td>
+          </tr>
+          <tr>
+            <td><strong>AGENT Bulk</strong></td>
+            <td>Barcode-only mall photo capture</td>
+            <td><span class="tag tag-ml">ML Kit Barcode</span> <span class="tag tag-android">TakePicture</span> <span class="tag tag-onnx">ONNX cutout opt</span></td>
+            <td><code>BulkCaptureStore</code></td>
+            <td><span class="tag tag-off">Offline</span></td>
+          </tr>
+          <tr>
+            <td><strong>PARAY Learn</strong></td>
+            <td>Front / side / back visual teach queue</td>
+            <td><span class="tag tag-android">CameraX</span> <span class="tag tag-off">VisualFeatureExtractor</span> <span class="tag tag-file">learn_index.json</span></td>
+            <td><code>ParayLearnEngine</code></td>
+            <td><span class="tag tag-off">Offline</span></td>
+          </tr>
+          <tr>
+            <td><strong>Design</strong></td>
+            <td>12-up shelf A4 JPEG export + print history</td>
+            <td><span class="tag tag-android">Canvas Bitmap</span> <span class="tag tag-file">ShelfA4Renderer</span> <span class="tag tag-ui">Room print_batches</span></td>
+            <td><code>DesignScreen</code></td>
+            <td><span class="tag tag-off">Offline</span></td>
+          </tr>
+          <tr>
+            <td><strong>VisioPRO</strong></td>
+            <td>F&amp;V / boucherie preset cards, social + print export</td>
+            <td><span class="tag tag-android">Canvas</span> <span class="tag tag-file">JSON presets</span> <span class="tag tag-android">TakePicture</span></td>
+            <td><code>VisioProRenderFacade</code></td>
+            <td><span class="tag tag-off">Offline</span></td>
+          </tr>
+          <tr>
+            <td><strong>CSV import</strong></td>
+            <td>Gestium diff import, rayon filters, change report</td>
+            <td><span class="tag tag-file">Streaming CSV parser</span> <span class="tag tag-ui">Room migrations</span> <span class="tag tag-android">SAF OpenDocument</span></td>
+            <td><code>ImportService</code></td>
+            <td><span class="tag tag-off">Offline</span></td>
+          </tr>
+          <tr>
+            <td><strong>Background cutout</strong></td>
+            <td>Transparent PNG from product photo</td>
+            <td><span class="tag tag-onnx">ONNX Runtime u2netp.onnx</span> <span class="tag tag-ml">TFLite fallback</span></td>
+            <td><code>SaliencySegmenter</code></td>
+            <td><span class="tag tag-off">Offline</span></td>
+          </tr>
+          <tr>
+            <td><strong>PhotoRoom bridge</strong></td>
+            <td>Watch folder + pick PNG when export fails</td>
+            <td><span class="tag tag-android">SAF DocumentFile</span> <span class="tag tag-android">OpenDocument</span></td>
+            <td><code>PhotoroomStorage</code></td>
+            <td><span class="tag tag-off">Offline</span></td>
+          </tr>
+          <tr>
+            <td><strong>To share</strong></td>
+            <td>Share PNGs as Telegram documents (no compression)</td>
+            <td><span class="tag tag-android">Intent ACTION_SEND</span> <span class="tag tag-android">FileProvider</span></td>
+            <td><code>PngShareHelper</code> · <code>OasisShareFileProvider</code></td>
+            <td><span class="tag tag-off">Intent only</span></td>
+          </tr>
+          <tr>
+            <td><strong>Phone sync</strong></td>
+            <td>Hotspot LAN catalog compare + delta PNG push</td>
+            <td><span class="tag tag-net">NanoHTTPD :8776</span> <span class="tag tag-net">OkHttp</span> multipart POST</td>
+            <td><code>PhoneSyncServer</code> · <code>PhoneSyncClient</code></td>
+            <td><span class="tag tag-net">Local LAN</span></td>
+          </tr>
+          <tr>
+            <td><strong>Backup / transfer</strong></td>
+            <td>Full device ZIP export / restore, Gestium purge</td>
+            <td><span class="tag tag-android">CreateDocument zip</span> <span class="tag tag-ui">EncryptedSharedPreferences</span></td>
+            <td><code>DeviceTransferService</code></td>
+            <td><span class="tag tag-off">Offline</span></td>
+          </tr>
+          <tr>
+            <td><strong>Long tasks</strong></td>
+            <td>Import / re-index / sync while screen locked</td>
+            <td><span class="tag tag-android">ForegroundService dataSync</span> <span class="tag tag-android">Notifications</span></td>
+            <td><code>OasisBackgroundTaskService</code></td>
+            <td><span class="tag tag-off">Offline</span></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="footer">Page 6</div>
+    </section>
+
+    <!-- PAGE 7 DEPENDENCIES -->
+    <section class="sheet">
+      <div class="sheet-head">
+        <h2>§6 — Dependency &amp; platform API inventory</h2>
+        <p>Gradle libraries (libs.versions.toml) + key Android platform surfaces. Supabase keys are optional BuildConfig — not required for core offline flows.</p>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Category</th>
+            <th>Name</th>
+            <th>Version</th>
+            <th>Used for</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>UI</td><td>Jetpack Compose + Material 3</td><td>BOM 2024.10</td><td>All screens, navigation, theming</td></tr>
+          <tr><td>UI</td><td>Navigation Compose</td><td>2.8.3</td><td>Bottom nav + deep links</td></tr>
+          <tr><td>State</td><td>ViewModel + StateFlow + Lifecycle</td><td>2.8.6</td><td>Screen state, AGENT / Ticket flows</td></tr>
+          <tr><td>DI</td><td>Hilt</td><td>2.52</td><td>Repository, DB, services injection</td></tr>
+          <tr><td>Data</td><td>Room</td><td>2.7.1 (schema v18)</td><td>Articles, images, carts, print audit, bulk</td></tr>
+          <tr><td>Data</td><td>Paging 3</td><td>3.3.6</td><td>Large catalog lists (Articles rayon)</td></tr>
+          <tr><td>Images</td><td>Coil Compose</td><td>2.6.0</td><td>Lazy PNG previews in lists / cards</td></tr>
+          <tr><td>Camera</td><td>CameraX (core, camera2, lifecycle, view)</td><td>1.3.4</td><td>AGENT, PARAY Learn, Ticket high-res capture</td></tr>
+          <tr><td>ML on-device</td><td>ML Kit Barcode Scanning</td><td>17.2.0</td><td>EAN/UPC/Code128 — Smart, Bulk (not Ticket tab)</td></tr>
+          <tr><td>ML on-device</td><td>ML Kit Text Recognition (Latin)</td><td>16.0.1</td><td>Ticket OCR corps — offline, no cloud OCR</td></tr>
+          <tr><td>ML on-device</td><td>ONNX Runtime Android</td><td>1.19.2</td><td>U2NetP background removal (<code>assets/u2netp.onnx</code>)</td></tr>
+          <tr><td>ML on-device</td><td>TensorFlow Lite</td><td>2.14.0</td><td>Cutout fallback if ONNX unavailable</td></tr>
+          <tr><td>ML custom</td><td>VisualFeatureExtractor</td><td>in-app</td><td>PARAY pack shape/color fingerprints (no TFLite model)</td></tr>
+          <tr><td>Network</td><td>NanoHTTPD</td><td>2.3.1</td><td>Phone sync master: GET /ping /catalog POST /push</td></tr>
+          <tr><td>Network</td><td>OkHttp</td><td>4.12.0</td><td>Phone sync slave client</td></tr>
+          <tr><td>Android SDK</td><td>Storage Access Framework</td><td>—</td><td>CSV import, ZIP backup, PhotoRoom tree, PNG pick</td></tr>
+          <tr><td>Android SDK</td><td>FileProvider + custom MIME</td><td>—</td><td>Telegram document share (<code>.oasis</code> trick)</td></tr>
+          <tr><td>Android SDK</td><td>PdfDocument</td><td>—</td><td>Legacy template PDF export (Settings print flow)</td></tr>
+          <tr><td>Android SDK</td><td>Activity Result API</td><td>—</td><td>TakePicture, RequestPermission, OpenDocument</td></tr>
+          <tr><td>Android SDK</td><td>Foreground Service</td><td>—</td><td>CSV import, re-index, backup (screen-off safe)</td></tr>
+          <tr><td>Security</td><td>AndroidX Security Crypto</td><td>1.1.0-alpha06</td><td>Optional AES backup encryption</td></tr>
+          <tr><td>External file</td><td>GestiumERP CSV</td><td>—</td><td>Catalog source — not a live ERP API</td></tr>
+          <tr><td>External app</td><td>PhotoRoom folder</td><td>—</td><td>Cutout PNG drop folder — not PhotoRoom SDK</td></tr>
+          <tr><td>External app</td><td>Telegram / any share target</td><td>—</td><td>Via ACTION_SEND — not Telegram Bot API</td></tr>
+          <tr><td>Reserved</td><td>Supabase URL + anon key</td><td>BuildConfig</td><td>Placeholder in local.properties — optional future cloud</td></tr>
+        </tbody>
+      </table>
+
+      <table style="margin-top:5px;">
+        <thead>
+          <tr><th colspan="4">Phone sync HTTP surface (local hotspot only · port 8776)</th></tr>
+          <tr><th>Method</th><th>Path</th><th>Auth</th><th>Payload</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>GET</td><td><code>/ping</code></td><td>PIN header</td><td>JSON role master service port</td></tr>
+          <tr><td>GET</td><td><code>/catalog</code></td><td>PIN header</td><td>JSON barcode designation hash list</td></tr>
+          <tr><td>GET</td><td><code>/catalog.txt</code></td><td>PIN header</td><td>Plain-text catalog for diff</td></tr>
+          <tr><td>POST</td><td><code>/push</code></td><td>PIN header</td><td>Multipart manifest JSON + PNG files</td></tr>
+        </tbody>
+      </table>
+      <div class="footer">Page 7 · docs/FEATURES_API_A4.html · Visio Ai v2.35.0</div>
+    </section>
+  </main>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: "neutral",
+      securityLevel: "loose",
+      flowchart: { useMaxWidth: true, htmlLabels: true, padding: 10, nodeSpacing: 28, rankSpacing: 36 },
+      themeVariables: {
+        primaryColor: "#fff4ee",
+        primaryBorderColor: "#ff5e13",
+        primaryTextColor: "#1a1a2e",
+        lineColor: "#5a5a72",
+        fontSize: "12px"
+      }
+    });
+  </script>
+</body>
+</html>

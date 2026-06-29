@@ -521,10 +521,10 @@ private fun CheckShootArticlePopup(
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(
             when {
-                isLocked -> "Glissez la carte ← ou → pour le ticket suivant"
+                isLocked -> "Glissez la carte ← ou → pour le scan suivant"
                 ticketVerifyMode && ticketAssessment != null ->
-                    "Maintenez la carte 1 s pour verrouiller · actions après verrouillage"
-                else -> "Maintenez la carte 1 s (ou bouton cadenas) pour verrouiller · le scan continue"
+                    "Glissez ← ou → pour fermer · maintenez 1 s pour verrouiller"
+                else -> "Glissez ← ou → pour fermer · maintenez 1 s (ou cadenas) pour verrouiller"
             },
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -534,14 +534,14 @@ private fun CheckShootArticlePopup(
         modifier = Modifier
             .fillMaxWidth()
             .offset { IntOffset(dragOffset.roundToInt(), 0) }
-            .pointerInput(isLocked) {
+            .pointerInput(scan.barcode, isLocked) {
                 detectHorizontalDragGestures(
                     onDragEnd = {
-                        if (isLocked && abs(dragOffset) > 140f) onUnlock()
+                        if (abs(dragOffset) > 140f) onUnlock()
                         dragOffset = 0f
                     },
                     onHorizontalDrag = { _, amount ->
-                        if (isLocked) dragOffset += amount
+                        dragOffset += amount
                     },
                 )
             }
@@ -606,7 +606,7 @@ private fun CheckShootArticlePopup(
                 externalLockButton = true,
                 onLock = onLock,
                 onUnlock = onUnlock,
-                onDismiss = null,
+                onDismiss = onUnlock,
                 onCreateAsset = onCreateAsset,
                 onAddToShare = onAddToShare,
                 onAddToDesign = onAddToDesign,

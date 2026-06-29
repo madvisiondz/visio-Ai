@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Visio Ai — Architecture Diagrams (A4 Landscape)</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --oasis-orange: #ff5e13;
+      --ink: #1a1a2e;
+      --muted: #5a5a72;
+      --paper: #ffffff;
+      --border: #d8dce6;
+      --page-w: 297mm;
+      --page-h: 210mm;
+    }
+
+    * { box-sizing: border-box; }
+
+    @page {
+      size: A4 landscape;
+      margin: 8mm 10mm;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      color: var(--ink);
+      background: #eef0f4;
+    }
+
+    body.screen { padding: 12px; }
+
+    .toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--ink);
+      color: #fff;
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.2);
+    }
+
+    .toolbar h1 { margin: 0; font-size: 0.95rem; font-weight: 600; }
+    .toolbar span { font-size: 0.75rem; opacity: 0.85; }
+
+    .toolbar button {
+      background: var(--oasis-orange);
+      border: none;
+      color: #fff;
+      padding: 7px 16px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .toolbar button:hover { filter: brightness(1.08); }
+
+    .document {
+      width: var(--page-w);
+      max-width: 100%;
+      margin: 0 auto;
+      background: var(--paper);
+      box-shadow: 0 4px 24px rgba(0,0,0,.12);
+    }
+
+    body.screen .document { margin: 6px auto 24px; }
+
+    /* Each sheet = one A4 landscape page */
+    .sheet {
+      width: var(--page-w);
+      min-height: var(--page-h);
+      padding: 7mm 9mm 6mm;
+      page-break-after: always;
+      page-break-inside: avoid;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sheet:last-child { page-break-after: auto; }
+
+    body.screen .sheet {
+      border-bottom: 1px dashed var(--border);
+      min-height: var(--page-h);
+    }
+
+    /* Cover */
+    .cover {
+      flex-direction: row;
+      align-items: stretch;
+      gap: 10mm;
+    }
+
+    .cover-left {
+      flex: 1.1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      border-right: 3px solid var(--oasis-orange);
+      padding-right: 8mm;
+    }
+
+    .cover-right {
+      flex: 0.9;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      font-size: 0.72rem;
+    }
+
+    .badge {
+      display: inline-block;
+      background: var(--oasis-orange);
+      color: #fff;
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 4px;
+      margin-bottom: 8px;
+      width: fit-content;
+    }
+
+    .cover h1 {
+      margin: 0 0 4px;
+      font-size: 1.55rem;
+      line-height: 1.15;
+    }
+
+    .cover .subtitle {
+      margin: 0 0 10px;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    .cover dl {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 3px 12px;
+      margin: 0;
+      font-size: 0.72rem;
+    }
+
+    .cover dt { color: var(--muted); font-weight: 600; }
+    .cover dd { margin: 0; }
+
+    .cover-right h3 {
+      margin: 0 0 6px;
+      font-size: 0.78rem;
+      color: var(--oasis-orange);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .cover-right ol {
+      margin: 0;
+      padding-left: 1.3em;
+      line-height: 1.55;
+      color: var(--muted);
+    }
+
+    .cover-right .print-hint {
+      margin-top: 10px;
+      padding: 8px 10px;
+      background: #f5f6f8;
+      border-radius: 6px;
+      border-left: 3px solid var(--oasis-orange);
+      font-size: 0.68rem;
+      color: var(--ink);
+    }
+
+    /* Diagram sheets */
+    .sheet-head {
+      flex-shrink: 0;
+      margin-bottom: 4px;
+    }
+
+    .sheet-head h2 {
+      margin: 0;
+      font-size: 0.92rem;
+      border-left: 4px solid var(--oasis-orange);
+      padding-left: 8px;
+      line-height: 1.2;
+    }
+
+    .sheet-head p {
+      margin: 2px 0 0;
+      padding-left: 12px;
+      font-size: 0.68rem;
+      color: var(--muted);
+    }
+
+    .mermaid-wrap {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 4px 2px;
+      background: #fafbfc;
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    .mermaid {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .mermaid svg {
+      max-width: 100% !important;
+      max-height: 168mm !important;
+      height: auto !important;
+      width: auto !important;
+    }
+
+    /* Dual layout: two diagrams on one landscape page */
+    .dual {
+      flex-direction: row;
+      gap: 6mm;
+    }
+
+    .dual-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    .dual-panel .mermaid-wrap { min-height: 150mm; }
+    .dual-panel .mermaid svg { max-height: 145mm !important; }
+
+    table.ref {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.62rem;
+      margin-top: 4px;
+      flex-shrink: 0;
+    }
+
+    table.ref th, table.ref td {
+      border: 1px solid var(--border);
+      padding: 3px 6px;
+      text-align: left;
+    }
+
+    table.ref th { background: #f0f2f6; font-weight: 600; }
+
+    .page-footer {
+      flex-shrink: 0;
+      margin-top: 3px;
+      font-size: 0.58rem;
+      color: var(--muted);
+      text-align: right;
+    }
+
+    @media print {
+      body { background: #fff; }
+      .toolbar { display: none !important; }
+      body.screen { padding: 0; }
+      .document {
+        width: auto;
+        max-width: none;
+        box-shadow: none;
+        margin: 0;
+      }
+      body.screen .sheet { border-bottom: none; }
+      .mermaid svg { max-height: 175mm !important; }
+      .dual-panel .mermaid svg { max-height: 150mm !important; }
+    }
+  </style>
+</head>
+<body class="screen">
+  <div class="toolbar">
+    <div>
+      <h1>Visio Ai — Architecture Diagrams</h1>
+      <span>A4 landscape · Ctrl+P · Paper: A4 · Orientation: Landscape · Background graphics: ON</span>
+    </div>
+    <button type="button" onclick="window.print()">Print A4 Landscape</button>
+  </div>
+
+  <main class="document">
+    <!-- Page 1: Cover -->
+    <section class="sheet cover">
+      <div class="cover-left">
+        <span class="badge">OASIS MALL · Offline-first</span>
+        <h1>Visio Ai / MadVision<br>Architecture Block Diagrams</h1>
+        <p class="subtitle">Designation-first · Catalog → pre-selection → template → export</p>
+        <dl>
+          <dt>Format</dt><dd>A4 landscape · print-ready</dd>
+          <dt>Platform</dt><dd>Android · Kotlin · Compose · Room · CameraX · ML Kit</dd>
+          <dt>Version</dt><dd>v2.35.0 (340)</dd>
+          <dt>Date</dt><dd>2026-06-14</dd>
+        </dl>
+      </div>
+      <div class="cover-right">
+        <h3>Contents — 8 diagrams</h3>
+        <ol>
+          <li>System overview</li>
+          <li>Bottom navigation</li>
+          <li>Core product workflow</li>
+          <li>AGENT tab (Smart · Ticket · Bulk)</li>
+          <li>Data &amp; storage layer</li>
+          <li>PARAY AI subsystem</li>
+          <li>Supporting services</li>
+          <li>Technical layer stack + reference</li>
+        </ol>
+        <div class="print-hint">
+          <strong>Print:</strong> Chrome/Edge → Ctrl+P → Paper <em>A4</em> → Layout <em>Landscape</em> → Margins <em>Default</em> → enable <em>Background graphics</em>. Requires internet on first open (Mermaid CDN).
+        </div>
+      </div>
+    </section>
+
+    <!-- Page 2: §1 + §2 side by side -->
+    <section class="sheet dual">
+      <div class="dual-panel">
+        <div class="sheet-head">
+          <h2>§1 — System overview</h2>
+          <p>App layers and external inputs.</p>
+        </div>
+        <div class="mermaid-wrap">
+          <pre class="mermaid">
+flowchart TB
+    subgraph User["Mall staff"]
+        U1[Scan verify]
+        U2[Import CSV]
+        U3[Print share]
+    end
+    subgraph App["Visio Ai"]
+        UI[Compose UI] --> VM[ViewModels] --> DOM[Domain] --> DATA[Room + files]
+    end
+    subgraph Ext["External"]
+        GEST[Gestium CSV]
+        PHOTO[PhotoRoom]
+        TG[Share]
+        LAN[Phone sync]
+    end
+    User --> UI
+    GEST --> DOM
+    PHOTO --> DOM
+    DOM --> TG
+    DOM <--> LAN
+          </pre>
+        </div>
+      </div>
+      <div class="dual-panel">
+        <div class="sheet-head">
+          <h2>§2 — Bottom navigation</h2>
+          <p>Nine tabs and routing.</p>
+        </div>
+        <div class="mermaid-wrap">
+          <pre class="mermaid">
+flowchart LR
+    VP[VisioPRO] --- ART[Articles]
+    ART --- TS[To shoot]
+    TS --- AG[AGENT]
+    AG --- PR[PARAY]
+    PR --- BT[Batch txt]
+    BT --- SH[To share]
+    SH --- DS[Design]
+    DS --- ST[Settings]
+    ART --> AG
+    TS --> AG
+    SH --> DS
+          </pre>
+        </div>
+      </div>
+      <div class="page-footer">Visio Ai · Page 2</div>
+    </section>
+
+    <!-- Page 3: §3 -->
+    <section class="sheet">
+      <div class="sheet-head">
+        <h2>§3 — Core product workflow (designation-first)</h2>
+        <p>Catalog and images → pre-selection → template → export → auditable print batches. Never template-first.</p>
+      </div>
+      <div class="mermaid-wrap">
+        <pre class="mermaid">
+flowchart LR
+    CSV[Gestium CSV] --> CAT[(Articles)]
+    PNG[PNG files] --> IMG[(Images)]
+    CAT --> BROWSE[Search catalog]
+    IMG --> BROWSE
+    BROWSE --> PRE[Pre-selection]
+    PRE --> TMPL[Design / VisioPRO]
+    TMPL --> EXP[Export JPEG PDF]
+    EXP --> AUDIT[(Print batches)]
+        </pre>
+      </div>
+      <div class="page-footer">Visio Ai · Page 3</div>
+    </section>
+
+    <!-- Page 4: §4 AGENT -->
+    <section class="sheet">
+      <div class="sheet-head">
+        <h2>§4 — AGENT tab (Smart · Ticket · Bulk)</h2>
+        <p>Shared CameraX; Ticket = OCR corps + fuzzy fusion; Smart = barcode + PARAY; v2.35 isolated ML Kit clients per tab.</p>
+      </div>
+      <div class="mermaid-wrap">
+        <pre class="mermaid">
+flowchart TB
+    CAM[CameraX Preview] --> M{Mode}
+    M --> SMART[Smart]
+    M --> TICK[Ticket]
+    M --> BULK[Bulk]
+    SMART --> BC[ML Kit barcode] --> CARD[Article card]
+    CARD --> PARAY[PARAY matcher]
+    TICK --> TAP[Tap capture] --> BUF[Frame buffer] --> CROP[Crop] --> OCR[OCR corps] --> FUZ[Fuzzy match]
+    BULK --> BC2[Barcode] --> PHOTO[Photo] --> BDB[(bulk_images)]
+    CARD --> REPO[(Room)]
+    FUZ --> REPO
+    BDB --> REPO
+        </pre>
+      </div>
+      <div class="page-footer">Visio Ai · Page 4</div>
+    </section>
+
+    <!-- Page 5: §5 + §6 side by side -->
+    <section class="sheet dual">
+      <div class="dual-panel">
+        <div class="sheet-head">
+          <h2>§5 — Data &amp; storage</h2>
+          <p>Room + filesystem + paray_home JSON.</p>
+        </div>
+        <div class="mermaid-wrap">
+          <pre class="mermaid">
+flowchart TB
+    REPO[OasisRepository]
+    REPO --> R[(Room SQLite)]
+    REPO --> F[PNG files exports]
+    PARAY[PARAY] --> J[paray_home JSON]
+    PARAY --> REPO
+    R --- a[articles]
+    R --- b[product_images]
+    R --- c[print_batches]
+    J --- d[learn_index]
+    J --- e[ticket_events]
+          </pre>
+        </div>
+      </div>
+      <div class="dual-panel">
+        <div class="sheet-head">
+          <h2>§6 — PARAY AI</h2>
+          <p>Learn, observers, fusion; UI reads cached JSON.</p>
+        </div>
+        <div class="mermaid-wrap">
+          <pre class="mermaid">
+flowchart TB
+    IN[Camera CSV AGENT] --> ENG[PARAY engine]
+    ENG --> LEARN[Learn V1]
+    ENG --> MATCH[Matcher]
+    ENG --> OBS[Observers]
+    ENG --> FUSE[PKP fusion]
+    ENG --> UI[PARAY tab UI]
+    LEARN --> LI[(learn_index)]
+    OBS --> WF[(workflows)]
+    MATCH --> REC[(recognition)]
+          </pre>
+        </div>
+      </div>
+      <div class="page-footer">Visio Ai · Page 5</div>
+    </section>
+
+    <!-- Page 6: §7 + §8 side by side -->
+    <section class="sheet dual">
+      <div class="dual-panel">
+        <div class="sheet-head">
+          <h2>§7 — Supporting services</h2>
+          <p>Background tasks, cutout, device sync.</p>
+        </div>
+        <div class="mermaid-wrap">
+          <pre class="mermaid">
+flowchart TB
+    BGS[Background service] --> IMP[CSV import]
+    BGS --> SYNC[Sub-PNG sync]
+    BGS --> BKP[Backup ZIP]
+    BGREM[U2NetP cutout] --> PNG[Transparent PNGs]
+    PHSYNC[Phone sync LAN] --> PNG
+    IMP --> REPO[Repository]
+          </pre>
+        </div>
+      </div>
+      <div class="dual-panel">
+        <div class="sheet-head">
+          <h2>§8 — Layer stack</h2>
+          <p>Compose → domain → Room → device ML.</p>
+        </div>
+        <div class="mermaid-wrap">
+          <pre class="mermaid">
+block-beta
+    columns 1
+    block:ui:1
+        Compose["Compose UI"]
+    end
+    block:st:1
+        VM["ViewModels + StateFlow"]
+    end
+    block:dom:1
+        DOM2["Import PARAY Design Promo"]
+    end
+    block:dat:1
+        DAT["Room · Files · JSON"]
+    end
+    block:dev:1
+        DEV["CameraX · ML Kit · ONNX · TFLite"]
+    end
+    ui --> st --> dom --> dat --> dev
+          </pre>
+        </div>
+      </div>
+      <div class="page-footer">Visio Ai · Page 6</div>
+    </section>
+
+    <!-- Page 7: Reference table -->
+    <section class="sheet">
+      <div class="sheet-head">
+        <h2>Quick reference — modules &amp; roles</h2>
+        <p>Visio Ai / MadVision · OASIS MALL · docs/BLOCK_DIAGRAM_A4_LANDSCAPE.html</p>
+      </div>
+      <table class="ref">
+        <thead>
+          <tr>
+            <th>Module</th>
+            <th>Role</th>
+            <th>Module</th>
+            <th>Role</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Articles</strong></td>
+            <td>20k+ catalog; search designation · barcode · rayon</td>
+            <td><strong>AGENT Smart</strong></td>
+            <td>Barcode → card → PARAY visual fallback</td>
+          </tr>
+          <tr>
+            <td><strong>AGENT Ticket</strong></td>
+            <td>Tap → crop → OCR corps → fuzzy match → verify price</td>
+            <td><strong>AGENT Bulk</strong></td>
+            <td>Barcode + photo for mall-wide capture</td>
+          </tr>
+          <tr>
+            <td><strong>To shoot</strong></td>
+            <td>Photo queue for missing PNGs</td>
+            <td><strong>To share</strong></td>
+            <td>PNG share cart → Telegram / files</td>
+          </tr>
+          <tr>
+            <td><strong>Design</strong></td>
+            <td>Pre-selection → A4 shelf JPEG 12-up + history</td>
+            <td><strong>VisioPRO</strong></td>
+            <td>F&amp;V / boucherie presets → social + print</td>
+          </tr>
+          <tr>
+            <td><strong>PARAY</strong></td>
+            <td>Visual learn + observers + ticket telemetry</td>
+            <td><strong>Settings</strong></td>
+            <td>CSV import, backup, PhotoRoom, phone sync</td>
+          </tr>
+          <tr>
+            <td><strong>Batch txt</strong></td>
+            <td>Designation lists → To share / To shoot / camera queue</td>
+            <td><strong>Phone sync</strong></td>
+            <td>Hotspot LAN port 8776 · delta PNG push</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="page-footer">Visio Ai · Page 7 · End</div>
+    </section>
+  </main>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: "neutral",
+      securityLevel: "loose",
+      flowchart: {
+        useMaxWidth: true,
+        htmlLabels: true,
+        curve: "basis",
+        padding: 8,
+        nodeSpacing: 22,
+        rankSpacing: 28
+      },
+      themeVariables: {
+        primaryColor: "#fff4ee",
+        primaryBorderColor: "#ff5e13",
+        primaryTextColor: "#1a1a2e",
+        lineColor: "#5a5a72",
+        fontSize: "11px"
+      }
+    });
+  </script>
+</body>
+</html>

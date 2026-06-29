@@ -1257,3 +1257,33 @@
 **User:** Crop preview stretched/distorted (vertical stripes); camera feed foggy; multi-camera device may be using weak camera.
 
 **Assistant:** **v2.32.1 (329)** — root cause: naive YUV plane concat in `CameraFrameUtils` → stride-aware NV21 conversion; Ticket mode binds best back camera (largest sensor) + 4K resolution selector + JPEG 95; warm-block scout rejects narrow desk blobs; crop preview uses correct aspect ratio; APK `VisioAI-debug.apk`.
+
+## Session 150 — 2026-06-14
+
+**User:** `docs/FEATURES_API_A4.html` — fit all diagrams one per page; they were too small.
+
+**Assistant:** Split §3 PARAY and §4 import/export from dual-panel page 4 into separate full pages; added `diagram-sheet` layout (175–182mm SVG height); bumped Mermaid font/spacing. Document is now 7 pages (cover + 4 diagram pages + 2 reference tables).
+
+## Session 151 — 2026-06-14
+
+**User:** Brief powerful investor explainer (amateur-friendly): PARAY as real BG removal on VPS, client sales pitch, HTML + short BMC + EUR numbers.
+
+**Assistant:** Created [`docs/INVESTOR_PARAY_CLOUD.html`](INVESTOR_PARAY_CLOUD.html) — one-page pitch: problem → PARAY Cloud flow → €540/user/yr, 20 users = €10,800 ARR, €4,200 VPS, €6,600 gross; BMC grid at end. Linked from `docs/ARCHITECTURE.md`.
+
+## Session 152 — 2026-06-14
+
+**User:** French version of investor brief.
+
+**Assistant:** Created [`docs/INVESTOR_PARAY_CLOUD_FR.html`](INVESTOR_PARAY_CLOUD_FR.html) — full FR translation + BMC; language switcher EN ↔ FR in toolbar.
+
+## Session 153 — 2026-06-14
+
+**User:** Update both investor HTML files — remove PhotoRoom; pitch against Word/Canva/Photoshop manual workflow instead.
+
+**Assistant:** Updated `INVESTOR_PARAY_CLOUD.html` + `_FR.html`: hero and pain points now target Word, Canva & Photoshop (everything typed by hand); all PhotoRoom references removed.
+
+## Session 154 — 2026-06-14
+
+**User:** Investor HTML — remove OCR ticket; replace with PARAY fingerprint visual ID to find articles.
+
+**Assistant:** Both investor briefs updated: hero, “80% fixed” block, and traction list now pitch PARAY empreintes visuelles / fingerprint matching (point at pack → find article) instead of ticket OCR.

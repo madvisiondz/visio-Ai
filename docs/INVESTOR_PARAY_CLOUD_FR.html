@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Visio Ai + PARAY Cloud — Dossier investisseur</title>
+  <style>
+    :root {
+      --orange: #ff5e13;
+      --orange-soft: #fff4ee;
+      --ink: #12121f;
+      --muted: #5c5c74;
+      --paper: #ffffff;
+      --bg: #f3f4f8;
+      --border: #e2e6ef;
+      --green: #0d7a4a;
+      --green-bg: #e8f7ef;
+      --blue: #1a4fd6;
+      --blue-bg: #eef3ff;
+      --shadow: 0 18px 50px rgba(18, 18, 31, 0.08);
+      --radius: 14px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+      line-height: 1.55;
+    }
+
+    .toolbar {
+      position: sticky; top: 0; z-index: 50;
+      background: var(--ink); color: #fff;
+      padding: 10px 20px;
+      display: flex; justify-content: space-between; align-items: center;
+      flex-wrap: wrap; gap: 8px;
+      box-shadow: 0 4px 20px rgba(0,0,0,.2);
+    }
+    .toolbar strong { font-size: 0.9rem; }
+    .toolbar span { font-size: 0.75rem; opacity: 0.8; margin-left: 10px; }
+    .toolbar-actions { display: flex; gap: 10px; align-items: center; }
+    .toolbar a {
+      color: rgba(255,255,255,.85);
+      font-size: 0.75rem;
+      text-decoration: none;
+    }
+    .toolbar a:hover { color: #ffb088; }
+    .toolbar button {
+      background: var(--orange); border: none; color: #fff;
+      padding: 8px 18px; border-radius: 8px; font-weight: 700;
+      cursor: pointer; font-size: 0.82rem;
+    }
+    .toolbar button:hover { filter: brightness(1.06); }
+
+    .wrap {
+      max-width: 920px;
+      margin: 0 auto;
+      padding: 28px 20px 48px;
+    }
+
+    .hero {
+      background: linear-gradient(135deg, #12121f 0%, #252545 55%, #3a2a22 100%);
+      color: #fff;
+      border-radius: calc(var(--radius) + 4px);
+      padding: 42px 38px 38px;
+      box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::after {
+      content: "";
+      position: absolute; top: -40%; right: -10%;
+      width: 340px; height: 340px;
+      background: radial-gradient(circle, rgba(255,94,19,.35) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .badge {
+      display: inline-block;
+      background: var(--orange);
+      color: #fff;
+      font-size: 0.68rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 5px 10px;
+      border-radius: 6px;
+      margin-bottom: 14px;
+    }
+    .hero h1 {
+      margin: 0 0 12px;
+      font-size: clamp(1.55rem, 3.8vw, 2.15rem);
+      line-height: 1.15;
+      max-width: 28ch;
+    }
+    .hero .lead {
+      margin: 0;
+      font-size: 1.02rem;
+      max-width: 58ch;
+      color: rgba(255,255,255,.88);
+    }
+    .hero-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin-top: 28px;
+    }
+    .stat {
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 10px;
+      padding: 14px 16px;
+    }
+    .stat .num {
+      display: block;
+      font-size: 1.55rem;
+      font-weight: 800;
+      color: #ffb088;
+      line-height: 1.1;
+    }
+    .stat .lbl {
+      font-size: 0.72rem;
+      color: rgba(255,255,255,.75);
+      margin-top: 4px;
+    }
+
+    section { margin-top: 28px; }
+
+    .card {
+      background: var(--paper);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 26px 28px;
+      box-shadow: var(--shadow);
+    }
+
+    h2 {
+      margin: 0 0 6px;
+      font-size: 1.15rem;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    h2 .dot {
+      width: 8px; height: 8px;
+      background: var(--orange);
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .section-sub {
+      margin: 0 0 18px;
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    .pain-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    .pain-item {
+      background: #fafbfd;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+    }
+    .pain-item strong { display: block; margin-bottom: 4px; font-size: 0.92rem; }
+    .pain-item p { margin: 0; font-size: 0.84rem; color: var(--muted); }
+
+    .idea-box {
+      background: var(--orange-soft);
+      border-left: 4px solid var(--orange);
+      border-radius: 0 10px 10px 0;
+      padding: 18px 20px;
+      margin: 16px 0;
+    }
+    .idea-box p {
+      margin: 0;
+      font-size: 1.02rem;
+      font-weight: 600;
+      color: var(--ink);
+    }
+
+    .flow {
+      display: flex;
+      align-items: stretch;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin: 18px 0 6px;
+    }
+    .flow-step {
+      flex: 1;
+      min-width: 120px;
+      background: var(--blue-bg);
+      border: 1px solid #c8d8ff;
+      border-radius: 10px;
+      padding: 14px 12px;
+      text-align: center;
+      font-size: 0.76rem;
+      font-weight: 600;
+    }
+    .flow-step.highlight {
+      background: var(--orange-soft);
+      border-color: #ffc9a8;
+    }
+    .flow-arrow {
+      align-self: center;
+      color: var(--muted);
+      font-size: 1.2rem;
+      font-weight: 300;
+    }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 14px;
+    }
+    .pill-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+    .pill-list li {
+      font-size: 0.86rem;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      gap: 8px;
+    }
+    .pill-list li:last-child { border-bottom: none; }
+    .pill-list li::before {
+      content: "✓";
+      color: var(--green);
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+
+    .numbers {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-top: 16px;
+    }
+    .num-card {
+      text-align: center;
+      padding: 18px 10px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: #fafbfd;
+    }
+    .num-card .euro {
+      font-size: 1.45rem;
+      font-weight: 800;
+      color: var(--ink);
+      line-height: 1.1;
+    }
+    .num-card .euro span { font-size: 0.85rem; font-weight: 700; color: var(--orange); }
+    .num-card p {
+      margin: 6px 0 0;
+      font-size: 0.72rem;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+    .num-card.profit {
+      background: var(--green-bg);
+      border-color: #b8e6cc;
+    }
+    .num-card.profit .euro { color: var(--green); }
+
+    .scale-bar {
+      margin-top: 18px;
+      padding: 16px 18px;
+      background: var(--green-bg);
+      border-radius: 10px;
+      font-size: 0.86rem;
+    }
+    .scale-bar strong { color: var(--green); }
+
+    .bmc {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      grid-template-rows: auto auto auto;
+      gap: 8px;
+      margin-top: 14px;
+      font-size: 0.72rem;
+    }
+    .bmc-cell {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 11px;
+      background: #fafbfd;
+      min-height: 88px;
+    }
+    .bmc-cell.wide { grid-column: span 2; }
+    .bmc-cell.tall { grid-row: span 2; }
+    .bmc-cell h3 {
+      margin: 0 0 6px;
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--orange);
+    }
+    .bmc-cell ul {
+      margin: 0;
+      padding-left: 1.1em;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+    .bmc-cell ul li { margin-bottom: 2px; }
+
+    .footer {
+      text-align: center;
+      margin-top: 32px;
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+
+    @media (max-width: 720px) {
+      .hero-stats, .pain-grid, .two-col, .numbers { grid-template-columns: 1fr; }
+      .bmc { grid-template-columns: 1fr; }
+      .bmc-cell.wide, .bmc-cell.tall { grid-column: auto; grid-row: auto; }
+      .flow-arrow { display: none; }
+    }
+
+    @media print {
+      .toolbar { display: none; }
+      body { background: #fff; }
+      .wrap { padding: 0; max-width: none; }
+      .hero, .card { box-shadow: none; break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <div>
+      <strong>Visio Ai · PARAY Cloud</strong>
+      <span>Dossier investisseur · OASIS MALL · 2026</span>
+    </div>
+    <div class="toolbar-actions">
+      <a href="INVESTOR_PARAY_CLOUD.html">English</a>
+      <button type="button" onclick="window.print()">Enregistrer en PDF</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <header class="hero">
+      <span class="badge">Pitch en une minute</span>
+      <h1>L’app du centre commercial qui remplace Word, Canva <em>et</em> Photoshop.</h1>
+      <p class="lead">
+        Le plus dur tourne déjà sur le téléphone — 20&nbsp;000 articles, étiquettes rayon, et les <strong>empreintes visuelles PARAY</strong>&nbsp;: on vise le produit, on retrouve l’article — sans lire l’étiquette rayon.
+        <strong>Prochaine étape&nbsp;:</strong> brancher PARAY sur un petit serveur cloud pour que chaque photo produit ait un détourage pro, dans la même app — sans retaper les prix dans Word ou Canva.
+      </p>
+      <div class="hero-stats">
+        <div class="stat">
+          <span class="num">20k+</span>
+          <span class="lbl">Articles par mall · douleur réelle que nous résolvons</span>
+        </div>
+        <div class="stat">
+          <span class="num">45&nbsp;€</span>
+          <span class="lbl">Par utilisateur / mois · app + détourages IA inclus</span>
+        </div>
+        <div class="stat">
+          <span class="num">~65&nbsp;%</span>
+          <span class="lbl">Marge brute à 20 utilisateurs payants (après cloud)</span>
+        </div>
+      </div>
+    </header>
+
+    <section class="card">
+      <h2><span class="dot"></span>Pourquoi ce projet existe</h2>
+      <p class="section-sub">Les supermarchés perdent des heures chaque semaine sur un travail qui devrait tenir en un tap.</p>
+      <div class="pain-grid">
+        <div class="pain-item">
+          <strong>Aujourd’hui&nbsp;: Word, Canva, Photoshop — tout à la main</strong>
+          <p>Export Gestium → retaper chaque prix dans Word ou Canva → retoucher l’image dans Photoshop → rendez l’image pour imprimer. Un changement de prix, et on recommence.</p>
+        </div>
+        <div class="pain-item">
+          <strong>Notre app règle déjà 80&nbsp;%</strong>
+          <p>Visio Ai synchronise le catalogue, imprime les planches A4 rayon, <strong>identifie les produits par empreintes PARAY</strong> en allée (forme, couleur, packaging appris sur photos), partage les PNG — <em>offline-first</em>, conçu pour l’échelle OASIS MALL. Plus de copier-coller depuis l’ERP.</p>
+        </div>
+        <div class="pain-item">
+          <strong>Ce qui reste pénible&nbsp;: le média manuel</strong>
+          <p>Le détourage passe encore par Photoshop, ou un résultat faible sur téléphone — puis retour sur Canva pour placer l’image et retaper le prix à la main.</p>
+        </div>
+        <div class="pain-item">
+          <strong>Le déclencheur</strong>
+          <p>Héberger l’IA de détourage PARAY sur un serveur GPU en Europe. Même bouton dans l’app — résultat pro en ~3&nbsp;secondes quand on est en ligne.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2><span class="dot"></span>L’idée clé — PARAY Cloud</h2>
+      <p class="section-sub">Transformer notre assistant IA in-app en service cloud payant que les clients ont déjà besoin d’acheter.</p>
+
+      <div class="idea-box">
+        <p>Photo produit → tap <strong>«&nbsp;PARAY Détourage&nbsp;»</strong> → notre VPS exécute une IA commerciale → PNG transparent dans le catalogue → étiquette imprimée au bon prix. Aucune app tierce. Un seul abonnement.</p>
+      </div>
+
+      <div class="flow">
+        <div class="flow-step">📱 Le staff photographie en rayon</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step highlight">☁️ PARAY VPS (GPU) détourre</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🗂️ PNG + prix enregistrés localement</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">🖨️ Étiquette rayon / partage Telegram</div>
+      </div>
+
+      <div class="two-col">
+        <div>
+          <strong style="font-size:0.9rem;">Pourquoi un VPS (version simple)</strong>
+          <ul class="pill-list">
+            <li>Un serveur loué (~350&nbsp;€/mois) sert ~20 magasins — moins cher que les heures perdues dans Word, Canva &amp; Photoshop</li>
+            <li>Le GPU fait le calcul lourd&nbsp;; les téléphones restent rapides et offline</li>
+            <li>Nous maîtrisons qualité, quotas et tarifs — pas Apple/Google ni des mises en page manuelles à l’infini</li>
+            <li>Hébergement UE possible (photos jamais revendues, seulement traitées)</li>
+          </ul>
+        </div>
+        <div>
+          <strong style="font-size:0.9rem;">Pourquoi les clients paieront</strong>
+          <ul class="pill-list">
+            <li><strong>Temps&nbsp;:</strong> détourage + étiquette passe de ~15&nbsp;min à ~2&nbsp;min par article — sans refaire la maquette Canva</li>
+            <li><strong>Argent&nbsp;:</strong> une facture remplace Word/Canva, le temps Photoshop &amp; les heures graphiste</li>
+            <li><strong>Confiance&nbsp;:</strong> app en production chez OASIS MALL — pas une présentation PowerPoint</li>
+            <li><strong>Fidélisation&nbsp;:</strong> catalogue + images + historique d’impression dans notre écosystème</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2><span class="dot"></span>Les chiffres qui comptent (EUR)</h2>
+      <p class="section-sub">Pilote conservateur&nbsp;: 20 employés / acheteurs sur un serveur cloud partagé.</p>
+
+      <div class="numbers">
+        <div class="num-card">
+          <div class="euro">540&nbsp;€<span>/an</span></div>
+          <p>Par utilisateur<br><strong>370&nbsp;€ app</strong> + <strong>170&nbsp;€ pack IA</strong><br>(~6&nbsp;000 détourages/an)</p>
+        </div>
+        <div class="num-card">
+          <div class="euro">10&nbsp;800&nbsp;€</div>
+          <p>Revenus annuels<br>20 utilisateurs × 540&nbsp;€</p>
+        </div>
+        <div class="num-card">
+          <div class="euro">4&nbsp;200&nbsp;€</div>
+          <p>VPS cloud GPU<br>~350&nbsp;€/mois tout compris</p>
+        </div>
+        <div class="num-card profit">
+          <div class="euro">6&nbsp;600&nbsp;€</div>
+          <p>Marge brute / an<br>avant commission store (~15&nbsp;%)</p>
+        </div>
+      </div>
+
+      <div class="scale-bar">
+        <strong>Vision à l’échelle&nbsp;:</strong> 100 utilisateurs → ~54&nbsp;000&nbsp;€ de revenus. Le cloud monte à ~7&nbsp;000–8&nbsp;000&nbsp;€ (second nœud ou GPU plus puissant) → toujours <strong>~45&nbsp;000&nbsp;€+ de marge brute</strong>. Les marges s’améliorent car l’app est déjà construite — nous vendons surtout des sièges et des minutes GPU.
+      </div>
+
+      <p style="margin:16px 0 0;font-size:0.84rem;color:var(--muted);">
+        <strong>Pitch client en une phrase&nbsp;:</strong> «&nbsp;45&nbsp;€/mois — tout votre flux rayon, détourages studio inclus, dans une seule app que vous utilisez déjà en magasin.&nbsp;»
+      </p>
+    </section>
+
+    <section class="card">
+      <h2><span class="dot"></span>Pourquoi maintenant &amp; ce qu’on prouve d’abord</h2>
+      <p class="section-sub">Produit réel (v2.35). La couche cloud est le multiplicateur commercial.</p>
+      <div class="two-col">
+        <ul class="pill-list">
+          <li>App Android opérationnelle&nbsp;: catalogue, scan AGENT, <strong>matching empreintes PARAY</strong>, impression Design, PARAY Learn</li>
+          <li>Premier mall payant (OASIS) = client référence + boucle de feedback produit</li>
+          <li>Pilote 3 mois&nbsp;: PARAY Cloud en prod → mesurer détourages/user → ajuster le pack tarifaire</li>
+        </ul>
+        <ul class="pill-list">
+          <li>Investissement → serveur GPU + modèle sous licence + 12 mois de runway pour vendre à 5 malls de plus</li>
+          <li>Chaque nouveau mall ≈ 2&nbsp;700–5&nbsp;400&nbsp;€/an récurrent (5–10 utilisateurs typiques)</li>
+          <li>Sortie possible&nbsp;: SaaS vertical retail imagery — les acquéreurs aiment le récurrent + le fossé offline</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2><span class="dot"></span>Business Model Canvas (condensé)</h2>
+      <p class="section-sub">Comment le business fonctionne sur une page.</p>
+
+      <div class="bmc">
+        <div class="bmc-cell tall">
+          <h3>Partenaires clés</h3>
+          <ul>
+            <li>Hébergeur GPU (Hetzner / OVH / Scaleway)</li>
+            <li>Éditeur modèle détourage (licence commerciale)</li>
+            <li>Google Play (distribution)</li>
+            <li>ERP mall (Gestium CSV — pas d’API live requise)</li>
+          </ul>
+        </div>
+        <div class="bmc-cell">
+          <h3>Activités clés</h3>
+          <ul>
+            <li>Maintenance app + IA PARAY</li>
+            <li>API cloud détourage</li>
+            <li>Onboarding &amp; support</li>
+          </ul>
+        </div>
+        <div class="bmc-cell">
+          <h3>Proposition de valeur</h3>
+          <ul>
+            <li>Ops média mall tout-en-un</li>
+            <li>Travail rayon offline + détourages pro online</li>
+            <li>Traçabilité sur chaque impression</li>
+          </ul>
+        </div>
+        <div class="bmc-cell">
+          <h3>Relations clients</h3>
+          <ul>
+            <li>B2B direct par mall</li>
+            <li>Formation sur site</li>
+            <li>Abonnement annuel</li>
+          </ul>
+        </div>
+        <div class="bmc-cell tall">
+          <h3>Segments clients</h3>
+          <ul>
+            <li>Chaînes super / hypermarchés</li>
+            <li>Équipes média &amp; pricing en magasin</li>
+            <li>Franchises à fort volume SKU</li>
+            <li>Départ&nbsp;: retail Maroc → UE francophone</li>
+          </ul>
+        </div>
+
+        <div class="bmc-cell">
+          <h3>Ressources clés</h3>
+          <ul>
+            <li>Codebase Visio Ai (livré)</li>
+            <li>Données vision + learn PARAY</li>
+            <li>VPS GPU + clés API</li>
+            <li>Déploiement référence OASIS</li>
+          </ul>
+        </div>
+        <div class="bmc-cell">
+          <h3>Canaux</h3>
+          <ul>
+            <li>Vente directe aux ops mall</li>
+            <li>Play Store (géré)</li>
+            <li>Bouche-à-oreille réseaux retail</li>
+          </ul>
+        </div>
+
+        <div class="bmc-cell wide">
+          <h3>Structure de coûts</h3>
+          <ul>
+            <li>Cloud GPU ~4&nbsp;200&nbsp;€/an (20 users) · licence modèle · support minimal · Play Store 15&nbsp;% sur abos digitaux</li>
+          </ul>
+        </div>
+        <div class="bmc-cell wide">
+          <h3>Sources de revenus</h3>
+          <ul>
+            <li><strong>Abonnement app</strong> ~370&nbsp;€/user/an · <strong>Packs détourage IA</strong> ~170&nbsp;€/user/an (6k images) · futur&nbsp;: packs supplémentaires, admin multi-sites, marque blanche</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <p class="footer">
+      Visio Ai / PARAY · OASIS MALL · Dossier investisseur confidentiel · docs/INVESTOR_PARAY_CLOUD_FR.html
+    </p>
+  </div>
+</body>
+</html>

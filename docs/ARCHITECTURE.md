@@ -93,7 +93,7 @@ Shelf labels: **Design** screen → `ShelfA4Renderer` → landscape A4 JPEG (12-
 
 Phone-to-phone PNG sync: **Phone sync** (hotspot LAN, port 8776) — see `docs/PHONE_SYNC.md`.
 
-**Architecture diagrams (A3 HTML):** [`docs/BLOCK_DIAGRAM.html`](BLOCK_DIAGRAM.html) — printable Mermaid block diagrams (system overview, nav, AGENT, PARAY, data layer).
+**Architecture diagrams:** [`docs/BLOCK_DIAGRAM.html`](BLOCK_DIAGRAM.html) (A3 portrait) · [`docs/BLOCK_DIAGRAM_A4_LANDSCAPE.html`](BLOCK_DIAGRAM_A4_LANDSCAPE.html) (A4 landscape) · [`docs/FEATURES_API_A4.html`](FEATURES_API_A4.html) (features × APIs, A4 landscape) · [`docs/INVESTOR_PARAY_CLOUD.html`](INVESTOR_PARAY_CLOUD.html) / [`FR`](INVESTOR_PARAY_CLOUD_FR.html) (investor brief, PARAY cloud).
 
 - **AGENT** tab: **Smart** (PARAY + catalog + SUB-BC), **Ticket** (PARAY Vision hold-to-snap + fuzzy fusion + match tiers), or **Bulk** (barcode-only mall captures → `bulk_images/` + `bulk_captures`).
 - **Article cards**: all list/detail panels show **Rayon** (`ArticleRayonLine`) for mall location when printing or verifying tickets.
