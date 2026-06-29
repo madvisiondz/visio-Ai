@@ -8,7 +8,8 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
 import com.oasismall.oasisai.data.db.dao.PreselectionWithArticle
-import com.oasismall.oasisai.domain.paray.ParayAgent
+import com.oasismall.oasisai.domain.layoutagent.LayoutFitAgent
+import com.oasismall.oasisai.domain.layoutagent.ProductLearnContext
 import com.oasismall.oasisai.util.PriceFormatter
 import java.io.File
 import java.io.FileOutputStream
@@ -64,7 +65,7 @@ object ShelfA4Renderer {
         items: List<PreselectionWithArticle>,
         pageIndex: Int,
         exportsDir: File,
-        paray: ParayAgent,
+        layoutFitAgent: LayoutFitAgent,
     ): File {
         val chunk = items.drop(pageIndex * CAPACITY).take(CAPACITY)
         val bitmap = Bitmap.createBitmap(PAGE_W, PAGE_H, Bitmap.Config.ARGB_8888)
@@ -74,7 +75,7 @@ object ShelfA4Renderer {
         chunk.forEachIndexed { index, item ->
             val col = index % COLS
             val row = index / COLS
-            drawShelfTicket(canvas, col, row, item, paray)
+            drawShelfTicket(canvas, col, row, item, layoutFitAgent)
         }
 
         val name = buildExportFileName(pageIndex)
@@ -105,7 +106,7 @@ object ShelfA4Renderer {
         col: Int,
         row: Int,
         item: PreselectionWithArticle,
-        paray: ParayAgent,
+        layoutFitAgent: LayoutFitAgent,
     ) {
         val ticketX = mmToPx(col * (slotWmm + COL_GAP_MM))
         val ticketY = mmToPx(row * (YELLOW_H_MM + ROW_GAP_MM))
@@ -115,7 +116,7 @@ object ShelfA4Renderer {
 
         val imageRect = RectF(ticketX, ticketY, ticketX + imageW, ticketY + labelH)
         canvas.drawRect(imageRect, Paint().apply { color = Color.WHITE })
-        drawProductImage(canvas, item, imageRect, paray)
+        drawProductImage(canvas, item, imageRect, layoutFitAgent)
 
         val yellowRect = RectF(ticketX + imageW, ticketY, ticketX + imageW + yellowW, ticketY + labelH)
         canvas.drawRect(yellowRect, Paint().apply { color = YELLOW })
@@ -298,7 +299,7 @@ object ShelfA4Renderer {
         canvas: Canvas,
         item: PreselectionWithArticle,
         rect: RectF,
-        paray: ParayAgent,
+        layoutFitAgent: LayoutFitAgent,
     ) {
         val path = item.imagePath
         if (path.isNullOrBlank()) return
@@ -323,7 +324,13 @@ object ShelfA4Renderer {
         val bmp = BitmapFactory.decodeFile(file.absolutePath, opts) ?: return
 
         canvas.drawRect(inner, Paint().apply { color = Color.WHITE })
-        paray.drawProductInShelfSlot(canvas, bmp, item, inner)
+        val learn = ProductLearnContext(
+            articleId = item.articleId,
+            barcode = item.barcode,
+            designation = item.designation,
+            imagePath = path,
+        )
+        layoutFitAgent.drawProductInShelfSlot(canvas, bmp, inner, learn)
         bmp.recycle()
     }
 

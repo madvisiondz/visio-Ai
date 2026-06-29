@@ -30,13 +30,6 @@ import com.oasismall.oasisai.data.db.dao.ArticleWithImage
 import com.oasismall.oasisai.util.BarcodeSuffixMatcher
 import com.oasismall.oasisai.util.PriceFormatter
 
-data class SuffixMatchState(
-    val scannedBarcode: String,
-    val editableBarcode: String,
-    val candidates: List<ArticleWithImage>,
-    val searching: Boolean = false,
-)
-
 @Composable
 fun CheckShootSuffixPicker(
     state: SuffixMatchState,

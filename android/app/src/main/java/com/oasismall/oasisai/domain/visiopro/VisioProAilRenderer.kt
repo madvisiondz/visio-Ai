@@ -11,6 +11,7 @@ import android.graphics.Typeface
 import com.oasismall.oasisai.domain.visiopro.designer.QuadInt
 import com.oasismall.oasisai.util.PriceFormatter
 import org.json.JSONObject
+import java.io.File
 import kotlin.math.max
 import kotlin.math.min
 
@@ -60,10 +61,15 @@ class VisioProTemplateAssets(context: Context) {
         return loadBitmap(assetPath)?.also { overlayCache[templateId] = it }
     }
 
-    fun loadBitmap(assetPath: String): Bitmap? =
-        runCatching {
+    fun loadBitmap(assetPath: String): Bitmap? {
+        val external = VisioProMediaStore.mediaFile(appContext, assetPath)
+        if (external.isFile) {
+            return BitmapFactory.decodeFile(external.absolutePath)
+        }
+        return runCatching {
             appContext.assets.open(assetPath).use { BitmapFactory.decodeStream(it) }
         }.getOrNull()
+    }
 
     fun printProductBitmap(article: VisioProArticleDef): Bitmap? =
         article.printProductAsset?.let { loadBitmap(it) }

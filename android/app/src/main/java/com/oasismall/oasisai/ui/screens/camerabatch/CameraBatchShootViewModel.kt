@@ -56,7 +56,6 @@ class CameraBatchShootViewModel(
     private val repository: OasisRepository,
     private val store: CameraBatchStore,
     private val queueStore: BatchCameraQueueStore,
-    private val workflowTracker: com.oasismall.oasisai.domain.paray.ParayWorkflowTracker,
 ) : ViewModel() {
     val batchFolder = VisioDownloadStorage.displayPath(store.batchFolderName())
     val todayShots: StateFlow<List<CameraBatchItemEntity>> =
@@ -118,7 +117,6 @@ class CameraBatchShootViewModel(
 
     private val _deferSubBarcodeLink = MutableStateFlow(false)
     private val _pendingLinkParentId = MutableStateFlow<Long?>(null)
-    private var workflowSessionRecorded = false
 
     fun initSession(
         queueItemId: Long?,
@@ -245,7 +243,6 @@ class CameraBatchShootViewModel(
             subBarcodes = meta.subBarcodes,
         )
         _step.value = CameraBatchShootStep.LOCKED
-        markCameraBatchSession()
         _autoLaunchCamera.value = true
         _message.value = "Shoot photo for sub-barcode $subBarcode — saved after PhotoRoom import"
     }
@@ -286,18 +283,9 @@ class CameraBatchShootViewModel(
         )
     }
 
-    private fun markCameraBatchSession() {
-        if (workflowSessionRecorded) return
-        workflowSessionRecorded = true
-        workflowTracker.recordFeature(
-            com.oasismall.oasisai.domain.paray.ParayWorkflowFeature.CAMERA_BATCH_SESSION,
-        )
-    }
-
     private suspend fun lockFromArticle(article: ArticleWithImage) {
         _locked.value = enrichLockedState(article, article.barcode, inCatalog = true, linkedViaAlternate = false)
         _step.value = CameraBatchShootStep.LOCKED
-        markCameraBatchSession()
     }
 
     private suspend fun lockBarcode(barcode: String) {
@@ -323,7 +311,6 @@ class CameraBatchShootViewModel(
             )
         }
         _step.value = CameraBatchShootStep.LOCKED
-        markCameraBatchSession()
         _message.value = null
     }
 

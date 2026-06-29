@@ -14,25 +14,11 @@ import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import android.util.Size
-import com.oasismall.oasisai.domain.layoutagent.ContentBounds
-import com.oasismall.oasisai.domain.layoutagent.ProductContentBounds
-import com.oasismall.oasisai.domain.paray.VisualFeatureExtractor
 import java.io.ByteArrayOutputStream
 
 object CameraFrameUtils {
     private const val JPEG_QUALITY_DEFAULT = 85
     private const val JPEG_QUALITY_TICKET = 95
-
-    fun extractFeatures(imageProxy: ImageProxy): VisualFeatureExtractor.Features? {
-        val bitmap = imageProxyToBitmap(imageProxy) ?: return null
-        val bounds = ProductContentBounds.detect(bitmap)
-        val content = if (bounds.isEmpty) {
-            ContentBounds(0, 0, bitmap.width, bitmap.height)
-        } else {
-            bounds
-        }
-        return VisualFeatureExtractor.extract(bitmap, content)
-    }
 
     /** Converts CameraX YUV frame to bitmap — correct stride handling (fixes stripe/stretch artifacts). */
     fun imageProxyToBitmap(imageProxy: ImageProxy, highQuality: Boolean = false): Bitmap? {

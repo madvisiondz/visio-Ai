@@ -31,7 +31,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.oasismall.oasisai.BuildConfig
 import com.oasismall.oasisai.ui.components.ImportantRayonsFilterNote
 import com.oasismall.oasisai.ui.components.ImportChangeCard
 import java.text.SimpleDateFormat
@@ -55,7 +54,7 @@ fun ImportScreen(
     val picker = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.OpenDocument(),
     ) { uri ->
-        if (uri != null) viewModel.previewFromUri(context, uri)
+        if (uri != null) viewModel.importFromUri(context, uri)
     }
 
     Scaffold(
@@ -125,98 +124,6 @@ fun ImportScreen(
                     onClick = { picker.launch(arrayOf("text/*", "text/csv", "application/vnd.ms-excel")) },
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text("Pick CSV file") }
-            }
-            item {
-                OutlinedButton(
-                    onClick = { viewModel.importSample(context) },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("Load sample data (demo)")
-                }
-            }
-
-            uiState.preview?.let { preview ->
-                item {
-                    Card(modifier = Modifier.fillMaxWidth()) {
-                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("Import preview", style = MaterialTheme.typography.titleSmall)
-                            Text(
-                                "Visio Ai ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Text("File: ${preview.fileName}")
-                            val totalInFile = preview.parseResult.rows.size +
-                                preview.parseResult.skippedRows
-                            if (preview.importantRayonsFiltered) {
-                                Text(
-                                    "$totalInFile rows in file · ${preview.scopedRowCount} in your rayons importants",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                )
-                                Text(
-                                    "Full catalog is imported; counts below are for selected rayons only.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            } else {
-                                Text("$totalInFile rows in file · ${preview.parseResult.rows.size} will import")
-                            }
-                            if (preview.parseResult.barcodeLessRows > 0) {
-                                Text(
-                                    "${preview.parseResult.barcodeLessRows} without Code-barres → kept via Gestium Code (e.g. PIEDS DE VEAU)",
-                                    color = MaterialTheme.colorScheme.primary,
-                                    style = MaterialTheme.typography.bodySmall,
-                                )
-                            }
-                            if (preview.parseResult.skippedRows > 0) {
-                                Text(
-                                    "${preview.parseResult.skippedRows} rows skipped (missing designation, price, or Code)",
-                                    color = MaterialTheme.colorScheme.error,
-                                    style = MaterialTheme.typography.bodySmall,
-                                )
-                            }
-                            if (preview.parseResult.garbledDesignationRows > 0) {
-                                Text(
-                                    "${preview.parseResult.garbledDesignationRows} rows skipped (unreadable designation — ??????? from Gestium export)",
-                                    color = MaterialTheme.colorScheme.error,
-                                    style = MaterialTheme.typography.bodySmall,
-                                )
-                            }
-                            Text("Sample rows:", style = MaterialTheme.typography.labelMedium)
-                            preview.sampleRows.take(8).forEach {
-                                Text(it, style = MaterialTheme.typography.bodySmall)
-                            }
-                            if (preview.sampleRows.size > 8) {
-                                Text(
-                                    "… and ${preview.sampleRows.size - 8} more in file",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-                    }
-                }
-                item {
-                    val context = LocalContext.current
-                    Button(
-                        onClick = { viewModel.confirmImport(context) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .navigationBarsPadding(),
-                    ) {
-                        Text("Confirm import")
-                    }
-                }
-                item {
-                    OutlinedButton(
-                        onClick = viewModel::cancelPreview,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .navigationBarsPadding(),
-                    ) {
-                        Text("Cancel")
-                    }
-                }
             }
 
             uiState.lastResult?.summary?.let { s ->

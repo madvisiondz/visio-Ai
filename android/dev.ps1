@@ -26,9 +26,10 @@ function Start-EmulatorIfNeeded {
 }
 
 function Copy-DebugApkToRoot {
-    $src = Join-Path $env:LOCALAPPDATA "OasisAI-android-build\outputs\apk\debug\app-debug.apk"
+    $root = Split-Path $PSScriptRoot -Parent
+    $src = Join-Path $root "android-build\outputs\apk\debug\app-debug.apk"
     if (-not (Test-Path $src)) {
-        $src = Join-Path $PSScriptRoot "app\build\outputs\apk\debug\app-debug.apk"
+        $src = Join-Path $env:LOCALAPPDATA "OasisAI-android-build\outputs\apk\debug\app-debug.apk"
     }
     $dest = Join-Path (Split-Path $PSScriptRoot -Parent) "VisioAI-debug.apk"
     if (-not (Test-Path $src)) {

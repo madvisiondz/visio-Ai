@@ -10,11 +10,9 @@ plugins {
     alias(libs.plugins.hilt.android)
 }
 
-// Build outside OneDrive (sync locks files) — entire :app module in one folder so dex/APK stay consistent.
-val localAppData = System.getenv("LOCALAPPDATA")
-if (!localAppData.isNullOrBlank()) {
-    layout.buildDirectory.set(File(localAppData, "OasisAI-android-build"))
-}
+// Build on D: (same drive as sources) — KSP/Room break if build dir is on C: while project is on D:.
+// Kept outside android/ folder to avoid Gradle sync noise in the IDE.
+layout.buildDirectory.set(File(rootProject.rootDir.parentFile, "android-build"))
 
 val localProperties = Properties().apply {
     val file = rootProject.file("local.properties")
@@ -32,8 +30,12 @@ android {
         applicationId = "com.oasismall.visioai"
         minSdk = 26
         targetSdk = 34
-        versionCode = 340
-        versionName = "2.35.0"
+        versionCode = 342
+        versionName = "2.37.0"
+
+        ndk {
+            abiFilters += listOf("arm64-v8a")
+        }
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -86,7 +88,7 @@ android {
         buildConfig = true
     }
     androidResources {
-        noCompress += listOf("tflite", "onnx")
+        noCompress += listOf("onnx")
     }
     sourceSets {
         getByName("androidTest").assets.srcDir("$projectDir/schemas")
@@ -124,12 +126,10 @@ dependencies {
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
     implementation(libs.mlkit.barcode)
-    implementation(libs.mlkit.text.recognition)
     implementation(libs.coil.compose)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.okhttp)
     implementation(libs.androidx.documentfile)
-    implementation(libs.tensorflow.lite)
     implementation(libs.onnxruntime.android)
     implementation(libs.nanohttpd)
     implementation(libs.timber)

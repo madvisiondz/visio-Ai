@@ -145,7 +145,6 @@ class DeviceBackupExporter(
             "visio_pro_designs",
             "bulk_images",
             "exports",
-            "paray_home",
         )
 
         fun copyIfExists(source: File, dest: File) {

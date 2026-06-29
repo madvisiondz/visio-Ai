@@ -101,7 +101,6 @@ private fun DesignHomeScreen(viewModel: DesignViewModel) {
     val isRendering by viewModel.isRendering.collectAsStateWithLifecycle()
     val shareable = viewModel.shareableItems()
     val labelCount = DesignCartExpand.labelCount(shareable)
-    val learned by viewModel.parayLearnedCount.collectAsStateWithLifecycle()
     var detailItem by remember { mutableStateOf<PreselectionWithArticle?>(null) }
     var showImportDialog by remember { mutableStateOf(false) }
     var importPasteText by remember { mutableStateOf("") }
@@ -171,11 +170,6 @@ private fun DesignHomeScreen(viewModel: DesignViewModel) {
                 Text(
                     "Shelf labels on phone — pick a template to generate a print-ready A4 JPEG.",
                     style = MaterialTheme.typography.bodyMedium,
-                )
-                Text(
-                    "${viewModel.parayName} learned $learned product look(s) — shape, colors, typography for future camera ID.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary,
                 )
             }
             message?.let { msg ->

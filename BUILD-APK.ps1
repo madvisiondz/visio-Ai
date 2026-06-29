@@ -28,9 +28,9 @@ if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
 
-$src = Join-Path $env:LOCALAPPDATA "OasisAI-android-build\outputs\apk\debug\app-debug.apk"
+$src = Join-Path $Root "android-build\outputs\apk\debug\app-debug.apk"
 if (-not (Test-Path $src)) {
-    $src = Join-Path $Android "app\build\outputs\apk\debug\app-debug.apk"
+    $src = Join-Path $env:LOCALAPPDATA "OasisAI-android-build\outputs\apk\debug\app-debug.apk"
 }
 $dest = Join-Path $Root "VisioAI-debug.apk"
 Copy-Item $src $dest -Force

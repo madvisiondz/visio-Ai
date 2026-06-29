@@ -3,17 +3,18 @@
 ## 1. GestiumERP import
 
 ```
-CSV file (content URI or assets sample)
-    ??? CsvParser (flexible French/English headers; **Rayon** / **Catégorie** / **Famille** mapped separately)
-    ??? ImportService
-        ??? **ArticleImportSnapshot** (compare fields only — no `rawData` blobs)
-        ??? compare by barcode / codeart / normalized designation
-        ??? persist designation, price, **rayon**, famille, catégorie (`rawData` null on save)
-        ??? detect NEW / PRICE_CHANGED / RENAMED / REMOVED; skip unchanged row writes
-        ??? write articles + import_changes + article_price_history
-    ??? ImageMatcher.upsertImagesForArticles() — **new articles only** on re-import; PNG index cached in memory
-    ??? UI: Import summary + ImportDetailScreen (enriched rows: PNG thumbnail, Add to To share / To shoot)
-    ??? When **Rayons importants** configured: preview sample rows, change counts, and Report summaries show only those rayons (full DB import unchanged)
+CSV file (content URI from Settings or Import history screen)
+    → CsvParser.validate + parse
+    → OasisBackgroundTaskManager.enqueueCsvImport()
+    → ImportService (foreground service)
+        → **ArticleImportSnapshot** (compare fields only — no `rawData` blobs)
+        → compare by barcode / codeart / normalized designation
+        → persist designation, price, **rayon**, famille, catégorie (`rawData` null on save)
+        → detect NEW / PRICE_CHANGED / RENAMED / REMOVED; skip unchanged row writes
+        → write articles + import_changes + article_price_history
+    → ImageMatcher.upsertImagesForArticles() — **new articles only** on re-import
+    → UI: CsvImportBanner on nav host; Import history + ImportDetailScreen
+    → When **Rayons importants** configured: Report summaries show only those rayons (full DB import unchanged)
 ```
 
 ## Device transfer (v2.15)
@@ -25,7 +26,7 @@ Settings → Device transfer
     → Re-import CSV — ImportService auto-runs restoreLinkedFlavors() (re-links sub-barcodes to parents)
     → Restore sub-barcode flavors — manual retry in Settings (same restore logic)
     → Export full backup — VisioAi_backup_*.zip → Download/VisioAi/
-        (database JSON + product_images + visio_pro_* + paray_home + exports + settings)
+        (database JSON + product_images + visio_pro_* + exports + settings)
     → Import full backup — pick ZIP; restores files + DB with barcode ID remapping
     → Export VisioPRO presets — per-category folder + ZIP (articles, photos, catalog PNGs, designs)
     → Export PNG database — all gallery PNGs incl. sub-barcode variants
@@ -34,16 +35,20 @@ Settings → Device transfer
 ## Background long tasks (v2.15.6)
 
 ```
-Settings / Import confirm
+Settings / Import history picker
     → OasisBackgroundTaskManager.enqueue(kind [, uri | csv parse | png uris])
     → OasisBackgroundTaskService (foreground + wake lock)
         → runs task on Dispatchers.IO; updates notification + shared StateFlow
     → UI observes progress overlay; user may lock screen — task continues
 ```
 
-Kinds: sync sub-PNGs, re-index, PNG export, full backup import/export, VisioPRO bundle, purge Gestium, sample data, load ready PNGs, CSV import.
+Kinds: sync sub-PNGs, re-index, PNG export, full backup import/export, VisioPRO bundle, purge Gestium, load ready PNGs, CSV import.
 
-## PARAY Observer Phase 1 (v2.17.0)
+## PARAY (removed v2.36.0)
+
+PARAY observer, learn, fusion, and ticket-verify flows were removed. Design shelf layout uses **LayoutFitAgent** (`domain/layoutagent/`). Legacy docs: `docs/PARAY_*.md` (historical only).
+
+## PARAY Observer Phase 1 (v2.17.0) — removed
 
 ```
 Trigger (startup / import / re-index / learn complete)
@@ -446,7 +451,18 @@ AGENT (bottom nav) — Smart
     -> unlock -> clear session; scanner resumes immediately
 ```
 
-### Ticket mode (tap-to-capture, v2.31.0)
+### AGENT Smart mode (v2.36+ — Ticket/Bulk removed from CheckShoot)
+
+```
+AGENT — barcode camera
+    -> debounced scan -> article card
+    -> lock if in Gestium catalog else "Not in catalog — search in Articles tab"
+    -> optional: Link barcode to catalog (suffix picker -> linkAlternateBarcode)
+    -> locked actions: share, design, shoot PNG (U2NetP), SUB-BC
+    -> AgentSessionStore persists lock across restart
+```
+
+### Ticket mode (tap-to-capture, v2.31.0) — *removed from CheckShoot UI 2026-06-29*
 
 ```
 AGENT — Ticket toggle
@@ -459,7 +475,7 @@ AGENT — Ticket toggle
     -> swipe unlock → tap next ticket
 ```
 
-### Bulk mode (mall photo job)
+### Bulk mode (mall photo job) — *removed from CheckShoot UI 2026-06-29*
 
 ```
 AGENT — Bulk toggle
@@ -509,18 +525,23 @@ Settings -> Load IMAGE ASSETS folder
     -> run image re-index after load
 ```
 
-## 14. VisioPRO (v2.6.0)
+## 14. VisioPRO (v2.6.0+)
 
 ```
-Settings → VisioPRO
-    → VisioProHome (categories: Fruits, Légumes, Boucherie, Poisson)
-    → VisioProCategory
-        → Social tab: manual price first, else CSV by designation keywords
-        → Print tab: CSV first, else manual price from social memory (shared slug)
-        → VisioProCardRenderer (1080² social / 1200×1697 print)
-        → product PNG from catalog when keyword match has image
-        → export → DCIM/VisioPRO/Social or Print
-        → VisioProStore (visio_pro_memory.json): manualPrice, lastSocialExportAt, lastPrintExportAt
+VisioPRO home (bottom nav)
+    -> VisioProHome (categories: Fruits, Legumes, Boucherie, Poisson)
+    -> VisioProCategory
+        -> Social tab: manual price first, else CSV by designation keywords
+        -> Print tab: CSV first, else manual price from social memory (shared slug)
+        -> VisioProCardRenderer (1080 social / 1200x1697 print)
+        -> product PNG from VisioProMediaStore (sideload) or catalog when keyword match has image
+        -> export -> DCIM/VisioPRO/Social or Print
+        -> VisioProStore (visio_pro_memory.json): manualPrice, lastSocialExportAt, lastPrintExportAt
+
+Settings -> Install VisioPRO images (v2.37.0)
+    -> pick VisioPRO-media.zip (from BUILD-VISIOPRO-MEDIA.ps1 on PC)
+    -> VisioProMediaImporter unzips to filesDir/visiopro_media/visiopro/
+    -> VisioProTemplateAssets.loadBitmap checks device files first, then lean APK assets (layout JSON only)
 ```
 
 Preset definitions: `VisioProPresetCatalog.kt` (agent-maintained; 7 layout families). Fish = social only, no price on card.

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.oasismall.oasisai.OasisApp
 import com.oasismall.oasisai.data.model.CartType
+import com.oasismall.oasisai.domain.layoutagent.LayoutFitAgent
 import com.oasismall.oasisai.ui.screens.article.ArticleDetailViewModel
 import com.oasismall.oasisai.ui.screens.backgroundremoval.BackgroundRemovalViewModel
 import com.oasismall.oasisai.ui.screens.batchtxt.BatchTxtViewModel
@@ -22,9 +23,6 @@ import com.oasismall.oasisai.ui.screens.preselection.PreselectionViewModel
 import com.oasismall.oasisai.ui.screens.print.PrintViewModel
 import com.oasismall.oasisai.ui.screens.promo.PromoViewModel
 import com.oasismall.oasisai.ui.screens.design.DesignViewModel
-import com.oasismall.oasisai.ui.screens.parayhome.ParayHomeRepository
-import com.oasismall.oasisai.ui.screens.parayhome.ParayHomeViewModel
-import com.oasismall.oasisai.ui.screens.parayimport.ParayImportViewModel
 import com.oasismall.oasisai.ui.screens.phonesync.PhoneSyncViewModel
 import com.oasismall.oasisai.ui.screens.scanner.ScannerViewModel
 import com.oasismall.oasisai.ui.screens.settings.ImportantRayonsViewModel
@@ -43,8 +41,8 @@ class OasisViewModelFactory(
 ) : ViewModelProvider.Factory {
 
     val repository get() = app.repository
-    val parayWorkflowTracker get() = app.parayWorkflowTracker
-    val parayActivityMonitor get() = app.parayActivityMonitor
+    val backgroundTaskManager get() = app.backgroundTaskManager
+
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         return when {
@@ -56,47 +54,10 @@ class OasisViewModelFactory(
                     app.imageMatcher,
                     app.backgroundTaskManager,
                     app.backupSecurityStore,
+                    app.visioProMediaImporter,
                 ) as T
             modelClass.isAssignableFrom(ImportantRayonsViewModel::class.java) ->
                 ImportantRayonsViewModel(app.repository) as T
-            modelClass.isAssignableFrom(ParayImportViewModel::class.java) ->
-                ParayImportViewModel(app.parayImportManager) as T
-            modelClass.isAssignableFrom(ParayHomeViewModel::class.java) ->
-                ParayHomeViewModel(
-                    ParayHomeRepository(app.parayHome),
-                    app.paray,
-                    app.parayKnowledgeFusionEngine,
-                ) as T
-            modelClass.isAssignableFrom(com.oasismall.oasisai.ui.screens.paraylearn.ParayMainViewModel::class.java) ->
-                com.oasismall.oasisai.ui.screens.paraylearn.ParayMainViewModel(app.repository, app.paray) as T
-            modelClass.isAssignableFrom(com.oasismall.oasisai.ui.screens.paraylearn.ParayLearnSettingsViewModel::class.java) ->
-                com.oasismall.oasisai.ui.screens.paraylearn.ParayLearnSettingsViewModel(app.paray) as T
-            modelClass.isAssignableFrom(com.oasismall.oasisai.ui.screens.paraylearn.ParayMemoryViewModel::class.java) ->
-                com.oasismall.oasisai.ui.screens.paraylearn.ParayMemoryViewModel(
-                    com.oasismall.oasisai.ui.screens.paraylearn.ParayMemoryRepository(app.paray.learnStore),
-                ) as T
-            modelClass.isAssignableFrom(com.oasismall.oasisai.ui.screens.paraylearn.ParayKnowledgeViewModel::class.java) ->
-                com.oasismall.oasisai.ui.screens.paraylearn.ParayKnowledgeViewModel(
-                    com.oasismall.oasisai.ui.screens.paraylearn.ParayKnowledgeRepository(
-                        com.oasismall.oasisai.domain.paray.ParayKnowledgeStore(app.parayHome),
-                    ),
-                ) as T
-            modelClass.isAssignableFrom(com.oasismall.oasisai.ui.screens.paraylearn.ParayStatisticsViewModel::class.java) ->
-                com.oasismall.oasisai.ui.screens.paraylearn.ParayStatisticsViewModel(
-                    com.oasismall.oasisai.ui.screens.paraylearn.ParayStatisticsRepository(
-                        app.paray.learnStore,
-                        com.oasismall.oasisai.domain.paray.ParayKnowledgeStore(app.parayHome),
-                        com.oasismall.oasisai.domain.paray.ParayWorkflowStore(app.parayHome),
-                        com.oasismall.oasisai.domain.paray.ParayRecognitionStore(app.parayHome),
-                    ),
-                ) as T
-            modelClass.isAssignableFrom(com.oasismall.oasisai.ui.screens.paraylearn.ParayLearnSessionViewModel::class.java) ->
-                com.oasismall.oasisai.ui.screens.paraylearn.ParayLearnSessionViewModel(
-                    app.repository,
-                    app.paray,
-                    app.parayObserver,
-                    app.parayWorkflowTracker,
-                ) as T
             modelClass.isAssignableFrom(ImportViewModel::class.java) ->
                 ImportViewModel(app.repository, app.backgroundTaskManager) as T
             modelClass.isAssignableFrom(CatalogViewModel::class.java) ->
@@ -104,11 +65,11 @@ class OasisViewModelFactory(
             modelClass.isAssignableFrom(ArticleDetailViewModel::class.java) ->
                 ArticleDetailViewModel(app.repository, app.galleryPngAssignService) as T
             modelClass.isAssignableFrom(ScannerViewModel::class.java) ->
-                ScannerViewModel(app.repository, app.parayWorkflowTracker, app.parayRecognitionTracker) as T
+                ScannerViewModel(app.repository) as T
             modelClass.isAssignableFrom(PreselectionViewModel::class.java) ->
                 PreselectionViewModel(app.repository) as T
             modelClass.isAssignableFrom(PrintViewModel::class.java) ->
-                PrintViewModel(app.repository, app.printGenerator, app.parayWorkflowTracker) as T
+                PrintViewModel(app.repository, app.printGenerator) as T
             modelClass.isAssignableFrom(PrintHistoryViewModel::class.java) ->
                 PrintHistoryViewModel(app.repository) as T
             modelClass.isAssignableFrom(WorkHistoryViewModel::class.java) ->
@@ -126,7 +87,6 @@ class OasisViewModelFactory(
                     app.repository,
                     app.cameraBatchStore,
                     app.batchCameraQueueStore,
-                    app.parayWorkflowTracker,
                 ) as T
             modelClass.isAssignableFrom(CameraBatchImportViewModel::class.java) ->
                 CameraBatchImportViewModel(app.cameraBatchStore) as T
@@ -136,16 +96,12 @@ class OasisViewModelFactory(
                     app.repository,
                     app.imageMatcher,
                     app.backgroundRemovalService,
-                    app.paray,
-                    app.bulkCaptureStore,
-                    app.parayWorkflowTracker,
-                    app.parayRecognitionTracker,
                     app.galleryPngAssignService,
                 ) as T
             modelClass.isAssignableFrom(PhoneSyncViewModel::class.java) ->
                 PhoneSyncViewModel(app.repository, app.imageMatcher) as T
             modelClass.isAssignableFrom(DesignViewModel::class.java) ->
-                DesignViewModel(app.repository, app.paray, app.parayWorkflowTracker) as T
+                DesignViewModel(app.repository, LayoutFitAgent(app)) as T
             modelClass.isAssignableFrom(VisioProViewModel::class.java) ->
                 VisioProViewModel(
                     app.repository,
@@ -161,7 +117,7 @@ class OasisViewModelFactory(
             modelClass.isAssignableFrom(VisioProSettingsViewModel::class.java) ->
                 VisioProSettingsViewModel(app.visioProCatalogService, app.visioProPrintImageLinker) as T
             modelClass.isAssignableFrom(VisioProHomeViewModel::class.java) ->
-                VisioProHomeViewModel(app.visioProCatalogService, app.visioProPrintImageLinker) as T
+                VisioProHomeViewModel(app, app.visioProCatalogService, app.visioProPrintImageLinker) as T
             modelClass.isAssignableFrom(VisioProDesignerHubViewModel::class.java) ->
                 VisioProDesignerHubViewModel(app.visioProDesignStore) as T
             else -> throw IllegalArgumentException("Unknown ViewModel: ${modelClass.name}")
@@ -210,3 +166,4 @@ class OasisViewModelFactory(
             }
         }
 }
+

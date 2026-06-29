@@ -665,6 +665,9 @@ It:
 
 | Date | Change |
 |------|--------|
+| 2026-06-29 | **Visio Ai v2.37.0 — lean APK** — arm64-only native libs; removed ML Kit OCR + TensorFlow Lite (ONNX cutout only); ~102 MB VisioPRO product PNGs moved to `packs/visiopro-media/` + `VisioPRO-media.zip` sideload (`BUILD-VISIOPRO-MEDIA.ps1`); Settings **Install VisioPRO images**; `VisioProMediaStore` on-device; VisioPRO home banner when pack missing; APK **51.6 MB** (342) |
+| 2026-06-29 | **Visio Ai v2.36.0** — PARAY removal complete: deleted `domain/paray` + UI; CSV import direct from Settings (OpenDocument → background enqueue); `CsvImportBanner` on nav host; Design uses `LayoutFitAgent`; bottom nav 8 tabs; APK 2.36.0 (341) |
+| 2026-06-29 | **AGENT Smart-only simplification** — removed Ticket/Bulk/PARAY modes from CheckShoot; `AgentSessionStore` for lock persist; suffix link via `linkAlternateBarcode`; deleted ticket/bulk UI files |
 | 2026-06-14 | **Visio Ai docs**: Added `docs/BLOCK_DIAGRAM.html` — A3 printable architecture diagrams (8 Mermaid blocks) |
 | 2026-06-14 | **Visio Ai v2.35.0**: Fix Smart↔Ticket camera interference (fresh ML Kit scanner per bind; no barcode in Ticket mode); stronger shelf OCR — magenta/deglare/adaptive variants, split designation/price bands, 1080px upscale; APK 2.35.0 (340) |
 | 2026-06-14 | **Visio Ai v2.34.3**: Fix ticket re-shoot after unlock — camera buffer stays live while card locked; capture uses newest frame in ring (not 400ms window); reset snap-in-flight on unlock; clear stale error toasts; APK 2.34.3 (339) |

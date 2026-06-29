@@ -34,7 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.oasismall.oasisai.ui.components.AgentNavIcon
 
-/** Fixed width per tab so all 8 destinations stay tappable and scroll horizontally on narrow phones. */
+/** Fixed width per tab so all destinations stay tappable and scroll horizontally on narrow phones. */
 private val NavItemWidth = 76.dp
 /** Material 3 navigation bar height (dp). */
 private val NavBarHeight = 80.dp
@@ -160,7 +160,6 @@ fun isBottomNavSelected(itemRoute: String, currentRoute: String?): Boolean {
 
 fun showMainBottomBar(currentRoute: String?): Boolean {
     if (currentRoute == null) return false
-    if (currentRoute == OasisRoute.ParayLearnSession.route) return false
     if (currentRoute == OasisRoute.VisioProHome.route || currentRoute.startsWith("visio_pro/")) {
         return true
     }

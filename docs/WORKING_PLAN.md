@@ -1,5 +1,7 @@
 # Oasis AI — Working Plan
 
+> **2026-06-29:** Lean APK v2.37.0 — arm64-only, ONNX cutout, VisioPRO images sideloaded. AGENT CheckShoot Smart-only (PARAY removed v2.36).
+
 ## Phase 0 — Environment ✅
 
 - [x] Android Studio / SDK API 34

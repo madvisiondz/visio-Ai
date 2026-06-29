@@ -20,10 +20,11 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class SettingsUiState(
     val isReindexing: Boolean = false,
-    val isLoadingSample: Boolean = false,
+    val isImportingCsv: Boolean = false,
     val isLoadingImages: Boolean = false,
     val isExportingPngs: Boolean = false,
     val isPurgingCatalog: Boolean = false,
@@ -31,6 +32,7 @@ data class SettingsUiState(
     val isImportingBackup: Boolean = false,
     val isExportingVisioPro: Boolean = false,
     val isImportingVisioPro: Boolean = false,
+    val isImportingVisioProMedia: Boolean = false,
     val isRestoringSubBarcodeFlavors: Boolean = false,
     val progress: com.oasismall.oasisai.util.TaskProgress? = null,
     val message: String? = null,
@@ -52,6 +54,7 @@ class SettingsViewModel(
     private val imageMatcher: ImageMatcher,
     private val backgroundTasks: OasisBackgroundTaskManager,
     private val backupSecurityStore: BackupSecurityStore,
+    private val visioProMediaImporter: com.oasismall.oasisai.domain.transfer.VisioProMediaImporter,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
@@ -102,7 +105,7 @@ class SettingsViewModel(
                             isImportingBackup = task.kind == OasisBackgroundTaskKind.IMPORT_FULL_BACKUP,
                             isExportingVisioPro = task.kind == OasisBackgroundTaskKind.EXPORT_VISIOPRO_BUNDLE,
                             isImportingVisioPro = task.kind == OasisBackgroundTaskKind.IMPORT_VISIOPRO_BUNDLE,
-                            isLoadingSample = task.kind == OasisBackgroundTaskKind.LOAD_SAMPLE_DATA,
+                            isImportingCsv = task.kind == OasisBackgroundTaskKind.CSV_IMPORT,
                             isLoadingImages = task.kind == OasisBackgroundTaskKind.LOAD_READY_PNGS,
                             progress = task.progress,
                             message = null,
@@ -128,7 +131,7 @@ class SettingsViewModel(
                             isImportingBackup = false,
                             isExportingVisioPro = false,
                             isImportingVisioPro = false,
-                            isLoadingSample = false,
+                            isImportingCsv = false,
                             isLoadingImages = false,
                             progress = null,
                             message = when {
@@ -193,8 +196,44 @@ class SettingsViewModel(
         backgroundTasks.startIfPending(context)
     }
 
-    fun loadSampleData(context: Context) =
-        start(context, OasisBackgroundTaskKind.LOAD_SAMPLE_DATA)
+    fun importGestiumCsv(context: Context, uri: Uri) {
+        viewModelScope.launch {
+            if (backgroundTasks.isRunning()) {
+                showMessage("Another task is already running — check the notification.")
+                return@launch
+            }
+            val enqueueResult = runCatching {
+                kotlinx.coroutines.withContext(Dispatchers.IO) {
+                    val fileName = uri.lastPathSegment ?: "import.csv"
+                    context.contentResolver.openInputStream(uri)?.use { stream ->
+                        val parseResult = com.oasismall.oasisai.domain.CsvParser.parseWithFallback(stream)
+                        val validation = com.oasismall.oasisai.domain.CsvParser.validate(parseResult.headers)
+                        if (!validation.isValid) {
+                            throw IllegalArgumentException(
+                                "Missing columns: ${validation.missingColumns.joinToString(", ")}",
+                            )
+                        }
+                        if (parseResult.rows.isEmpty()) {
+                            throw IllegalArgumentException("No valid article rows found in file.")
+                        }
+                        fileName to parseResult
+                    } ?: throw IllegalArgumentException("Cannot open file")
+                }
+            }
+            enqueueResult.fold(
+                onSuccess = { (fileName, parseResult) ->
+                    backgroundTasks.enqueueCsvImport(fileName, parseResult)
+                    backgroundTasks.startIfPending(context)
+                },
+                onFailure = { err ->
+                    _uiState.value = _uiState.value.copy(
+                        message = err.message ?: "CSV import failed",
+                        messageIsError = true,
+                    )
+                },
+            )
+        }
+    }
 
     fun exportProductImages(context: Context) =
         start(context, OasisBackgroundTaskKind.EXPORT_PNG_DATABASE)
@@ -231,6 +270,38 @@ class SettingsViewModel(
 
     fun importVisioProBundle(context: Context, uri: Uri) =
         start(context, OasisBackgroundTaskKind.IMPORT_VISIOPRO_BUNDLE, uri)
+
+    fun importVisioProMedia(context: Context, uri: Uri) {
+        if (_uiState.value.isImportingVisioProMedia) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isImportingVisioProMedia = true, message = null, progress = null) }
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    visioProMediaImporter.importFromUri(uri) { progress ->
+                        _uiState.update { it.copy(progress = progress) }
+                    }
+                }
+            }.onSuccess { result ->
+                _uiState.update {
+                    it.copy(
+                        isImportingVisioProMedia = false,
+                        progress = null,
+                        message = "VisioPRO images installed (${result.fileCount} files).",
+                        messageIsError = false,
+                    )
+                }
+            }.onFailure { e ->
+                _uiState.update {
+                    it.copy(
+                        isImportingVisioProMedia = false,
+                        progress = null,
+                        message = e.message ?: "VisioPRO media install failed.",
+                        messageIsError = true,
+                    )
+                }
+            }
+        }
+    }
 
     fun setBackupEncryptionEnabled(enabled: Boolean) {
         backupSecurityStore.setEncryptionEnabled(enabled)

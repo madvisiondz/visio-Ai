@@ -21,10 +21,6 @@
 -keep class ai.onnxruntime.** { *; }
 -dontwarn ai.onnxruntime.**
 
-# TensorFlow Lite
--keep class org.tensorflow.lite.** { *; }
--dontwarn org.tensorflow.lite.**
-
 # NanoHTTPD (phone sync)
 -keep class org.nanohttpd.** { *; }
 -keepclassmembers class * extends org.nanohttpd.protocols.http.NanoHTTPD { *; }

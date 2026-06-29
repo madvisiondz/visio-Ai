@@ -2,6 +2,24 @@
 
 > What has been built. Update at end of each work session.
 
+## 2026-06-29 — Lean APK v2.37.0 (phone / arm64)
+
+- [x] **arm64-v8a only** — dropped x86/x86_64/armeabi-v7a native libs (~80% smaller `lib/`)
+- [x] **ONNX-only cutout** — removed TensorFlow Lite + ML Kit text recognition deps
+- [x] **VisioPRO media externalized** — `packs/visiopro-media/` + `BUILD-VISIOPRO-MEDIA.ps1` → `VisioPRO-media.zip`; Settings **Install VisioPRO images**; `VisioProMediaStore` + home banner when missing
+- [x] APK **51.6 MB** (code 342) at `VisioAI-debug.apk`
+
+---
+
+## 2026-06-29 — AGENT Smart-only CheckShoot rewrite
+
+- [x] `CheckShootViewModel` — Smart barcode flow only; `AgentSessionStore` persist; no PARAY/Ticket/Bulk
+- [x] `CheckShootScreen` — simplified header; camera + article popup + suffix picker + asset overlay
+- [x] Deleted Ticket/Bulk/PARAY UI files + `AgentCaptureMode.kt`; simplified `BarcodeCameraPreview`
+- [x] `OasisViewModelFactory` — lean CheckShoot constructor (5 deps)
+
+---
+
 ## 2026-06-14 — Visio Ai v2.34.2 Ticket → article card (no suggestions)
 
 - [x] Best PARAY match opens standard article card (same as barcode Smart mode)

@@ -145,7 +145,6 @@ fun ScannerScreen(
                         onAddToShare = { viewModel.addToShareCart(article) },
                         onAddToShoot = { viewModel.addToPhotoshootCart(article) },
                         onAddToDesign = { viewModel.addToDesignCart(article) },
-                        onMarkTicketVerified = { viewModel.markTicketVerified(article.id) },
                         onOpenDetail = { onArticleClick(article.id) },
                         onRemoveSubBarcode = viewModel::removeSubBarcode,
                     )

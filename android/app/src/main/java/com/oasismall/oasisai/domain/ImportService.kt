@@ -20,7 +20,6 @@ class ImportService(
     private val imageMatcher: ImageMatcher,
     @Suppress("unused")
     private val subBarcodeFlavorService: com.oasismall.oasisai.domain.flavors.SubBarcodeFlavorService,
-    private val onParayObserver: (suspend (com.oasismall.oasisai.domain.paray.ParayObserverTrigger, com.oasismall.oasisai.domain.paray.ParayObserverContext) -> Unit)? = null,
 ) {
     suspend fun importFromStream(
         inputStream: InputStream,
@@ -280,13 +279,6 @@ class ImportService(
                     scopedPriceChangedCount = scopedPriceChangedCount,
                     scopedRenamedCount = scopedRenamedCount,
                     scopedRemovedCount = scopedRemovedCount,
-                ),
-            )
-            onParayObserver?.invoke(
-                com.oasismall.oasisai.domain.paray.ParayObserverTrigger.CSV_IMPORT_COMPLETED,
-                com.oasismall.oasisai.domain.paray.ParayObserverContext(
-                    importId = importId,
-                    importSummary = result.summary,
                 ),
             )
             result

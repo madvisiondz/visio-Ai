@@ -9,17 +9,13 @@ import androidx.camera.view.PreviewView
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import com.oasismall.oasisai.ui.screens.checkshoot.TicketCameraBuffer
-import com.oasismall.oasisai.util.CameraFrameUtils
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
@@ -32,18 +28,11 @@ fun BarcodeCameraPreview(
     onBarcodeDetected: (String) -> Unit,
     modifier: Modifier = Modifier,
     barcodeScanEnabled: Boolean = enabled,
-    ticketScanEnabled: Boolean = false,
-    ticketBuffer: TicketCameraBuffer? = null,
-    onTicketFrame: ((android.graphics.Bitmap, Int) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val onBarcode by rememberUpdatedState(onBarcodeDetected)
     val scanActive by rememberUpdatedState(barcodeScanEnabled)
-    val ticketActive by rememberUpdatedState(ticketScanEnabled)
-    val buffer by rememberUpdatedState(ticketBuffer)
-    val onTicket by rememberUpdatedState(onTicketFrame)
-    var lastTicketFrameMs by remember { mutableLongStateOf(0L) }
 
     val previewView = remember {
         PreviewView(context).apply {
@@ -51,7 +40,6 @@ fun BarcodeCameraPreview(
             implementationMode = PreviewView.ImplementationMode.COMPATIBLE
         }
     }
-    // Stable executor across Smart ↔ Ticket rebinding — only shut down when composable leaves.
     val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
 
     DisposableEffect(Unit) {
@@ -63,7 +51,7 @@ fun BarcodeCameraPreview(
         modifier = modifier,
     )
 
-    DisposableEffect(enabled, lifecycleOwner, ticketActive) {
+    DisposableEffect(enabled, lifecycleOwner) {
         if (!enabled) {
             return@DisposableEffect onDispose { }
         }
@@ -72,9 +60,7 @@ fun BarcodeCameraPreview(
         val disposed = AtomicBoolean(false)
         val mainExecutor = ContextCompat.getMainExecutor(context)
         val future = ProcessCameraProvider.getInstance(context)
-        val highQualityTicket = ticketActive || ticketBuffer != null
 
-        // Fresh ML Kit client per camera bind — never reuse a closed scanner after tab switch.
         val barcodeScanner = BarcodeScanning.getClient(
             com.google.mlkit.vision.barcode.BarcodeScannerOptions.Builder()
                 .setBarcodeFormats(
@@ -95,46 +81,14 @@ fun BarcodeCameraPreview(
                 val provider = runCatching { future.get() }.getOrNull() ?: return@addListener
                 boundProvider = provider
 
-                val resolutionSelector = if (highQualityTicket) {
-                    CameraFrameUtils.highResolutionSelector()
-                } else {
-                    CameraFrameUtils.standardResolutionSelector()
-                }
-
-                val preview = Preview.Builder()
-                    .setResolutionSelector(resolutionSelector)
-                    .build()
+                val preview = Preview.Builder().build()
                 preview.setSurfaceProvider(previewView.surfaceProvider)
 
                 val analysis = ImageAnalysis.Builder()
-                    .setResolutionSelector(resolutionSelector)
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                     .build()
 
-                val cameraSelector = if (highQualityTicket) {
-                    CameraFrameUtils.bestBackCameraSelector(provider)
-                } else {
-                    CameraSelector.DEFAULT_BACK_CAMERA
-                }
-
                 analysis.setAnalyzer(cameraExecutor) { imageProxy ->
-                    val rotation = imageProxy.imageInfo.rotationDegrees
-                    if (ticketActive) {
-                        val now = System.currentTimeMillis()
-                        if (now - lastTicketFrameMs >= TICKET_BUFFER_INTERVAL_MS) {
-                            lastTicketFrameMs = now
-                            CameraFrameUtils.imageProxyToBitmap(imageProxy, highQuality = true)?.let { bitmap ->
-                                when {
-                                    buffer != null -> buffer!!.offer(bitmap, rotation)
-                                    onTicket != null -> {
-                                        val callback = onTicket
-                                        mainExecutor.execute { callback?.invoke(bitmap, rotation) }
-                                    }
-                                    else -> bitmap.recycle()
-                                }
-                            }
-                        }
-                    }
                     if (scanActive) {
                         scanBarcodes(barcodeScanner, imageProxy) { value ->
                             mainExecutor.execute { onBarcode(value) }
@@ -148,7 +102,7 @@ fun BarcodeCameraPreview(
                     provider.unbindAll()
                     provider.bindToLifecycle(
                         lifecycleOwner,
-                        cameraSelector,
+                        CameraSelector.DEFAULT_BACK_CAMERA,
                         preview,
                         analysis,
                     )
@@ -185,5 +139,3 @@ private fun scanBarcodes(
         }
         .addOnCompleteListener { imageProxy.close() }
 }
-
-private const val TICKET_BUFFER_INTERVAL_MS = 150L

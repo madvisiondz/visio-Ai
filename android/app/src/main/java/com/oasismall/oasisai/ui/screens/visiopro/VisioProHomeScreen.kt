@@ -11,6 +11,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Brush
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
@@ -36,6 +38,7 @@ fun VisioProHomeScreen(
     onOpenCategory: (VisioProCategory) -> Unit,
     onOpenDesigner: () -> Unit,
     categoryCounts: Map<VisioProCategory, Int> = emptyMap(),
+    mediaInstalled: Boolean = true,
     syncMessage: String? = null,
     onDismissSyncMessage: () -> Unit = {},
 ) {
@@ -69,6 +72,32 @@ fun VisioProHomeScreen(
                 .padding(padding),
             contentPadding = PaddingValues(vertical = 8.dp),
         ) {
+            if (!mediaInstalled) {
+                item {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        ),
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(
+                                "Product images not installed",
+                                fontWeight = FontWeight.SemiBold,
+                                style = MaterialTheme.typography.titleSmall,
+                            )
+                            Text(
+                                "VisioPRO preset photos are a one-time ~100 MB pack. " +
+                                    "Copy VisioPRO-media.zip to the phone, then Settings → Install VisioPRO images.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            )
+                        }
+                    }
+                }
+            }
             item {
                 ListItem(
                     modifier = Modifier.clickable { onOpenDesigner() },

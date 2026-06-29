@@ -35,9 +35,6 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.oasismall.oasisai.data.db.dao.ArticleWithImage
 import com.oasismall.oasisai.data.repository.SubBarcodeInfo
-import com.oasismall.oasisai.domain.paray.ParayTicketAssessment
-import com.oasismall.oasisai.domain.paray.ParayTicketMatchTier
-import com.oasismall.oasisai.domain.paray.ParayTicketStatus
 import com.oasismall.oasisai.util.PriceFormatter
 import com.oasismall.oasisai.util.hasAppGalleryImage
 import java.io.File
@@ -66,9 +63,6 @@ data class ArticlePanelData(
     val imageStatus: String? = null,
     val isLocked: Boolean = false,
     val subBcMode: Boolean = false,
-    val ticketVerifyMode: Boolean = false,
-    val ticketAssessment: ParayTicketAssessment? = null,
-    val ticketMatchTier: ParayTicketMatchTier? = null,
 ) {
     val hasShareablePng: Boolean
         get() = !imagePath.isNullOrBlank() && File(imagePath).exists()
@@ -125,7 +119,6 @@ fun ArticleActionPanel(
     onAddSubBarcodeBatchShoot: (() -> Unit)? = null,
     onAssignPngImage: (() -> Unit)? = null,
     onRemoveSubBarcode: ((String) -> Unit)? = null,
-    onMarkTicketVerified: (() -> Unit)? = null,
     onOpenDetail: (() -> Unit)? = null,
     onRemoveBackground: (() -> Unit)? = null,
 ) {
@@ -164,7 +157,7 @@ fun ArticleActionPanel(
             else -> "Not in catalog — lock or link to existing article"
         }
         Text(designationLabel, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-        ArticleRayonLine(rayon = data.rayon, prominent = data.ticketVerifyMode || !data.rayon.isNullOrBlank())
+        ArticleRayonLine(rayon = data.rayon, prominent = !data.rayon.isNullOrBlank())
         Text("Barcode: ${data.barcode}", style = MaterialTheme.typography.bodyMedium)
         data.codeart?.takeIf { it.isNotBlank() }?.let {
             Text("Article code: $it", style = MaterialTheme.typography.bodySmall)
@@ -195,13 +188,6 @@ fun ArticleActionPanel(
                 "Last ticket price: ${PriceFormatter.format(printed)}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        if (data.ticketVerifyMode && data.ticketAssessment != null) {
-            TicketVerifyBanner(
-                assessment = data.ticketAssessment,
-                matchTier = data.ticketMatchTier,
             )
         }
 
@@ -275,7 +261,7 @@ fun ArticleActionPanel(
                 onLock?.let { lock ->
                     Button(onClick = lock, modifier = Modifier.fillMaxWidth()) {
                         androidx.compose.material3.Icon(Icons.Default.Lock, contentDescription = null)
-                        Text(if (data.inGestiumCatalog) " Lock this barcode" else " Lock — ask PARAY")
+                        Text(if (data.inGestiumCatalog) " Lock this barcode" else " Lock barcode")
                     }
                 }
             }
@@ -358,29 +344,6 @@ fun ArticleActionPanel(
                     Text("Remove background (offline)")
                 }
             }
-            if (data.ticketVerifyMode && data.ticketAssessment != null) {
-                onMarkTicketVerified?.let { verify ->
-                    when (data.ticketAssessment.status) {
-                        ParayTicketStatus.MATCH, ParayTicketStatus.NEVER_PRINTED -> {
-                            OutlinedButton(onClick = verify, modifier = Modifier.fillMaxWidth()) {
-                                Text("Shelf price matches catalog")
-                            }
-                        }
-                        ParayTicketStatus.STALE -> {
-                            OutlinedButton(onClick = verify, modifier = Modifier.fillMaxWidth()) {
-                                Text("I replaced the shelf ticket")
-                            }
-                        }
-                        ParayTicketStatus.NOT_IN_CATALOG -> Unit
-                    }
-                }
-            } else if (data.needsTicketUpdate) {
-                onMarkTicketVerified?.let { verify ->
-                    OutlinedButton(onClick = verify, modifier = Modifier.fillMaxWidth()) {
-                        Text("Mark ticket verified on shelf")
-                    }
-                }
-            }
             onOpenDetail?.let { detail ->
                 OutlinedButton(onClick = detail, modifier = Modifier.fillMaxWidth()) {
                     Text("Open article detail")
@@ -409,48 +372,3 @@ fun formatLastPrintedLabel(printedAt: Long?): String {
     val fmt = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.FRANCE)
     return "Last printed: ${fmt.format(Date(printedAt))}"
 }
-
-@Composable
-fun TicketVerifyBanner(
-    assessment: ParayTicketAssessment,
-    matchTier: ParayTicketMatchTier? = null,
-) {
-    val (container, onContainer) = when (assessment.status) {
-        ParayTicketStatus.MATCH -> MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.onPrimaryContainer
-        ParayTicketStatus.STALE -> MaterialTheme.colorScheme.errorContainer to MaterialTheme.colorScheme.onErrorContainer
-        ParayTicketStatus.NEVER_PRINTED -> MaterialTheme.colorScheme.secondaryContainer to MaterialTheme.colorScheme.onSecondaryContainer
-        ParayTicketStatus.NOT_IN_CATALOG -> MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.onSurfaceVariant
-    }
-    val tierLabel = matchTier?.marketingLabel
-    val title = when (assessment.status) {
-        ParayTicketStatus.MATCH -> tierLabel ?: assessment.matchProbability?.let { "PARAY — ticket OK (${(it * 100).toInt()}%)" } ?: "PARAY — ticket OK"
-        ParayTicketStatus.STALE -> tierLabel?.let { "$it — replace ticket" }
-            ?: assessment.matchProbability?.let { "PARAY — replace ticket (${(it * 100).toInt()}% match)" }
-            ?: "PARAY — replace ticket"
-        ParayTicketStatus.NEVER_PRINTED -> tierLabel ?: assessment.matchProbability?.let { "PARAY — predicted article (${(it * 100).toInt()}%)" }
-            ?: "PARAY — no print record"
-        ParayTicketStatus.NOT_IN_CATALOG -> "PARAY — no match"
-    }
-    Surface(color = container, shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(title, fontWeight = FontWeight.SemiBold, color = onContainer)
-            assessment.ocrDesignation?.takeIf { it.isNotBlank() }?.let { ocr ->
-                Text(
-                    "Read on ticket: $ocr",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = onContainer,
-                )
-            }
-            assessment.fusion?.let { fusion ->
-                Text(
-                    "Match: text ${pctLabel(fusion.designationScore)} · price ${pctLabel(fusion.priceScore)} · PNG ${pctLabel(fusion.imageScore)}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = onContainer,
-                )
-            }
-            Text(assessment.message, style = MaterialTheme.typography.bodyMedium, color = onContainer)
-        }
-    }
-}
-
-private fun pctLabel(score: Float): String = "${(score * 100f).toInt()}%"

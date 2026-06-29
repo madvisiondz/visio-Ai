@@ -55,10 +55,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import com.oasismall.oasisai.OasisApp
 import com.oasismall.oasisai.BuildConfig
 import com.oasismall.oasisai.domain.visio.PhotoroomStorage
-import com.oasismall.oasisai.domain.paray.ParayImportStatus
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -69,28 +67,22 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel,
-    onNavigateImport: () -> Unit,
+    onNavigateImportHistory: () -> Unit = {},
     onNavigateImageManager: () -> Unit,
     onNavigateScanner: () -> Unit,
-    onNavigateGalleryLink: () -> Unit,
     onNavigateBackgroundRemoval: () -> Unit = {},
     onNavigatePhoneSync: () -> Unit = {},
     onNavigateHistory: () -> Unit = {},
     onNavigateReport: () -> Unit = {},
-    onNavigateParayImport: () -> Unit = {},
-    onNavigateParayHome: () -> Unit = {},
-    onNavigateParayLearnSettings: () -> Unit = {},
     onNavigateVisioProSettings: () -> Unit = {},
     onNavigateImportantRayons: () -> Unit = {},
 ) {
     val context = LocalContext.current
-    val app = context.applicationContext as OasisApp
     val overview by viewModel.overview.collectAsStateWithLifecycle()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val photoroomFolderLabel by viewModel.photoroomFolderLabel.collectAsStateWithLifecycle()
     val photoroomCustomFolder by viewModel.photoroomCustomFolder.collectAsStateWithLifecycle()
     val backupEncryptionEnabled by viewModel.backupEncryptionEnabled.collectAsStateWithLifecycle()
-    val parayImport by app.parayImportManager.state.collectAsStateWithLifecycle()
     var backupPassword by remember { mutableStateOf("") }
 
     LaunchedEffect(Unit) {
@@ -123,13 +115,10 @@ fun SettingsScreen(
             viewModel.setPhotoroomFolder(context, uri)
         }
     }
-    val parayFingerprintPicker = rememberLauncherForActivityResult(
+    val csvPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument(),
     ) { uri ->
-        if (uri != null) {
-            app.parayImportManager.enqueue(uri)
-            onNavigateParayImport()
-        }
+        if (uri != null) viewModel.importGestiumCsv(context, uri)
     }
     val backupImportPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument(),
@@ -151,6 +140,11 @@ fun SettingsScreen(
     ) { uri ->
         if (uri != null) viewModel.importVisioProBundle(context, uri)
     }
+    val visioProMediaPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) viewModel.importVisioProMedia(context, uri)
+    }
 
     fun defaultBackupZipName(): String {
         val stamp = java.text.SimpleDateFormat("yyyy-MM-dd_HHmm", java.util.Locale.US)
@@ -167,9 +161,10 @@ fun SettingsScreen(
     var showPurgeConfirm by remember { mutableStateOf(false) }
     var showImportConfirm by remember { mutableStateOf(false) }
 
-    val busy = uiState.isLoadingImages || uiState.isReindexing || uiState.isLoadingSample ||
+    val busy = uiState.isLoadingImages || uiState.isReindexing || uiState.isImportingCsv ||
         uiState.isExportingPngs || uiState.isPurgingCatalog || uiState.isExportingBackup ||
-        uiState.isImportingBackup || uiState.isExportingVisioPro || uiState.isImportingVisioPro || uiState.isRestoringSubBarcodeFlavors
+        uiState.isImportingBackup || uiState.isExportingVisioPro || uiState.isImportingVisioPro ||
+        uiState.isImportingVisioProMedia || uiState.isRestoringSubBarcodeFlavors
 
     Scaffold(topBar = {
         TopAppBar(
@@ -260,6 +255,17 @@ fun SettingsScreen(
             item { SectionTitle("VisioPRO") }
             item {
                 SettingsRow(
+                    title = "Install VisioPRO images",
+                    subtitle = "One-time pack (~100 MB) — VisioPRO-media.zip from your PC",
+                    icon = Icons.Default.Image,
+                    enabled = !busy,
+                    onClick = {
+                        visioProMediaPicker.launch(arrayOf("application/zip", "application/octet-stream", "*/*"))
+                    },
+                )
+            }
+            item {
+                SettingsRow(
                     title = "Listes VisioPRO",
                     subtitle = "Articles par carte · Fruits / Légumes depuis « Fruits et Légumes », ordre d'affichage",
                     icon = Icons.Default.Storefront,
@@ -273,55 +279,16 @@ fun SettingsScreen(
                     title = "Import Gestium CSV",
                     subtitle = "Articles database from ERP export (designation + barcode)",
                     icon = Icons.Default.CloudUpload,
-                    onClick = onNavigateImport,
-                )
-            }
-            item {
-                SettingsRow(
-                    title = "Load sample data",
-                    subtitle = "15 demo articles for testing without a real CSV",
-                    icon = Icons.Default.Storage,
-                    onClick = { viewModel.loadSampleData(context) },
-                    trailing = {
-                        if (uiState.isLoadingSample) CircularProgressIndicator()
-                    },
-                )
-            }
-
-            item { SectionTitle("PARAY") }
-            item {
-                SettingsRow(
-                    title = "PARAY home",
-                    subtitle = "PARAY's own space — memory folder, neural stats, links to Oasis work",
-                    icon = Icons.Default.AutoFixHigh,
                     enabled = !busy,
-                    onClick = onNavigateParayHome,
+                    onClick = { csvPicker.launch(arrayOf("text/*", "text/csv", "application/vnd.ms-excel")) },
                 )
             }
             item {
                 SettingsRow(
-                    title = "Import PARAY fingerprints",
-                    subtitle = "Opens neural load screen — runs in background even if screen is off",
-                    icon = Icons.Default.AutoFixHigh,
-                    enabled = !busy,
-                    onClick = {
-                        if (parayImport.status == ParayImportStatus.Running ||
-                            parayImport.status == ParayImportStatus.Complete
-                        ) {
-                            onNavigateParayImport()
-                        } else {
-                            parayFingerprintPicker.launch(arrayOf("application/json", "text/*", "*/*"))
-                        }
-                    },
-                )
-            }
-            item {
-                SettingsRow(
-                    title = "PARAY Learn settings",
-                    subtitle = "Front confirmation and side/back capture thresholds",
-                    icon = Icons.Default.Tune,
-                    enabled = !busy,
-                    onClick = onNavigateParayLearnSettings,
+                    title = "Import history",
+                    subtitle = "Past CSV imports and per-article change log",
+                    icon = Icons.Default.History,
+                    onClick = onNavigateImportHistory,
                 )
             }
 
@@ -395,14 +362,6 @@ fun SettingsScreen(
                     onClick = onNavigateImageManager,
                 )
             }
-            item {
-                SettingsRow(
-                    title = "Link images from gallery",
-                    subtitle = "Select ready PNGs, scan barcode, then name/link them",
-                    icon = Icons.Default.Image,
-                    onClick = onNavigateGalleryLink,
-                )
-            }
 
             item { SectionTitle("Device transfer") }
             item {
@@ -444,9 +403,9 @@ fun SettingsScreen(
                 SettingsRow(
                     title = "Export full backup (ZIP)",
                     subtitle = if (backupEncryptionEnabled) {
-                        "Encrypted export — catalog, carts, PNGs, VisioPRO, PARAY, Design"
+                        "Encrypted export — catalog, carts, PNGs, VisioPRO, Design"
                     } else {
-                        "Choose where to save — catalog, carts, PNGs, VisioPRO, PARAY, Design (not kept in app cache)"
+                        "Choose where to save — catalog, carts, PNGs, VisioPRO, Design (not kept in app cache)"
                     },
                     icon = Icons.Default.CloudUpload,
                     enabled = !busy,

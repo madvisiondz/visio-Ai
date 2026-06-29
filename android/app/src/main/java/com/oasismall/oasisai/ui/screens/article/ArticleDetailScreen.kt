@@ -110,7 +110,6 @@ fun ArticleDetailScreen(
                     onAddToShoot = viewModel::addToPhotoshootCart,
                     onAddToDesign = viewModel::addToDesignCart,
                     onRemoveBackground = { onRemoveBackground(articleId) },
-                    onMarkTicketVerified = viewModel::markTicketVerified,
                     onRemoveSubBarcode = viewModel::removeSubBarcode,
                 )
             }

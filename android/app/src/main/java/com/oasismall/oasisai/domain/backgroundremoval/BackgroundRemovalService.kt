@@ -26,8 +26,7 @@ class BackgroundRemovalService(private val context: Context) {
     val workDir: File
         get() = File(context.filesDir, "bg_removal_work").also { it.mkdirs() }
 
-    fun isModelReady(): Boolean =
-        OnnxU2NetSegmenter.isModelPresent(context) || TfliteU2NetSegmenter.isModelPresent(context)
+    fun isModelReady(): Boolean = OnnxU2NetSegmenter.isModelPresent(context)
 
     suspend fun removeBackground(
         inputImage: File,
@@ -140,12 +139,12 @@ class BackgroundRemovalService(private val context: Context) {
         return BitmapFactory.decodeFile(file.absolutePath, opts)
     }
 
-    private fun createSegmenter(context: Context): SaliencySegmenter =
-        when {
-            OnnxU2NetSegmenter.isModelPresent(context) -> OnnxU2NetSegmenter(context)
-            TfliteU2NetSegmenter.isModelPresent(context) -> TfliteU2NetSegmenter(context)
-            else -> error("No segmentation model in assets")
+    private fun createSegmenter(context: Context): SaliencySegmenter {
+        if (!OnnxU2NetSegmenter.isModelPresent(context)) {
+            error("No segmentation model in assets")
         }
+        return OnnxU2NetSegmenter(context)
+    }
 
     private fun fail(original: File, message: String) = BackgroundRemovalResult(
         originalPath = original.absolutePath,

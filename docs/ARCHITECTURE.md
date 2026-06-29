@@ -89,13 +89,13 @@ Shelf labels: **Design** screen → `ShelfA4Renderer` → landscape A4 JPEG (12-
 
 **PSD cloning (in progress):** drop `.psd` in `templates/psd-inbox/` → `scripts/INSPECT-PSD.ps1` → JSON specs in `templates/psd-specs/` → map to Kotlin renderers. See [`docs/PSD_TEMPLATES.md`](PSD_TEMPLATES.md).
 
-**VisioPRO (v2.6.x):** in-app module at `domain/visiopro/` + `ui/screens/visiopro/` — preset catalog, card renderer, JSON price memory; **first bottom-nav tab** (`SwipeableBottomNavBar` — custom fixed-width scroll row, not Material3 `NavigationBarItem` in a `Row`). **v2.12.1:** `VisioProCatalogService.syncRayonPoolsAfterCsvImport()` reloads full Gestium rayon pools after every CSV import; list editors read live pool minus enabled selection.
+**VisioPRO (v2.6.x):** in-app module at `domain/visiopro/` + `ui/screens/visiopro/` — preset catalog, card renderer, JSON price memory; **first bottom-nav tab**. **v2.37.0:** preset product PNGs (~100 MB) **not in APK** — sideload `VisioPRO-media.zip` via Settings → `VisioProMediaStore` (`filesDir/visiopro_media/`); layout JSON stays in assets.
 
 Phone-to-phone PNG sync: **Phone sync** (hotspot LAN, port 8776) — see `docs/PHONE_SYNC.md`.
 
 **Architecture diagrams:** [`docs/BLOCK_DIAGRAM.html`](BLOCK_DIAGRAM.html) (A3 portrait) · [`docs/BLOCK_DIAGRAM_A4_LANDSCAPE.html`](BLOCK_DIAGRAM_A4_LANDSCAPE.html) (A4 landscape) · [`docs/FEATURES_API_A4.html`](FEATURES_API_A4.html) (features × APIs, A4 landscape) · [`docs/INVESTOR_PARAY_CLOUD.html`](INVESTOR_PARAY_CLOUD.html) / [`FR`](INVESTOR_PARAY_CLOUD_FR.html) (investor brief, PARAY cloud).
 
-- **AGENT** tab: **Smart** (PARAY + catalog + SUB-BC), **Ticket** (PARAY Vision hold-to-snap + fuzzy fusion + match tiers), or **Bulk** (barcode-only mall captures → `bulk_images/` + `bulk_captures`).
+- **AGENT** tab (**v2.36+ Smart-only**): barcode scan → lock → share/design/shoot PNG; `AgentSessionStore` for lock persist; suffix picker links via `linkAlternateBarcode`; SUB-BC. (Ticket/Bulk modes removed from CheckShoot UI.)
 - **Article cards**: all list/detail panels show **Rayon** (`ArticleRayonLine`) for mall location when printing or verifying tickets.
 - **PARAY Ticket** (v2.30.0): `ParayTicketReader` + `ParayTicketFuzzyMatcher` + `ParayTicketFrameQuality` + `ParayTicketSnapStabilizer` — ring buffer, recovery pass, tiers, anti-flip; `ParayTicketAdvisor`; `ticket_events.jsonl`.
 - **PARAY home** (`paray_home/`): memory (learn/visual), **observer**, **knowledge**, **workflows**, **recognition**, **fusion** (PKP lineage, v2.22.0), sessions, logs.

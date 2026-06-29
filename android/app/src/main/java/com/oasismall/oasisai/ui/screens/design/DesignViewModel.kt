@@ -1,6 +1,5 @@
 package com.oasismall.oasisai.ui.screens.design
 
-import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.oasismall.oasisai.data.db.dao.PreselectionWithArticle
@@ -11,7 +10,7 @@ import com.oasismall.oasisai.data.repository.OasisRepository
 import com.oasismall.oasisai.domain.design.DesignBatchItemUi
 import com.oasismall.oasisai.domain.design.DesignCartExpand
 import com.oasismall.oasisai.domain.design.ShelfA4Renderer
-import com.oasismall.oasisai.domain.paray.ParayAgent
+import com.oasismall.oasisai.domain.layoutagent.LayoutFitAgent
 import com.oasismall.oasisai.util.DesignPriceMessage
 import com.oasismall.oasisai.util.ExportShareHelper
 import kotlinx.coroutines.Dispatchers
@@ -36,8 +35,7 @@ data class DesignBatchDetailState(
 
 class DesignViewModel(
     private val repository: OasisRepository,
-    private val paray: ParayAgent,
-    private val workflowTracker: com.oasismall.oasisai.domain.paray.ParayWorkflowTracker,
+    private val layoutFitAgent: LayoutFitAgent,
 ) : ViewModel() {
     val items = repository.observeCart(CartType.DESIGN)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -48,12 +46,9 @@ class DesignViewModel(
     val printHistory = repository.observeDesignShelfPrints(limit = 100)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    val parayLearnedCount = MutableStateFlow(paray.learnedProductCount())
-    val parayName: String get() = paray.name
-
     init {
         viewModelScope.launch {
-            items.collect { queue -> paray.activateDesignSession(queue.size) }
+            items.collect { queue -> layoutFitAgent.activateDesignSession(queue.size) }
         }
     }
 
@@ -112,7 +107,7 @@ class DesignViewModel(
         }
     }
 
-    fun sendCartInfo(context: Context) {
+    fun sendCartInfo(context: android.content.Context) {
         val cart = items.value
         if (cart.isEmpty()) {
             _message.value = "File d'impression vide."
@@ -250,7 +245,7 @@ class DesignViewModel(
         }
     }
 
-    fun reprintFromBatchDetail(context: Context) {
+    fun reprintFromBatchDetail(context: android.content.Context) {
         val active = _batchDetail.value.items.filter { !it.excludedFromReprint }
         if (active.isEmpty()) {
             _message.value = "Sélectionnez au moins un article."
@@ -266,7 +261,7 @@ class DesignViewModel(
         )
     }
 
-    fun shareBatchExportFile(context: Context) {
+    fun shareBatchExportFile(context: android.content.Context) {
         val path = _batchDetail.value.batch?.exportPath ?: _readyJpegPath.value
         if (path.isNullOrBlank()) {
             _message.value = "Fichier introuvable."
@@ -289,7 +284,7 @@ class DesignViewModel(
         _batchDetail.value = DesignBatchDetailState(batch, items)
     }
 
-    fun startShelfPrint(context: Context) {
+    fun startShelfPrint(context: android.content.Context) {
         _shelfPageIndex.value = 0
         _readyJpegPath.value = null
         lastAutoSharedPath = null
@@ -301,7 +296,7 @@ class DesignViewModel(
         _readyJpegPath.value = null
     }
 
-    fun printPage(context: Context, pageIndex: Int) {
+    fun printPage(context: android.content.Context, pageIndex: Int) {
         renderAndOpenPrint(context, shareableExpanded(), pageIndex, recordBatch = true)
     }
 
@@ -323,7 +318,7 @@ class DesignViewModel(
             .take(ShelfA4Renderer.CAPACITY)
 
     private fun renderAndOpenPrint(
-        context: Context,
+        context: android.content.Context,
         expanded: List<PreselectionWithArticle>,
         pageIndex: Int,
         recordBatch: Boolean,
@@ -339,7 +334,7 @@ class DesignViewModel(
             runCatching {
                 withContext(Dispatchers.Default) {
                     val dir = File(context.filesDir, "exports").also { it.mkdirs() }
-                    ShelfA4Renderer.renderPage(expanded, pageIndex, dir, paray)
+                    ShelfA4Renderer.renderPage(expanded, pageIndex, dir, layoutFitAgent)
                 }
             }.onSuccess { file ->
                 if (recordBatch) {
@@ -353,15 +348,11 @@ class DesignViewModel(
                     val batchId = repository.recordDesignShelfPrint(pageIndex, file.absolutePath, pagePreselections)
                     if (batchId > 0) {
                         repository.updatePrintBatchStatus(batchId, PrintBatchStatus.PRINTED.name)
-                        workflowTracker.recordFeature(
-                            com.oasismall.oasisai.domain.paray.ParayWorkflowFeature.DESIGN_EXPORT,
-                        )
                     }
                 }
                 _shelfPageIndex.value = pageIndex
                 _readyJpegPath.value = file.absolutePath
                 _step.value = DesignStep.READY_PRINT
-                parayLearnedCount.value = paray.learnedProductCount()
                 _message.value = "Fichier ${file.parentFile?.name}/${file.name}"
                 if (lastAutoSharedPath != file.absolutePath) {
                     ExportShareHelper.shareJpegAsFile(context, file)
@@ -374,7 +365,7 @@ class DesignViewModel(
         }
     }
 
-    fun shareReadyFile(context: Context) {
+    fun shareReadyFile(context: android.content.Context) {
         val path = _readyJpegPath.value ?: return
         val file = File(path)
         if (file.exists()) ExportShareHelper.shareJpegAsFile(context, file)
@@ -416,7 +407,7 @@ class DesignViewModel(
     }
 
     override fun onCleared() {
-        paray.deactivateDesignSession()
+        layoutFitAgent.deactivateDesignSession()
         super.onCleared()
     }
 }

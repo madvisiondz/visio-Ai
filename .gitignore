@@ -1,8 +1,10 @@
 # Build outputs
 VisioAI-debug.apk
 OasisAI-debug.apk
+VisioPRO-media.zip
 *.apk
 *.aab
+android-build/
 
 # Android Gradle
 android/app/build/
@@ -13,6 +15,7 @@ android/local.properties
 android/.idea/
 android/*.iml
 android/app/*.iml
+android/hs_err_pid*.log
 
 # Large / generated / business data
 imports/

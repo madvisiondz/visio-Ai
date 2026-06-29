@@ -9,7 +9,7 @@ import android.graphics.RectF
 import kotlin.math.min
 
 /**
- * On-device layout fitter — used by **PARAY** for shelf ticket placement.
+ * On-device layout fitter — used by **Design** shelf ticket placement.
  */
 class LayoutFitAgent(
     context: Context,

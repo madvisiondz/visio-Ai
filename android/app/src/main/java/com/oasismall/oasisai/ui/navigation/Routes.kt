@@ -5,7 +5,6 @@ import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.ListAlt
-import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Storefront
@@ -27,7 +26,6 @@ sealed class OasisRoute(val route: String) {
     data object WorkHistory : OasisRoute("history")
     data object Report : OasisRoute("report")
     data object Settings : OasisRoute("settings")
-    data object GalleryLink : OasisRoute("gallery_link")
     data object Preselection : OasisRoute("preselection")
     data object Print : OasisRoute("print")
     data object PrintHistory : OasisRoute("print_history")
@@ -75,11 +73,6 @@ sealed class OasisRoute(val route: String) {
     }
     data object PhoneSync : OasisRoute("phone_sync")
     data object Design : OasisRoute("design")
-    data object ParayImport : OasisRoute("paray_import")
-    data object ParayHome : OasisRoute("paray_home")
-    data object ParayMain : OasisRoute("paray")
-    data object ParayLearnSession : OasisRoute("paray_learn_session")
-    data object ParayLearnSettings : OasisRoute("paray_learn_settings")
     data object VisioProHome : OasisRoute("visio_pro_home")
     data object VisioProCategory : OasisRoute("visio_pro/{category}") {
         fun create(category: String) = "visio_pro/$category"
@@ -107,7 +100,6 @@ val bottomNavItems = listOf(
     BottomNavItem(OasisRoute.Home.route, "Articles", Icons.Default.Home),
     BottomNavItem(OasisRoute.PhotoshootCart.route, "To shoot", Icons.Default.CameraAlt),
     BottomNavItem(OasisRoute.CheckShoot.route, "AGENT", Icons.Default.Home, useAgentIcon = true),
-    BottomNavItem(OasisRoute.ParayMain.route, "PARAY", Icons.Default.Psychology),
     BottomNavItem(OasisRoute.BatchTxt.route, "Batch txt", Icons.Default.ListAlt),
     BottomNavItem(OasisRoute.ShareCart.route, "To share", Icons.Default.Share),
     BottomNavItem(OasisRoute.Design.route, "Design", Icons.Default.Brush),

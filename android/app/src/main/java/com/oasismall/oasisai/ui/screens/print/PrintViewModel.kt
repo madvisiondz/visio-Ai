@@ -25,7 +25,6 @@ data class PrintUiState(
 class PrintViewModel(
     private val repository: OasisRepository,
     private val printGenerator: PrintGenerator,
-    private val workflowTracker: com.oasismall.oasisai.domain.paray.ParayWorkflowTracker,
 ) : ViewModel() {
     val templates = repository.observeTemplates()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -62,9 +61,6 @@ class PrintViewModel(
                 promoEnd = if (_uiState.value.isPromo) promoEnd else null,
                 campaignName = _uiState.value.campaignName.ifBlank { null },
             )
-            if (result.success) {
-                workflowTracker.recordFeature(com.oasismall.oasisai.domain.paray.ParayWorkflowFeature.PDF_GENERATION)
-            }
             _uiState.value = _uiState.value.copy(isGenerating = false, lastResult = result)
         }
     }

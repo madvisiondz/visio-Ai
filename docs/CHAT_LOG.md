@@ -1287,3 +1287,21 @@
 **User:** Investor HTML — remove OCR ticket; replace with PARAY fingerprint visual ID to find articles.
 
 **Assistant:** Both investor briefs updated: hero, “80% fixed” block, and traction list now pitch PARAY empreintes visuelles / fingerprint matching (point at pack → find article) instead of ticket OCR.
+
+## Session 155 — 2026-06-29
+
+**User:** Rewrite CheckShoot ViewModel + Screen for Smart-only AGENT; delete Ticket/Bulk/PARAY UI; use `AgentSessionStore`.
+
+**Assistant:** Replaced `CheckShootViewModel.kt` (~480 lines) and `CheckShootScreen.kt`; removed 9 ticket/bulk/paray files + `AgentCaptureMode.kt`; updated factory and `BarcodeCameraPreview`; compile OK.
+
+## Session 156 — 2026-06-29
+
+**User:** Complete Visio Ai PARAY removal — fix all compile errors; direct CSV import from Settings; CsvImportBanner; Design `LayoutFitAgent`; v2.36.0 (341).
+
+**Assistant:** Removed remaining PARAY wiring from `OasisApp`, nav, ViewModels, Settings, Import, Design, backup manifest; `assembleDebug` **BUILD SUCCESSFUL**.
+
+## Session 157 — 2026-06-29
+
+**User:** Testing on real phone; apply APK size recommendations — app must stay minimal.
+
+**Assistant:** **v2.37.0 (342)** — arm64-only; ONNX-only cutout (dropped TFLite + ML Kit OCR); VisioPRO product images moved to `packs/visiopro-media/` + `BUILD-VISIOPRO-MEDIA.ps1`; Settings **Install VisioPRO images**; VisioPRO home banner when pack missing. APK **51.6 MB** (`VisioAI-debug.apk`, down from ~276 MB).
